@@ -1,4 +1,4 @@
-{
+{ 
   "extends": "astro/tsconfigs/strict",
   "compilerOptions": {
     // Enable strict type checking for better code quality
