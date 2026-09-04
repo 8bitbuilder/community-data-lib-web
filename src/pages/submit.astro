@@ -159,15 +159,49 @@ const submitted = Astro.url.searchParams.get('submitted') === 'true';
           <legend>Classification</legend>
 
           <div class="field">
-            <label for="data_themes">Data Themes</label>
+            <label for="data-themes-search">Data Themes</label>
             <input
               type="text"
-              id="data_themes"
-              name="data_themes"
-              placeholder="e.g., health, transportation, education"
+              id="data-themes-search"
+              placeholder="Search themes…"
               autocomplete="off"
             />
-            <span class="field-hint">Comma-separated themes that describe the data domain.</span>
+            <!--
+              Mirrors the categories in backend/pythonscripts/tagdataset.py's
+              TAG_RULES. The two projects are separate repos with no shared
+              taxonomy file, so this list must be updated by hand if the
+              backend categories change.
+            -->
+            <div class="checkbox-group checkbox-group--scroll" id="data-themes-list">
+              {[
+                'Agriculture',
+                'Business & Economy',
+                'Children & Families',
+                'Elections & Politics',
+                'PreK-12 Education',
+                'Energy & Environment',
+                'Government Administration',
+                'Health & Social Services',
+                'Higher Education',
+                'Historic Preservation',
+                'Housing & Buildings',
+                'Labor & Workforce Development',
+                'Law & Public Safety',
+                'Parks & Recreation',
+                'Population Data',
+                'Public Utilities',
+                'Restaurant and Food Service',
+                'Transportation',
+                'Wildlife & Nature',
+              ].map((theme) => (
+                <label class="checkbox-label" data-theme-label>
+                  <input type="checkbox" name="data_themes" value={theme} />
+                  <span class="checkbox-box" aria-hidden="true"></span>
+                  {theme}
+                </label>
+              ))}
+            </div>
+            <span class="field-hint">Check all themes that describe the data domain.</span>
           </div>
 
           <!-- <div class="field">
@@ -504,6 +538,18 @@ const submitted = Astro.url.searchParams.get('submitted') === 'true';
     gap: var(--space-4);
   }
 
+  .checkbox-group--scroll {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--space-2) var(--space-4);
+    max-height: 220px;
+    overflow-y: auto;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-raised);
+  }
+
   .checkbox-label,
   .toggle-label {
     display: flex;
@@ -692,3 +738,16 @@ const submitted = Astro.url.searchParams.get('submitted') === 'true';
     overflow: hidden;
   }
 </style>
+
+<script>
+  const searchInput = document.getElementById('data-themes-search') as HTMLInputElement | null;
+  const themeLabels = document.querySelectorAll<HTMLLabelElement>('#data-themes-list [data-theme-label]');
+
+  searchInput?.addEventListener('input', () => {
+    const query = searchInput.value.trim().toLowerCase();
+    themeLabels.forEach((label) => {
+      const text = label.textContent?.toLowerCase() ?? '';
+      label.style.display = query && !text.includes(query) ? 'none' : '';
+    });
+  });
+</script>
