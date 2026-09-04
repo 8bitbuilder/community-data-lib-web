@@ -140,7 +140,7 @@ export async function buildPreview(source, options = {}) {
 const TEMPORAL_COLUMNS = ["YEAR", "DATE", "PERIOD", "TIMEPERIOD_NAME"];
 
 export async function buildChart(source, options = {}) {
-  const { variable, state, county, limit = 50, xVariable } = options;
+  const { variable, state, county, limit = 50, xVariable, plotType = "bar" } = options;
   const { headers, rows } = await getSourceTable(source);
 
   const focalVariable = variable || defaultFocalVariable(source, headers);
@@ -149,6 +149,28 @@ export async function buildChart(source, options = {}) {
   }
 
   const filtered = filterRows(headers, rows, { state, county });
+
+  if (plotType === "scatter") {
+    if (!xVariable || !headers.includes(xVariable)) {
+      throw new Error(`X variable not found: ${xVariable ?? "none"}`);
+    }
+    const points = [];
+    for (const row of filtered) {
+      const obj = rowToObject(headers, row);
+      const x = parseNumeric(obj[xVariable]);
+      const y = parseNumeric(obj[focalVariable]);
+      if (x === null || y === null) continue;
+      points.push({ x, y });
+      if (points.length >= limit) break;
+    }
+    return {
+      variable: focalVariable,
+      label: focalVariable.replace(/_/g, " "),
+      xVariable,
+      xLabel: xVariable.replace(/_/g, " "),
+      points,
+    };
+  }
 
   // Determine X-axis column
   let xCol;

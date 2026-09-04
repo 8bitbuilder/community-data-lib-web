@@ -111,8 +111,16 @@ const catalogHref = withBasePath('/complete-catalog');
                 <select id="x-variable-filter"></select>
               </label>
               <label class="filter-control">
-                <span>Variable</span>
+                <span>Y Variable</span>
                 <select id="variable-filter"></select>
+              </label>
+              <label class="filter-control">
+                <span>Plot Type</span>
+                <select id="plot-type-filter">
+                  <option value="bar">Bar</option>
+                  <option value="line">Line</option>
+                  <option value="scatter">Scatter</option>
+                </select>
               </label>
             </div>
           </div>
@@ -180,15 +188,27 @@ const catalogHref = withBasePath('/complete-catalog');
     const countyFilter = document.getElementById('county-filter') as HTMLSelectElement;
     const variableFilter = document.getElementById('variable-filter') as HTMLSelectElement;
     const xVariableFilter = document.getElementById('x-variable-filter') as HTMLSelectElement;
+    const plotTypeFilter = document.getElementById('plot-type-filter') as HTMLSelectElement;
     const stateFilterWrap = document.getElementById('state-filter-wrap');
     const countyFilterWrap = document.getElementById('county-filter-wrap');
 
     let chartInstance = null;
+    // Full X-variable option list (value + numeric flag), captured once per source
+    // so the dropdown can be narrowed to numeric-only columns when Plot Type is Scatter.
+    let xVariableOptions: { value: string; numeric: boolean }[] = [];
+
+    // In raw-YAML mode (no SQLite DB), the pipeline writes column names as
+    // `variable_names`; only the SQLite import path renames it to `variables`.
+    // The chart backends already fall back to `variable_names` — mirror that here.
+    function getSourceVariables(source): string[] {
+      return source.variables ?? source.variable_names ?? [];
+    }
 
     function pickPreviewColumns(source) {
       const skip = new Set(['SUMLEV', 'REGION', 'DIVISION']);
-      const vars = (source.variables ?? []).filter((v) => !skip.has(v));
-      return (vars.length > 0 ? vars : (source.variables ?? [])).join(',');
+      const allVars = getSourceVariables(source);
+      const vars = allVars.filter((v) => !skip.has(v));
+      return (vars.length > 0 ? vars : allVars).join(',');
     }
 
     function pickFocalVariable(source) {
@@ -197,7 +217,7 @@ const catalogHref = withBasePath('/complete-catalog');
       );
       if (numeric?.name) return numeric.name;
 
-      const vars = source.variables ?? [];
+      const vars = getSourceVariables(source);
       const preferred = vars.find((v) => /estimate|total|value|amount|production|population/i.test(v));
       return preferred ?? vars[vars.length - 1] ?? '';
     }
@@ -259,7 +279,7 @@ const catalogHref = withBasePath('/complete-catalog');
       return String(n);
     }
 
-    function renderChart(chartData) {
+    function renderChart(chartData, plotType: string = 'bar') {
       const container = document.getElementById('focal-chart');
       const Apex = window.ApexCharts;
       if (!container || typeof Apex === 'undefined') return;
@@ -269,12 +289,48 @@ const catalogHref = withBasePath('/complete-catalog');
         chartInstance = null;
       }
 
-      const labels = chartData.series.map((p) => p.label);
-      const values = chartData.series.map((p) => p.value);
+      if (plotType === 'scatter') {
+        const points = (chartData.points ?? []).map((p: { x: number; y: number }) => [p.x, p.y]);
+        chartInstance = new Apex(container, {
+          chart: {
+            type: 'scatter',
+            height: 300,
+            toolbar: { show: false },
+            fontFamily: 'Outfit, sans-serif',
+            zoom: { enabled: true, type: 'xy' },
+          },
+          series: [{ name: chartData.label, data: points }],
+          xaxis: {
+            title: {
+              text: chartData.xLabel ?? chartData.xVariable ?? 'X',
+              style: { fontSize: '11px', color: '#52606D' },
+            },
+            labels: { style: { fontSize: '11px', colors: '#52606D' } },
+            tickAmount: 6,
+          },
+          yaxis: {
+            title: { text: chartData.label, style: { fontSize: '11px', color: '#52606D' } },
+            labels: { style: { colors: '#52606D', fontSize: '11px' } },
+          },
+          colors: ['#155E75'],
+          dataLabels: { enabled: false },
+          grid: {
+            strokeDashArray: 4,
+            borderColor: '#D2DEE6',
+          },
+          tooltip: {
+            theme: 'light',
+            x: { formatter: (v: number) => Number(v).toLocaleString() },
+            y: { formatter: (v: number) => Number(v).toLocaleString() },
+          },
+        });
+        chartInstance.render();
+        return;
+      }
 
-      const isLineChart =
-        chartData.xVariable != null && labels.every((l) => !isNaN(Number(l)));
-      const chartType = isLineChart ? 'line' : 'bar';
+      const labels = (chartData.series ?? []).map((p) => p.label);
+      const values = (chartData.series ?? []).map((p) => p.value);
+      const chartType = plotType === 'line' ? 'line' : 'bar';
 
       chartInstance = new Apex(container, {
         chart: {
@@ -410,6 +466,7 @@ const catalogHref = withBasePath('/complete-catalog');
       const county = countyFilter?.value || undefined;
       const variable = variableFilter?.value || focalVariable;
       const xVariable = xVariableFilter?.value || undefined;
+      const plotType = (plotTypeFilter?.value || 'bar') as 'bar' | 'line' | 'scatter';
 
       setSectionLoading(true, true);
       try {
@@ -420,11 +477,18 @@ const catalogHref = withBasePath('/complete-catalog');
             limit: 25,
             columns: previewColumns || undefined,
           }),
-          fetchChart(sourceId, { state, county, variable, xVariable, limit: 15 }),
+          fetchChart(sourceId, {
+            state,
+            county,
+            variable,
+            xVariable,
+            plotType,
+            limit: plotType === 'scatter' ? 300 : 15,
+          }),
         ]);
 
         renderTable(preview);
-        renderChart(chart);
+        renderChart(chart, plotType);
       } finally {
         setSectionLoading(false, false);
       }
@@ -548,7 +612,7 @@ const catalogHref = withBasePath('/complete-catalog');
         const numericVars =
           source.variable_report
             ?.filter((v) => v.type === 'integer' || v.type === 'float')
-            .map((v) => v.name) ?? source.variables ?? [];
+            .map((v) => v.name) ?? getSourceVariables(source);
 
         const uniqueVars = [...new Set(numericVars.filter(Boolean))];
         const options = uniqueVars.length > 0 ? uniqueVars : [focalVariable].filter(Boolean);
@@ -560,30 +624,27 @@ const catalogHref = withBasePath('/complete-catalog');
           .join('');
       }
 
+      let defaultX = '';
       if (xVariableFilter) {
         const report = source.variable_report ?? [];
-        const allCols = source.variables ?? [];
+        const allCols = getSourceVariables(source);
+        const numericNames = new Set(
+          report.filter((v) => v.type === 'integer' || v.type === 'float').map((v) => v.name),
+        );
         // Non-numeric (label/time) columns first, then numeric
         const nonNumeric = report
-          .filter((v) => v.type !== 'integer' && v.type !== 'float')
+          .filter((v) => !numericNames.has(v.name))
           .map((v) => v.name)
           .filter((n) => allCols.includes(n));
-        const numeric = report
-          .filter((v) => v.type === 'integer' || v.type === 'float')
-          .map((v) => v.name)
-          .filter((n) => allCols.includes(n));
+        const numeric = [...numericNames].filter((n) => allCols.includes(n));
         const ordered = [...new Set([...nonNumeric, ...numeric, ...allCols])];
         const xOptions = ordered.length > 0 ? ordered : allCols;
+        xVariableOptions = xOptions.map((v) => ({ value: v, numeric: numericNames.has(v) }));
         // Auto-detect default X: first temporal column or first column
         const temporalNames = ['YEAR', 'DATE', 'PERIOD', 'TIMEPERIOD_NAME'];
-        const defaultX =
+        defaultX =
           xOptions.find((v) => temporalNames.includes(v.toUpperCase())) ?? xOptions[0] ?? '';
-        xVariableFilter.innerHTML = xOptions
-          .map(
-            (v) =>
-              `<option value="${v}" ${v === defaultX ? 'selected' : ''}>${v.replace(/_/g, ' ')}</option>`,
-          )
-          .join('');
+        renderXVariableOptions('bar', defaultX);
       }
 
       populateReferenceCard(source);
@@ -598,6 +659,28 @@ const catalogHref = withBasePath('/complete-catalog');
       countyFilter?.addEventListener('change', refreshPreviewAndChart);
       variableFilter?.addEventListener('change', refreshPreviewAndChart);
       xVariableFilter?.addEventListener('change', refreshPreviewAndChart);
+      plotTypeFilter?.addEventListener('change', async () => {
+        renderXVariableOptions(plotTypeFilter.value, xVariableFilter?.value);
+        await refreshPreviewAndChart();
+      });
+    }
+
+    // Scatter needs two numeric axes, so its X list is narrowed to numeric columns.
+    // Bar/Line can group by any column. Keeps the current selection when it's still
+    // valid for the new plot type, otherwise falls back to the first option.
+    function renderXVariableOptions(plotType: string, preferredValue: string | undefined) {
+      if (!xVariableFilter) return;
+      const pool =
+        plotType === 'scatter' ? xVariableOptions.filter((o) => o.numeric) : xVariableOptions;
+      const selected = pool.some((o) => o.value === preferredValue)
+        ? preferredValue
+        : (pool[0]?.value ?? '');
+      xVariableFilter.innerHTML = pool
+        .map(
+          (o) =>
+            `<option value="${o.value}" ${o.value === selected ? 'selected' : ''}>${o.value.replace(/_/g, ' ')}</option>`,
+        )
+        .join('');
     }
 
     const urlParams = new URLSearchParams(window.location.search);

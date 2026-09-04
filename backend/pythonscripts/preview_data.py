@@ -174,11 +174,24 @@ def build_preview(source: dict[str, Any], options: dict[str, Any]) -> dict[str, 
     }
 
 
+def _is_numeric_label(value: Any) -> bool:
+    try:
+        float(value)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _to_numeric(series: "pd.Series[Any]") -> "pd.Series[Any]":
+    return pd.to_numeric(series.astype(str).str.replace(",", "", regex=False), errors="coerce")
+
+
 def build_chart(source: dict[str, Any], options: dict[str, Any]) -> dict[str, Any]:
     state = options.get("state")
     county = options.get("county")
-    limit = int(options.get("limit", 50))
     variable = options.get("variable")
+    x_variable = options.get("xVariable")
+    plot_type = options.get("plotType") or "bar"
 
     df = load_dataframe(source)
     filtered = filter_dataframe(df, state, county)
@@ -186,17 +199,54 @@ def build_chart(source: dict[str, Any], options: dict[str, Any]) -> dict[str, An
     if not focal or focal not in filtered.columns:
         raise ValueError(f"Focal variable not found: {focal}")
 
+    y_numeric = _to_numeric(filtered[focal])
+
+    if plot_type == "scatter":
+        limit = int(options.get("limit", 300))
+        if not x_variable or x_variable not in filtered.columns:
+            raise ValueError(f"X variable not found: {x_variable}")
+        x_numeric = _to_numeric(filtered[x_variable])
+        points_df = filtered.assign(_x=x_numeric, _y=y_numeric)
+        points_df = points_df[points_df["_x"].notna() & points_df["_y"].notna()].head(limit)
+        points = [{"x": float(row["_x"]), "y": float(row["_y"])} for _, row in points_df.iterrows()]
+        return {
+            "variable": focal,
+            "label": focal.replace("_", " "),
+            "xVariable": x_variable,
+            "xLabel": x_variable.replace("_", " "),
+            "points": points,
+            "engine": "pandas",
+        }
+
+    limit = int(options.get("limit", 50))
+
+    if x_variable and x_variable in filtered.columns:
+        grouped = filtered.assign(_value=y_numeric, _x=filtered[x_variable].astype(str).str.strip())
+        grouped = grouped[grouped["_value"].notna()]
+        agg = grouped.groupby("_x")["_value"].mean()
+        if len(agg) and all(_is_numeric_label(label) for label in agg.index):
+            agg = agg.sort_index(key=lambda idx: idx.map(float))
+        else:
+            agg = agg.sort_index()
+        agg = agg.head(limit)
+        series = [{"label": label, "value": float(value)} for label, value in agg.items()]
+        return {
+            "variable": focal,
+            "label": focal.replace("_", " "),
+            "xVariable": x_variable,
+            "xLabel": x_variable.replace("_", " "),
+            "series": series,
+            "engine": "pandas",
+        }
+
+    # No X variable given — fall back to ranking rows by Y value using a geo label column.
     label_col = (
         find_column(filtered, GEO_COLUMNS["countyName"])
         or find_column(filtered, GEO_COLUMNS["stateName"])
         or find_column(filtered, GEO_COLUMNS["county"])
         or str(filtered.columns[0])
     )
-
-    numeric = pd.to_numeric(
-        filtered[focal].astype(str).str.replace(",", "", regex=False), errors="coerce"
-    )
-    chart_df = filtered.assign(_value=numeric, _label=filtered[label_col].astype(str).str.strip())
+    chart_df = filtered.assign(_value=y_numeric, _label=filtered[label_col].astype(str).str.strip())
     chart_df = chart_df[chart_df["_value"].notna()].sort_values("_value", ascending=False).head(limit)
 
     series = [
