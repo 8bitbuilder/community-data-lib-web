@@ -31,14 +31,10 @@ function parseNumeric(value) {
   return Number.isFinite(num) ? num : null;
 }
 
-function selectPreviewColumns(source, headers, overrideColumns) {
+function selectPreviewColumns(headers, overrideColumns) {
   if (overrideColumns?.length) {
     return overrideColumns.filter((c) => headers.includes(c));
   }
-
-  const variables = source.variables ?? [];
-  const selected = variables.filter((v) => headers.includes(v));
-  if (selected.length > 0) return selected;
 
   return headers;
 }
@@ -116,7 +112,6 @@ export async function buildPreview(source, options = {}) {
 
   const filtered = filterRows(headers, rows, { state, county });
   const columns = selectPreviewColumns(
-    source,
     headers,
     columnsOverride ? columnsOverride.split(",").map((c) => c.trim()) : null,
   );

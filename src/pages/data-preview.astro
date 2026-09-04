@@ -173,7 +173,6 @@ const catalogHref = withBasePath('/complete-catalog');
     }
 
     let sourceId = getSourceIdFromUrl();
-    let previewColumns = '';
     let focalVariable = '';
     let initialStateFilter = '';
 
@@ -202,13 +201,6 @@ const catalogHref = withBasePath('/complete-catalog');
     // The chart backends already fall back to `variable_names` — mirror that here.
     function getSourceVariables(source): string[] {
       return source.variables ?? source.variable_names ?? [];
-    }
-
-    function pickPreviewColumns(source) {
-      const skip = new Set(['SUMLEV', 'REGION', 'DIVISION']);
-      const allVars = getSourceVariables(source);
-      const vars = allVars.filter((v) => !skip.has(v));
-      return (vars.length > 0 ? vars : allVars).join(',');
     }
 
     function pickFocalVariable(source) {
@@ -475,7 +467,6 @@ const catalogHref = withBasePath('/complete-catalog');
             state,
             county,
             limit: 25,
-            columns: previewColumns || undefined,
           }),
           fetchChart(sourceId, {
             state,
@@ -543,7 +534,6 @@ const catalogHref = withBasePath('/complete-catalog');
         fetchDatasheet(sourceId),
       ]);
 
-      previewColumns = pickPreviewColumns(source);
       focalVariable = pickFocalVariable(source);
       initialStateFilter = pickInitialState(source);
 
@@ -1063,6 +1053,7 @@ const catalogHref = withBasePath('/complete-catalog');
     .chart-panel,
     .table-panel {
       padding: var(--space-6) var(--space-6);
+      min-width: 0;
     }
 
     .chart-header {
@@ -1166,7 +1157,8 @@ const catalogHref = withBasePath('/complete-catalog');
       --grid-template: repeat(auto-fit, minmax(7rem, 1fr));
       display: grid;
       grid-template-columns: var(--grid-template);
-      min-width: min(100%, max-content);
+      width: max-content;
+      min-width: 100%;
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
       overflow: hidden;

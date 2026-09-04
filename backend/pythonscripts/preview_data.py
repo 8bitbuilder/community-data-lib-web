@@ -112,15 +112,11 @@ def filter_dataframe(df: pd.DataFrame, state: str | None, county: str | None) ->
 
 
 def select_preview_columns(
-    source: dict[str, Any], df: pd.DataFrame, columns_override: list[str] | None
+    df: pd.DataFrame, columns_override: list[str] | None
 ) -> list[str]:
     if columns_override:
         return [c for c in columns_override if c in df.columns]
-    variables = source.get("variables") or source.get("variable_names") or []
-    selected = [v for v in variables if v in df.columns]
-    if selected:
-        return selected[:8]
-    return list(df.columns[:8])
+    return list(df.columns)
 
 
 def default_focal_variable(source: dict[str, Any], df: pd.DataFrame) -> str | None:
@@ -158,7 +154,7 @@ def build_preview(source: dict[str, Any], options: dict[str, Any]) -> dict[str, 
 
     df = load_dataframe(source)
     filtered = filter_dataframe(df, state, county)
-    columns = select_preview_columns(source, df, columns_override)
+    columns = select_preview_columns(df, columns_override)
     page = filtered.iloc[offset : offset + limit]
 
     rows = [[cell_value(row[col]) for col in columns] for _, row in page.iterrows()]
