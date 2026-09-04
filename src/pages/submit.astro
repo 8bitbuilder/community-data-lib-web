@@ -4,6 +4,33 @@ import { withBasePath } from '@lib/paths';
 
 // Read search params to detect Netlify Forms success redirect
 const submitted = Astro.url.searchParams.get('submitted') === 'true';
+
+// Mirrors the categories in backend/pythonscripts/tagdataset.py's TAG_RULES.
+// Subcategories are curated, human-readable labels derived from that file's
+// keyword stems (not the raw stems themselves). The two projects are
+// separate repos with no shared taxonomy file, so this must be updated by
+// hand if the backend categories change.
+const THEME_GROUPS = [
+  { category: 'Agriculture', subcategories: ['Farming', 'Crops & Produce', 'Fruits & Vegetables', 'Livestock & Poultry', 'Aquaculture', 'Soil Health', 'Food Distribution', 'Nutrition'] },
+  { category: 'Business & Economy', subcategories: ['Business & Commerce', 'Banking & Financial Services', 'Insurance', 'Licensing & Registration', 'Retail & Storefronts', 'Vendors & Contracts', 'Economic Indicators (GDP, Income, Wages)'] },
+  { category: 'Children & Families', subcategories: ['Child Welfare', 'Foster Care', 'Family Services', 'Parenting', 'Maternal & Infant Health', 'Family Demographics'] },
+  { category: 'Elections & Politics', subcategories: ['Elections & Voting', 'Campaign Finance', 'Lobbying', 'Legislative Activity', 'Elected Representatives'] },
+  { category: 'PreK-12 Education', subcategories: ['Early Learning & Pre-K', 'Elementary School', 'Middle School', 'High School', 'School Attendance', 'School Facilities', 'School Districts', 'Private Schools'] },
+  { category: 'Energy & Environment', subcategories: ['Air Quality & Pollution', 'Emissions', 'Recycling & Waste', 'Water Bodies & Water Quality', 'Flood & Hazard Zones', 'Weather & Climate', 'Conservation & Habitat', 'Sea Level & Coastal', 'Tree Canopy'] },
+  { category: 'Government Administration', subcategories: ['Budget & Spending', 'Contracts & Procurement', 'City Departments & Agencies', 'Civil Service & Employees', 'Pensions & Investments', 'Taxes', 'Financial Reports', 'State & Federal Offices'] },
+  { category: 'Health & Social Services', subcategories: ['Public Health', 'Disease & Outbreaks', 'Hospitals & Medical Care', 'Vaccination & Immunization', 'Substance Use & Overdose', 'Mortality & Vital Records', 'Animal Control & Pest Management', 'Senior & Disability Services', 'Social Services'] },
+  { category: 'Higher Education', subcategories: ['Colleges & Universities', 'Admissions', 'Tuition & Financial Aid', 'Technical & Career Institutions', 'Enrollment'] },
+  { category: 'Historic Preservation', subcategories: ['Historic Sites & Landmarks', 'Heritage Preservation', 'Endangered Structures'] },
+  { category: 'Housing & Buildings', subcategories: ['Building Permits', 'Housing & Dwellings', 'Zoning & Land Use', 'Property & Assessments', 'Code Enforcement & Inspections', 'Rent & Eviction', 'Homelessness', 'Construction & Development'] },
+  { category: 'Labor & Workforce Development', subcategories: ['Employment & Unemployment', 'Workplace Conditions', 'Wages & Compensation', 'Careers & Apprenticeships', 'Pensions'] },
+  { category: 'Law & Public Safety', subcategories: ['Crime & Arrests', 'Police & Law Enforcement', 'Fire Department & Emergency Response', 'Courts & Corrections', 'Traffic & Public Safety Incidents', 'Homeland Security'] },
+  { category: 'Parks & Recreation', subcategories: ['Parks & Trails', 'Recreation Facilities', 'Libraries', 'Public Art & Entertainment', 'Tourism'] },
+  { category: 'Population Data', subcategories: ['Census & Demographics', 'Household Data', 'Poverty', 'Race & Ethnicity', 'Gender'] },
+  { category: 'Public Utilities', subcategories: ['Electric & Gas Utilities', 'Water & Sewer', 'Public Works', 'Waste Collection', 'Broadband & Connectivity', 'Street Infrastructure'] },
+  { category: 'Restaurant and Food Service', subcategories: ['Restaurants & Dining', 'Food Service Licensing', 'Liquor Licenses'] },
+  { category: 'Transportation', subcategories: ['Roads & Highways', 'Public Transit', 'Traffic & Congestion', 'Pedestrian & Bicycle', 'Parking', 'Airports & Aviation', 'Rail'] },
+  { category: 'Wildlife & Nature', subcategories: ['Bird Species & Observation', 'Wildlife & Biodiversity', 'Habitat', 'Flora & Fauna'] },
+];
 ---
 
 <Layout
@@ -166,42 +193,28 @@ const submitted = Astro.url.searchParams.get('submitted') === 'true';
               placeholder="Search themes…"
               autocomplete="off"
             />
-            <!--
-              Mirrors the categories in backend/pythonscripts/tagdataset.py's
-              TAG_RULES. The two projects are separate repos with no shared
-              taxonomy file, so this list must be updated by hand if the
-              backend categories change.
-            -->
-            <div class="checkbox-group checkbox-group--scroll" id="data-themes-list">
-              {[
-                'Agriculture',
-                'Business & Economy',
-                'Children & Families',
-                'Elections & Politics',
-                'PreK-12 Education',
-                'Energy & Environment',
-                'Government Administration',
-                'Health & Social Services',
-                'Higher Education',
-                'Historic Preservation',
-                'Housing & Buildings',
-                'Labor & Workforce Development',
-                'Law & Public Safety',
-                'Parks & Recreation',
-                'Population Data',
-                'Public Utilities',
-                'Restaurant and Food Service',
-                'Transportation',
-                'Wildlife & Nature',
-              ].map((theme) => (
-                <label class="checkbox-label" data-theme-label>
-                  <input type="checkbox" name="data_themes" value={theme} />
-                  <span class="checkbox-box" aria-hidden="true"></span>
-                  {theme}
-                </label>
+            <div class="theme-groups" id="data-themes-list">
+              {THEME_GROUPS.map((group) => (
+                <details class="theme-group" data-theme-group>
+                  <summary class="theme-group-summary">{group.category}</summary>
+                  <div class="theme-subcategories">
+                    <label class="checkbox-label" data-theme-label>
+                      <input type="checkbox" name="data_themes" value={group.category} />
+                      <span class="checkbox-box" aria-hidden="true"></span>
+                      General
+                    </label>
+                    {group.subcategories.map((sub) => (
+                      <label class="checkbox-label checkbox-label--sub" data-theme-label>
+                        <input type="checkbox" name="data_themes" value={sub} />
+                        <span class="checkbox-box" aria-hidden="true"></span>
+                        {sub}
+                      </label>
+                    ))}
+                  </div>
+                </details>
               ))}
             </div>
-            <span class="field-hint">Check all themes that describe the data domain.</span>
+            <span class="field-hint">Check all themes and subcategories that describe the data domain.</span>
           </div>
 
           <!-- <div class="field">
@@ -538,16 +551,49 @@ const submitted = Astro.url.searchParams.get('submitted') === 'true';
     gap: var(--space-4);
   }
 
-  .checkbox-group--scroll {
+  /* ── Grouped, searchable theme checklist ─ */
+  .theme-groups {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: var(--space-2) var(--space-4);
-    max-height: 220px;
+    gap: var(--space-1);
+    max-height: 320px;
     overflow-y: auto;
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-2) var(--space-4);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     background: var(--color-surface-raised);
+  }
+
+  .theme-group {
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--space-2) 0;
+  }
+
+  .theme-group:last-child {
+    border-bottom: none;
+  }
+
+  .theme-group-summary {
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+    padding: var(--space-1) 0;
+  }
+
+  .theme-group-summary::marker {
+    color: var(--color-text-dim);
+  }
+
+  .theme-subcategories {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--space-1) var(--space-4);
+    padding: var(--space-2) 0 0 var(--space-5);
+  }
+
+  .checkbox-label--sub {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-dim);
   }
 
   .checkbox-label,
@@ -741,13 +787,27 @@ const submitted = Astro.url.searchParams.get('submitted') === 'true';
 
 <script>
   const searchInput = document.getElementById('data-themes-search') as HTMLInputElement | null;
-  const themeLabels = document.querySelectorAll<HTMLLabelElement>('#data-themes-list [data-theme-label]');
+  const themeGroups = document.querySelectorAll<HTMLDetailsElement>('#data-themes-list [data-theme-group]');
 
   searchInput?.addEventListener('input', () => {
     const query = searchInput.value.trim().toLowerCase();
-    themeLabels.forEach((label) => {
-      const text = label.textContent?.toLowerCase() ?? '';
-      label.style.display = query && !text.includes(query) ? 'none' : '';
+
+    themeGroups.forEach((group) => {
+      const groupNameMatches = (group.querySelector('summary')?.textContent ?? '')
+        .toLowerCase()
+        .includes(query);
+      const labels = group.querySelectorAll<HTMLLabelElement>('[data-theme-label]');
+      let groupHasMatch = groupNameMatches;
+
+      labels.forEach((label) => {
+        const text = label.textContent?.toLowerCase() ?? '';
+        const matches = !query || groupNameMatches || text.includes(query);
+        label.style.display = matches ? '' : 'none';
+        if (matches) groupHasMatch = true;
+      });
+
+      group.style.display = groupHasMatch ? '' : 'none';
+      if (query) group.open = groupHasMatch;
     });
   });
 </script>
