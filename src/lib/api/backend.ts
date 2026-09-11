@@ -86,10 +86,18 @@ export interface ChartSeriesPoint {
   value: number;
 }
 
+export interface ChartScatterPoint {
+  x: number;
+  y: number;
+}
+
+export type PlotType = 'bar' | 'line' | 'scatter';
+
 export interface ChartResponse {
   variable: string;
   label: string;
-  series: ChartSeriesPoint[];
+  series?: ChartSeriesPoint[];
+  points?: ChartScatterPoint[];
   xVariable?: string;
   xLabel?: string;
 }
@@ -162,11 +170,19 @@ export async function fetchPreview(id: string, params: PreviewParams = {}): Prom
 
 export async function fetchChart(
   id: string,
-  params: { variable?: string; xVariable?: string; state?: string; county?: string; limit?: number } = {},
+  params: {
+    variable?: string;
+    xVariable?: string;
+    plotType?: PlotType;
+    state?: string;
+    county?: string;
+    limit?: number;
+  } = {},
 ): Promise<ChartResponse> {
   const search = new URLSearchParams();
   if (params.variable) search.set('variable', params.variable);
   if (params.xVariable) search.set('xVariable', params.xVariable);
+  if (params.plotType) search.set('plotType', params.plotType);
   if (params.state) search.set('state', params.state);
   if (params.county) search.set('county', params.county);
   if (params.limit != null) search.set('limit', String(params.limit));
