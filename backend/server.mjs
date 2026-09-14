@@ -101,6 +101,7 @@ const server = http.createServer(async (req, res) => {
         const options = {
           variable: url.searchParams.get("variable") ?? undefined,
           xVariable: url.searchParams.get("xVariable") ?? undefined,
+          plotType: url.searchParams.get("plotType") ?? undefined,
           state: url.searchParams.get("state") ?? undefined,
           county: url.searchParams.get("county") ?? undefined,
           limit: Number(url.searchParams.get("limit") ?? 50),
