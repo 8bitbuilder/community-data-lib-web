@@ -53,8 +53,16 @@ const base = '/example-community-library';
       })();
 
       function initMap() {
+        // Define US bounds
+        var usBounds = L.latLngBounds([24.396308, -124.848974], [49.384358, -66.885444]);
+
         // Center on Knox County, TN
-        var map = L.map('map', { scrollWheelZoom: false }).setView([35.9606, -83.9207], 10);
+        var map = L.map('map', { 
+          scrollWheelZoom: false,
+          maxBounds: usBounds,
+          maxBoundsViscosity: 1.0,
+          minZoom: 3
+        }).setView([35.9606, -83.9207], 10);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
@@ -69,6 +77,10 @@ const base = '/example-community-library';
         for (var i = 0; i < (data.features || []).length; i++) {
           var feature = data.features[i];
           if (!feature || feature.type !== 'Feature') continue;
+
+          // Filter to US only
+          if (feature.properties && feature.properties.region !== 'US') continue;
+
           var coords = feature.geometry && feature.geometry.coordinates;
           if (!Array.isArray(coords) || coords.length < 2) continue;
           var lon = coords[0], lat = coords[1];
