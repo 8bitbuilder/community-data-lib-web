@@ -8,6 +8,127 @@ media_folder: public/uploads
 public_folder: /web/uploads
 
 collections:
+  - name: communities
+    label: Communities
+    label_singular: Community
+    folder: src/content/communities
+    create: true
+    slug: '{{slug}}'
+    extension: md
+    format: frontmatter
+    fields:
+      - { label: Name, name: name, widget: string, required: true }
+      - label: Slug
+        name: slug
+        widget: string
+        required: true
+        pattern: ['^[a-z0-9]+(?:-[a-z0-9]+)*$', 'Must be URL-safe (lowercase letters, numbers, and hyphens)']
+      - { label: Description, name: description, widget: text, required: false }
+      - label: State Code
+        name: state_code
+        widget: select
+        required: true
+        options:
+          - AL
+          - AK
+          - AZ
+          - AR
+          - CA
+          - CO
+          - CT
+          - DE
+          - DC
+          - FL
+          - GA
+          - HI
+          - ID
+          - IL
+          - IN
+          - IA
+          - KS
+          - KY
+          - LA
+          - ME
+          - MD
+          - MA
+          - MI
+          - MN
+          - MS
+          - MO
+          - MT
+          - NE
+          - NV
+          - NH
+          - NJ
+          - NM
+          - NY
+          - NC
+          - ND
+          - OH
+          - OK
+          - OR
+          - PA
+          - RI
+          - SC
+          - SD
+          - TN
+          - TX
+          - UT
+          - VT
+          - VA
+          - WA
+          - WV
+          - WI
+          - WY
+      - { label: County, name: county, widget: string, required: false }
+      - label: County FIPS
+        name: county_fips
+        widget: string
+        required: false
+        pattern: ['^[0-9]{5}$', 'Must be a 5-digit FIPS code']
+      - label: ZIP Codes
+        name: zip_codes
+        widget: list
+        required: false
+        field:
+          label: ZIP Code
+          name: zip_code
+          widget: string
+          pattern: ['^[0-9]{5}$', 'Must be a 5-digit ZIP code']
+      - label: Librarian Email
+        name: librarian_email
+        widget: string
+        required: false
+        pattern: ['^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', 'Must be a valid email address']
+
+  - name: datasets
+    label: Datasets
+    label_singular: Dataset
+    folder: src/content/datasets
+    create: true
+    slug: '{{slug}}'
+    extension: md
+    format: frontmatter
+    fields:
+      - { label: Title, name: title, widget: string, required: true }
+      - { label: Description, name: description, widget: text, required: false }
+      - { label: Source URL, name: source_url, widget: string, required: false }
+      - label: Community
+        name: community
+        widget: relation
+        collection: communities
+        search_fields: [name, slug]
+        value_field: slug
+        display_fields: [name]
+      - label: Audience
+        name: audience
+        widget: select
+        multiple: true
+        options:
+          - { label: Student, value: student }
+          - { label: Teacher, value: teacher }
+          - { label: Community Member, value: community_member }
+
   - name: master-library
     label: Master Library
     folder: src/content/master-library

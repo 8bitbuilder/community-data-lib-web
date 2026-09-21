@@ -34,6 +34,33 @@ const masterLibraryCollection = defineCollection({
   }),
 });
 
+const communitiesCollection = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './src/content/communities' }),
+  schema: z.object({
+    name: z.string(),
+    slug: z.string(),
+    description: z.string().optional(),
+    state_code: z.string().length(2),
+    county: z.string().optional(),
+    county_fips: z.string().regex(/^\d{5}$/).optional(),
+    zip_codes: z.array(z.string().regex(/^\d{5}$/)).default([]),
+    librarian_email: z.string().email().optional(),
+  }),
+});
+
+const datasetsCollection = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './src/content/datasets' }),
+  schema: z.object({
+    title: z.string(),
+    description: z.string().optional(),
+    source_url: z.string().url().optional().or(z.literal('')),
+    community: z.string(),
+    audience: z.array(z.enum(['student', 'teacher', 'community_member'])).default([]),
+  }),
+});
+
 export const collections = {
   'master-library': masterLibraryCollection,
+  communities: communitiesCollection,
+  datasets: datasetsCollection,
 };
