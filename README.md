@@ -59,9 +59,9 @@ To enable the CMS on a Netlify-hosted deployment using `git-gateway`:
 
 ## Documentation
 
-- Netlify deployment: [docs/netlify.md](docs/netlify.md)
-- Geo data branching guidance: [docs/geo-branching.md](docs/geo-branching.md)
-- Community library structure: [docs/community-library-structure.md](docs/community-library-structure.md)
-- Datasheet requirements: [docs/datasheet-requirements.md](docs/datasheet-requirements.md)
-- DecapCMS implementation: [docs/decapcms-implementation.md](docs/decapcms-implementation.md)
-- Aadya checklist: [docs/checklist-aadya.md](docs/checklist-aadya.md)
+- Site architecture, routing, content model, CI/CD: [docs/technical/architecture.md](docs/technical/architecture.md)
+- Netlify deployment: [docs/technical/netlify.md](docs/technical/netlify.md)
+- Geo data branching guidance: [docs/technical/geo-branching.md](docs/technical/geo-branching.md)
+- Community library structure: [docs/data/community-library-structure.md](docs/data/community-library-structure.md)
+- Datasheet requirements: [docs/data/datasheet-requirements.md](docs/data/datasheet-requirements.md)
+- DecapCMS implementation: [docs/technical/decapcms-implementation.md](docs/technical/decapcms-implementation.md)
