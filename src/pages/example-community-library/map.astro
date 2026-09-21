@@ -1,11 +1,8 @@
 ---
 import CommunityLayout from '@layouts/CommunityLayout.astro';
 import { loadGeoMarkers } from '@lib/data/geo';
-import type { GeoMarkerFeature } from '@lib/types/geo';
 
 const collection = loadGeoMarkers();
-const features = collection.features as GeoMarkerFeature[];
-
 const base = '/example-community-library';
 ---
 
@@ -16,6 +13,7 @@ const base = '/example-community-library';
   communityLocation="Knox County, Tennessee"
   communityBase={base}
 >
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" slot="head" />
   <section>
     <header class="page-header">
       <p class="eyebrow">Community Map</p>
@@ -41,6 +39,13 @@ const base = '/example-community-library';
     <script type="application/json" id="geojson-data" set:html={JSON.stringify(collection)}></script>
 
     <script is:inline>
+      function showMapError(message) {
+        var mapEl = document.getElementById('map');
+        if (mapEl) {
+          mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#c2410c;font-family:sans-serif;padding:1rem;text-align:center;">' + message + '</div>';
+        }
+      }
+
       (function loadLeaflet() {
         var link = document.createElement('link');
         link.rel = 'stylesheet';
@@ -49,19 +54,39 @@ const base = '/example-community-library';
         var s = document.createElement('script');
         s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
         s.onload = initMap;
+        s.onerror = function() {
+          showMapError('Unable to load map library. Please check your network connection.');
+        };
         document.head.appendChild(s);
       })();
 
       function initMap() {
+        // Define US bounds
+        var usBounds = L.latLngBounds([24.396308, -124.848974], [49.384358, -66.885444]);
+
         // Center on Knox County, TN
-        var map = L.map('map', { scrollWheelZoom: false }).setView([35.9606, -83.9207], 10);
+        var map = L.map('map', { 
+          scrollWheelZoom: false,
+          maxBounds: usBounds,
+          maxBoundsViscosity: 1.0,
+          minZoom: 3
+        }).setView([35.9606, -83.9207], 10);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
         var el = document.getElementById('geojson-data');
-        if (!el || !el.textContent) return;
-        var data = JSON.parse(el.textContent);
+        if (!el || !el.textContent) {
+          showMapError('Unable to load map marker data.');
+          return;
+        }
+        var data;
+        try {
+          data = JSON.parse(el.textContent);
+        } catch (e) {
+          showMapError('Failed to parse map marker data.');
+          return;
+        }
 
         var colors = { dataset: '#155E75', site: '#166534', organization: '#B45309', event: '#9A3412', other: '#A8927A' };
         var registry = [];
@@ -69,6 +94,10 @@ const base = '/example-community-library';
         for (var i = 0; i < (data.features || []).length; i++) {
           var feature = data.features[i];
           if (!feature || feature.type !== 'Feature') continue;
+
+          // Filter to US only
+          if (feature.properties && feature.properties.region !== 'US') continue;
+
           var coords = feature.geometry && feature.geometry.coordinates;
           if (!Array.isArray(coords) || coords.length < 2) continue;
           var lon = coords[0], lat = coords[1];
