@@ -5,9 +5,11 @@ import type { GeoMarkerFeature } from '@lib/types/geo';
 
 const collection = loadGeoMarkers();
 const features = collection.features as GeoMarkerFeature[];
+const usFeatures = features.filter((f) => f.properties?.region === 'US');
 ---
 
 <Layout title="Community Map" description="Geographic markers for community data libraries">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" slot="head" />
   <section>
     <h1>Community Map</h1>
     <p>Click anywhere on the map to drop a pin and see the nearest datasets for that community.</p>
@@ -29,6 +31,13 @@ const features = collection.features as GeoMarkerFeature[];
     <script type="application/json" id="geojson-data" set:html={JSON.stringify(collection)}></script>
 
     <script is:inline>
+      function showMapError(message) {
+        var mapEl = document.getElementById('map');
+        if (mapEl) {
+          mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#c2410c;font-family:sans-serif;padding:1rem;text-align:center;">' + message + '</div>';
+        }
+      }
+
       // Dynamically inject Leaflet CSS + JS then call initMap via onload,
       // ensuring both the stylesheet and library are available before we
       // measure the container or create any Leaflet objects.
@@ -41,6 +50,9 @@ const features = collection.features as GeoMarkerFeature[];
         var s = document.createElement('script');
         s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
         s.onload = initMap;
+        s.onerror = function() {
+          showMapError('Unable to load map library. Please check your network connection.');
+        };
         document.head.appendChild(s);
       })();
 
@@ -63,8 +75,17 @@ const features = collection.features as GeoMarkerFeature[];
 
         // Parse embedded geojson
         const el = document.getElementById('geojson-data');
-        if (!el || !el.textContent) return;
-        const data = JSON.parse(el.textContent);
+        if (!el || !el.textContent) {
+          showMapError('Unable to load map marker data.');
+          return;
+        }
+        let data;
+        try {
+          data = JSON.parse(el.textContent);
+        } catch (e) {
+          showMapError('Failed to parse map marker data.');
+          return;
+        }
 
         // Prepare data structures
         const markersBounds = L.latLngBounds([]);
@@ -327,6 +348,6 @@ const features = collection.features as GeoMarkerFeature[];
       }
     </style>
 
-    <p class="marker-count">{features.length} location{features.length !== 1 ? 's' : ''} plotted on the map.</p>
+    <p class="marker-count">{usFeatures.length} location{usFeatures.length !== 1 ? 's' : ''} plotted on the map.</p>
   </section>
 </Layout>
