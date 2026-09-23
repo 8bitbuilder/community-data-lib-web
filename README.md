@@ -36,11 +36,32 @@ npm run validate:geo
 
 Contribution guidelines are in [data/geo/README.md](data/geo/README.md).
 
+## Decap CMS Setup & Netlify Configuration
+
+Decap CMS is available at `/admin` (or `/web/admin/` when served with base path) to allow community librarians to author and manage community profiles and datasets.
+
+To enable the CMS on a Netlify-hosted deployment using `git-gateway`:
+
+1. **Host Repository**: Ensure the repository is hosted on **GitHub.com** or **GitLab.com** (required by Netlify Git Gateway).
+2. **Enable Netlify Identity**:
+   - In the Netlify dashboard, navigate to **Site configuration** > **Identity** (or the **Identity** tab).
+   - Click **Enable Identity**.
+3. **Configure Registration Preferences**:
+   - Under Identity settings, go to **Registration preferences**.
+   - Change registration from *Open* to **Invite only** so that only authorized maintainers and librarians can access the CMS.
+4. **Enable Git Gateway**:
+   - In Identity settings, scroll to **Services** > **Git Gateway**.
+   - Click **Enable Git Gateway** to connect Netlify Identity with repository commit access.
+5. **Invite Maintainers & Librarians**:
+   - Navigate to the **Identity** tab in your Netlify dashboard.
+   - Click **Invite users** and enter the email address of the maintainer or community librarian.
+   - The invited user will receive an email invitation to accept and set their password, which will direct them to `/admin/` to begin managing content.
+
 ## Documentation
 
-- Netlify deployment: [docs/netlify.md](docs/netlify.md)
-- Geo data branching guidance: [docs/geo-branching.md](docs/geo-branching.md)
-- Community library structure: [docs/community-library-structure.md](docs/community-library-structure.md)
-- Datasheet requirements: [docs/datasheet-requirements.md](docs/datasheet-requirements.md)
-- DecapCMS implementation: [docs/decapcms-implementation.md](docs/decapcms-implementation.md)
-- Aadya checklist: [docs/checklist-aadya.md](docs/checklist-aadya.md)
+- Site architecture, routing, content model, CI/CD: [docs/technical/architecture.md](docs/technical/architecture.md)
+- Netlify deployment: [docs/technical/netlify.md](docs/technical/netlify.md)
+- Geo data branching guidance: [docs/technical/geo-branching.md](docs/technical/geo-branching.md)
+- Community library structure: [docs/data/community-library-structure.md](docs/data/community-library-structure.md)
+- Datasheet requirements: [docs/data/datasheet-requirements.md](docs/data/datasheet-requirements.md)
+- DecapCMS implementation: [docs/technical/decapcms-implementation.md](docs/technical/decapcms-implementation.md)

@@ -5,9 +5,11 @@ import type { GeoMarkerFeature } from '@lib/types/geo';
 
 const collection = loadGeoMarkers();
 const features = collection.features as GeoMarkerFeature[];
+const usFeatures = features.filter((f) => f.properties?.region === 'US');
 ---
 
 <Layout title="Community Map" description="Geographic markers for community data libraries">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" slot="head" />
   <section>
     <h1>Community Map</h1>
     <p>Click anywhere on the map to drop a pin and see the nearest datasets for that community.</p>
@@ -29,6 +31,13 @@ const features = collection.features as GeoMarkerFeature[];
     <script type="application/json" id="geojson-data" set:html={JSON.stringify(collection)}></script>
 
     <script is:inline>
+      function showMapError(message) {
+        var mapEl = document.getElementById('map');
+        if (mapEl) {
+          mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#c2410c;font-family:sans-serif;padding:1rem;text-align:center;">' + message + '</div>';
+        }
+      }
+
       // Dynamically inject Leaflet CSS + JS then call initMap via onload,
       // ensuring both the stylesheet and library are available before we
       // measure the container or create any Leaflet objects.
@@ -41,11 +50,23 @@ const features = collection.features as GeoMarkerFeature[];
         var s = document.createElement('script');
         s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
         s.onload = initMap;
+        s.onerror = function() {
+          showMapError('Unable to load map library. Please check your network connection.');
+        };
         document.head.appendChild(s);
       })();
 
       function initMap() {
-        const map = L.map('map', { scrollWheelZoom: false });
+        // Define US bounds
+        const usBounds = L.latLngBounds([24.396308, -124.848974], [49.384358, -66.885444]);
+
+        const map = L.map('map', { 
+          scrollWheelZoom: false,
+          maxBounds: usBounds,
+          maxBoundsViscosity: 1.0,
+          minZoom: 3
+        });
+        
         // Base layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution:
@@ -54,11 +75,20 @@ const features = collection.features as GeoMarkerFeature[];
 
         // Parse embedded geojson
         const el = document.getElementById('geojson-data');
-        if (!el || !el.textContent) return;
-        const data = JSON.parse(el.textContent);
+        if (!el || !el.textContent) {
+          showMapError('Unable to load map marker data.');
+          return;
+        }
+        let data;
+        try {
+          data = JSON.parse(el.textContent);
+        } catch (e) {
+          showMapError('Failed to parse map marker data.');
+          return;
+        }
 
         // Prepare data structures
-        const bounds = L.latLngBounds([]);
+        const markersBounds = L.latLngBounds([]);
         const registry = []; // { feature, marker, lat, lon, title, description, url, tags }
         let userPin = null;
 
@@ -73,6 +103,10 @@ const features = collection.features as GeoMarkerFeature[];
 
         for (const feature of data.features || []) {
           if (!feature || feature.type !== 'Feature') continue;
+          
+          // Filter to US only
+          if (feature.properties?.region !== 'US') continue;
+
           const coords = feature.geometry && feature.geometry.coordinates;
           if (!Array.isArray(coords) || coords.length < 2) continue;
           const [lon, lat] = coords;
@@ -92,7 +126,7 @@ const features = collection.features as GeoMarkerFeature[];
             (url ? `<br/><a href="${url}" target="_blank" rel="noopener">Source</a>` : '');
           marker.bindPopup(popupHtml);
 
-          bounds.extend([lat, lon]);
+          markersBounds.extend([lat, lon]);
           registry.push({
             feature,
             marker,
@@ -109,10 +143,10 @@ const features = collection.features as GeoMarkerFeature[];
         // remaining paint work, then tell Leaflet the true container size.
         setTimeout(() => {
           map.invalidateSize({ animate: false });
-          if (bounds.isValid()) {
-            map.fitBounds(bounds.pad(0.25));
+          if (markersBounds.isValid()) {
+            map.fitBounds(markersBounds.pad(0.25));
           } else {
-            map.setView([20, 0], 2);
+            map.setView([39.8283, -98.5795], 4);
           }
         }, 50);
 
@@ -175,10 +209,10 @@ const features = collection.features as GeoMarkerFeature[];
           placePin(event.latlng.lat, event.latlng.lng);
         });
 
-        if (bounds.isValid()) {
-          map.fitBounds(bounds.pad(0.25));
+        if (markersBounds.isValid()) {
+          map.fitBounds(markersBounds.pad(0.25));
         } else {
-          map.setView([20, 0], 2);
+          map.setView([39.8283, -98.5795], 4);
         }
       }
 
@@ -314,6 +348,6 @@ const features = collection.features as GeoMarkerFeature[];
       }
     </style>
 
-    <p class="marker-count">{features.length} location{features.length !== 1 ? 's' : ''} plotted on the map.</p>
+    <p class="marker-count">{usFeatures.length} location{usFeatures.length !== 1 ? 's' : ''} plotted on the map.</p>
   </section>
 </Layout>
