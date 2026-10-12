@@ -9,7 +9,7 @@ const communities = (await getCollection('communities')).sort((a, b) =>
   a.data.name.localeCompare(b.data.name)
 );
 
-const adminNewCommunityHref = withBasePath('/admin/#/collections/communities/new');
+const librarianPortalHref = withBasePath('/librarian/');
 ---
 
 <Layout
@@ -41,6 +41,7 @@ const adminNewCommunityHref = withBasePath('/admin/#/collections/communities/new
         <ul>
           <li>Your community's name and web address (slug).</li>
           <li>Its geographic identifiers, especially the five-digit county FIPS code.</li>
+          <li>Who else can edit it: add colleagues as librarians by email.</li>
         </ul>
         <p class="note">
           Dataset details are maintained in the main library. To add a dataset, use
@@ -53,12 +54,12 @@ const adminNewCommunityHref = withBasePath('/admin/#/collections/communities/new
       <h2 id="steps-heading">How to create one</h2>
       <ol>
         <li>
-          <strong>Check the list below.</strong> If your community already has a library, contact its
-          librarian instead of creating a duplicate.
+          <strong>Check the list below.</strong> Each county can have one library. If yours already has
+          one, contact its librarians instead of creating a duplicate.
         </li>
         <li>
-          <strong>Get a community librarian account.</strong> Accounts are invite-only. Request an invitation
-          from the Community Data Libraries team.
+          <strong>Create a librarian account.</strong> Sign up in the librarian portal with your email
+          address and confirm it from the email we send you.
         </li>
         <li>
           <strong>Look up your county FIPS code.</strong> It is the five-digit code for your county (for
@@ -70,16 +71,16 @@ const adminNewCommunityHref = withBasePath('/admin/#/collections/communities/new
           > include every county.
         </li>
         <li>
-          <strong>Fill in the community form.</strong> Sign in to the librarian editor and create a new
-          community with its name, slug, state, and county FIPS code.
+          <strong>Register your library.</strong> In the portal, enter its name, state, county FIPS code, and
+          ZIP codes. You become its first librarian and can add colleagues afterwards.
         </li>
         <li>
-          <strong>Publish.</strong> Once your entry is saved, the site rebuilds and your library appears
-          on the list below.
+          <strong>Publish.</strong> Saving publishes your library: the site rebuilds within a few minutes and
+          it appears on the list below. Come back to the portal any time to edit it.
         </li>
       </ol>
-      <a href={adminNewCommunityHref} class="button">Open the community librarian form</a>
-      <p class="note">Signing in is only required for community librarians.</p>
+      <a href={librarianPortalHref} class="button">Open the librarian portal</a>
+      <p class="note">Only librarians sign in. Visitors never need an account.</p>
     </section>
 
     <section class="existing" aria-labelledby="existing-heading">
@@ -96,6 +97,17 @@ const adminNewCommunityHref = withBasePath('/admin/#/collections/communities/new
                   {[community.data.county, community.data.state_code].filter(Boolean).join(', ')}
                   {community.data.county_fips && ` · FIPS ${community.data.county_fips}`}
                 </span>
+                {community.data.librarian_emails.length > 0 && (
+                  <span class="community-meta">
+                    Librarians:{' '}
+                    {community.data.librarian_emails.map((email, i) => (
+                      <>
+                        {i > 0 && ', '}
+                        <a href={`mailto:${email}`}>{email}</a>
+                      </>
+                    ))}
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -214,7 +226,7 @@ const adminNewCommunityHref = withBasePath('/admin/#/collections/communities/new
       border-bottom: 1px solid var(--color-border);
     }
 
-    .community-item a {
+    .community-item > a {
       font-weight: 600;
     }
 
