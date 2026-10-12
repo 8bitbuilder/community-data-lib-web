@@ -66,7 +66,21 @@ Community librarians register and maintain their community library at `/libraria
 
 ### Testing
 
-`npm test` covers the permission and validation rules and the function's handler, using a fake Identity service and an in-memory repo. Real sign-up, the confirmation email, Identity tokens, GitHub commits and the rebuild only work on a deployed Netlify site (a deploy preview is fine; deploy previews share the site's Identity users). The Identity widget does not load on `localhost`, so locally the portal shows a "sign-in isn't available" message.
+- **Unit tests**: `npm test` covers the permission and validation rules and the function's handler, using a fake Identity service and an in-memory repo.
+- **Full flow locally** with the [Netlify CLI](https://docs.netlify.com/cli/get-started/) (needs Identity enabled on the deployed site):
+  1. `npm install -g netlify-cli`, then `netlify login` and `netlify link` (pick the site).
+  2. Create a `.env` file (git-ignored) pointing saves at a **test branch of a fork**, so testing never publishes to the live site:
+
+     ```bash
+     LIBRARIAN_GITHUB_TOKEN=<fine-grained token with Contents read/write on the fork>
+     LIBRARIAN_GITHUB_REPO=<your-user>/web
+     LIBRARIAN_GITHUB_BRANCH=librarian-test
+     LIBRARIAN_IDENTITY_URL=https://<site>.netlify.app/.netlify/identity
+     ```
+
+     The branch must already exist on the fork.
+  3. Run `netlify dev` and open `http://localhost:8888/web/librarian/`. The first time, the Identity widget asks for the site URL; enter `https://<site>.netlify.app`. Sign-up, login and the confirmation email use the deployed site's real Identity users.
+- **Deploy preview**: on a deploy preview, set the same variables for the *Deploy Previews* context (Site configuration > Environment variables > Deploy previews) so test saves go to a test branch, not `main`. `LIBRARIAN_IDENTITY_URL` isn't needed there.
 
 ## Decap CMS (team editing)
 

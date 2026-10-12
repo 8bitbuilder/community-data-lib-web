@@ -10,6 +10,8 @@
  *   LIBRARIAN_GITHUB_TOKEN   Fine-grained token with Contents read/write on the repo (required)
  *   LIBRARIAN_GITHUB_REPO    "owner/name" (default community-data-libraries/web)
  *   LIBRARIAN_GITHUB_BRANCH  Branch the site deploys from (default main)
+ *   LIBRARIAN_IDENTITY_URL   Identity service to verify logins against (default: this site's
+ *                            /.netlify/identity). Set it for `netlify dev`, where localhost has none.
  */
 
 import { createGitHubCommunityStore } from '../lib/githubCommunityStore.mjs';
@@ -19,7 +21,7 @@ import { createLibrarianHandler } from '../lib/librarianApi.mjs';
 const token = process.env.LIBRARIAN_GITHUB_TOKEN;
 
 const handle = createLibrarianHandler({
-  verifyUser: createIdentityVerifier(),
+  verifyUser: createIdentityVerifier({ identityUrl: process.env.LIBRARIAN_IDENTITY_URL || undefined }),
   store: token
     ? createGitHubCommunityStore({
         token,

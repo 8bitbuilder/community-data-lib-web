@@ -168,6 +168,13 @@ test('the identity verifier accepts only confirmed users', async () => {
   assert.equal(await verify(req('Bearer unconfirmed')), null);
   assert.equal(await verify(req('Bearer expired')), null);
   assert.equal(await verify(req()), null);
+
+  const remote = createIdentityVerifier({
+    identityUrl: 'https://cdl.example/.netlify/identity/',
+    fetch: fakeFetch as typeof fetch,
+  });
+  const local = new Request('http://localhost:8888/api/librarian/libraries', { headers: { Authorization: 'Bearer good' } });
+  assert.deepEqual(await remote(local), { email: 'lib@example.org' });
 });
 
 test('the GitHub store commits community files through the contents API', async () => {
