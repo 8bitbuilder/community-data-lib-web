@@ -38,28 +38,43 @@ npm run validate:geo
 
 Contribution guidelines are in [data/geo/README.md](data/geo/README.md).
 
-## Decap CMS Setup & Netlify Configuration
+## Librarian Portal (community libraries)
 
-Decap CMS is available at `/admin` (or `/web/admin/` when served with base path) so community librarians can maintain their **community configuration**: library name, place name, slug, and geographic identifiers (county FIPS is the main filter).
+Community librarians register and maintain their community library at `/librarian/` (`/web/librarian/` with the base path). Site visitors never log in.
+
+- Anyone can sign up with Netlify Identity. Once their email is confirmed they can register a library: name, place name, description, state, county FIPS code, and ZIP codes. Their login email becomes the library's first entry in `librarian_emails`.
+- Each county can have one library, and each web address (slug) is unique; duplicates are rejected.
+- A librarian can edit only the libraries whose `librarian_emails` include their login email, and can add or remove other librarians (a library always keeps at least one).
+- Saves go through the `librarian-api` Netlify Function (`netlify/functions/librarian-api.mjs`). It verifies the Identity token, checks permissions, validates the fields, and commits `src/content/communities/<slug>.md` to GitHub. The commit triggers a normal Netlify build, so changes go live a few minutes later.
+- The rules live in `src/lib/community/librarianRules.mjs` and are covered by `npm test`.
+
+### Netlify setup
+
+1. **Identity**: Site configuration > Identity > **Enable Identity** (if it isn't already).
+2. **Registration**: Identity > Registration preferences > **Open**, so new librarians can sign up. Leave email confirmation on (do not enable autoconfirm); the function only accepts confirmed emails.
+3. **Lock down Decap's Git Gateway**: once registration is open, any signed-up user could use Decap's Git Gateway to edit the repo. Under Identity > Services > Git Gateway, restrict access to a role (for example `admin`), then give that role to team members under Identity > Users > (user) > Edit settings.
+4. **GitHub token**: create a fine-grained personal access token (or a token for a bot account) with access to **only** `community-data-libraries/web` and **Contents: Read and write**. Note when it expires and rotate it before then.
+5. **Environment variables**: Site configuration > Environment variables, scoped to **Functions**:
+
+   | Variable | Required | Value |
+   | --- | --- | --- |
+   | `LIBRARIAN_GITHUB_TOKEN` | yes | The token from step 4. Never commit it. |
+   | `LIBRARIAN_GITHUB_REPO` | no | `owner/name`; defaults to `community-data-libraries/web` |
+   | `LIBRARIAN_GITHUB_BRANCH` | no | Branch the site deploys from; defaults to `main` |
+
+   Without `LIBRARIAN_GITHUB_TOKEN` the portal loads but saving returns "not configured".
+
+### Testing
+
+`npm test` covers the permission and validation rules and the function's handler, using a fake Identity service and an in-memory repo. Real sign-up, the confirmation email, Identity tokens, GitHub commits and the rebuild only work on a deployed Netlify site (a deploy preview is fine; deploy previews share the site's Identity users). The Identity widget does not load on `localhost`, so locally the portal shows a "sign-in isn't available" message.
+
+## Decap CMS (team editing)
+
+Decap CMS is still available at `/admin` (or `/web/admin/` with the base path) for the Community Data Libraries team to edit community configuration directly: library name, place name, slug, geographic identifiers, and librarian emails. Librarians should use the portal instead; Decap cannot restrict a user to their own library. It uses Git Gateway, which Netlify has deprecated, and will be removed once the portal covers the team's needs.
 
 Decap does **not** manage datasets. The dataset catalog comes from the backend pipeline (`npm run sync:catalog` generates `src/content/master-library/datasets/` during `prebuild`), and each community library is a filtered view of that catalog. New datasets go through the main site's **Suggest a Data Resource** form (`/submit`).
 
-To enable the CMS on a Netlify-hosted deployment using `git-gateway`:
-
-1. **Host Repository**: Ensure the repository is hosted on **GitHub.com** or **GitLab.com** (required by Netlify Git Gateway).
-2. **Enable Netlify Identity**:
-   - In the Netlify dashboard, navigate to **Site configuration** > **Identity** (or the **Identity** tab).
-   - Click **Enable Identity**.
-3. **Configure Registration Preferences**:
-   - Under Identity settings, go to **Registration preferences**.
-   - Change registration from *Open* to **Invite only** so that only authorized maintainers and librarians can access the CMS.
-4. **Enable Git Gateway**:
-   - In Identity settings, scroll to **Services** > **Git Gateway**.
-   - Click **Enable Git Gateway** to connect Netlify Identity with repository commit access.
-5. **Invite Maintainers & Librarians**:
-   - Navigate to the **Identity** tab in your Netlify dashboard.
-   - Click **Invite users** and enter the email address of the maintainer or community librarian.
-   - The invited user will receive an email invitation to accept and set their password, which will direct them to `/admin/` to begin managing content.
+To use Decap on Netlify: enable Identity, enable **Git Gateway** under Identity > Services (restricted to a team role, see step 3 above), give team members that role, and open `/web/admin/`.
 
 ## Documentation
 

@@ -39,5 +39,7 @@ DecapCMS works with or without Netlify, but on Netlify the typical path is `git-
 - There is no dataset collection in Decap. Datasets are generated from the backend
   pipeline into `src/content/master-library/datasets/` and must be maintained there.
 - Community libraries (`/communities/<slug>/`) are filtered views of the main catalog.
-- Only community librarians sign in (Netlify Identity, invite-only). Visitors never do;
-  the Teacher / Student / Community Member choice only customizes the catalog view.
+- Community librarians now use the librarian portal (`/librarian/`, see the README) rather
+  than Decap; Decap is kept for the team, with Git Gateway restricted to a team role.
+  Visitors never sign in; the Teacher / Student / Community Member choice only customizes
+  the catalog view.
