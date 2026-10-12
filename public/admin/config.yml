@@ -109,8 +109,13 @@ collections:
           name: zip_code
           widget: string
           pattern: ['^[0-9]{5}$', 'Must be a 5-digit ZIP code']
-      - label: Librarian Email
-        name: librarian_email
-        widget: string
+      - label: Librarian Emails
+        name: librarian_emails
+        widget: list
         required: false
-        pattern: ['^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', 'Must be a valid email address']
+        hint: 'Everyone who can edit this library in the librarian portal.'
+        field:
+          label: Email
+          name: email
+          widget: string
+          pattern: ['^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', 'Must be a valid email address']

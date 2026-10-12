@@ -35,7 +35,7 @@ DecapCMS works with or without Netlify, but on Netlify the typical path is `git-
 ## Notes for this repo
 
 - Decap manages **community configuration only**: `src/content/communities/*.md`
-  (`name`, `place_name`, `slug`, `state_code`, `county`, `county_fips`, `zip_codes`, `librarian_email`).
+  (`name`, `place_name`, `slug`, `state_code`, `county`, `county_fips`, `zip_codes`, `librarian_emails`).
 - There is no dataset collection in Decap. Datasets are generated from the backend
   pipeline into `src/content/master-library/datasets/` and must be maintained there.
 - Community libraries (`/communities/<slug>/`) are filtered views of the main catalog.
