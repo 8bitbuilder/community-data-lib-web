@@ -57,14 +57,19 @@ function logAttempt(attempt) {
   }
 }
 
-async function handlePost(request, email, config, github, now) {
-  const attempt = { email, id: null, fields: [], status: null, pr: null, reason: null };
+async function handlePost(request, config, github, now) {
+  const attempt = { email: null, id: null, fields: [], status: null, pr: null, reason: null };
   let response = null;
   let body = null;
   let id = null;
   let branch = null;
+  let email = null;
 
   try {
+    // Authenticate within POST handler so auth failures are logged
+    email = requireEditor(request, config, now());
+    attempt.email = email;
+
     body = await request.json().catch(() => {
       throw new HttpError(400, 'Invalid JSON');
     });
@@ -138,15 +143,14 @@ async function handlePost(request, email, config, github, now) {
 export function createHandler({ config, github, now = Date.now }) {
   return async (request) => {
     try {
-      let email;
-      try {
-        email = requireEditor(request, config, now());
-      } catch (err) {
-        // Log auth failures at handler level without POST attempt tracking
-        return toResponse(err);
+      // Check method first to handle POST auth failures with logging
+      if (request.method === 'POST') {
+        // Handle POST with its own tracking (including auth)
+        return await handlePost(request, config, github, now);
       }
 
       if (request.method === 'GET') {
+        const email = requireEditor(request, config, now());
         const id = checkId(new URL(request.url).searchParams.get('id'));
         const head = await github.getHeadSha();
         const { current, vocabulary } = await loadAt(github, head, id);
@@ -159,12 +163,9 @@ export function createHandler({ config, github, now = Date.now }) {
         });
       }
 
-      if (request.method !== 'POST') throw new HttpError(405, 'Method not allowed');
-
-      // Handle POST with its own tracking
-      return await handlePost(request, email, config, github, now);
+      throw new HttpError(405, 'Method not allowed');
     } catch (err) {
-      // Outer errors (GET failures, method not allowed)
+      // Outer errors (GET failures, method not allowed, GET auth failures)
       // Convert GitHubError at outer level to 502
       if (err instanceof GitHubError) {
         return toResponse(new HttpError(502, 'GitHub is unavailable right now, so nothing was saved. Please try again.'));

@@ -366,7 +366,7 @@ test('POST missing vocabulary logs exactly once with 500', async () => {
   }
 });
 
-test('POST no session (requireEditor 401) does not log attempt', async () => {
+test('POST no session (requireEditor 401) logs exactly once with email null', async () => {
   const logs = [];
   const oldLog = console.log;
   const oldError = console.error;
@@ -381,9 +381,38 @@ test('POST no session (requireEditor 401) does not log attempt', async () => {
     });
     const res = await handler(noAuthPost);
     assert.equal(res.status, 401);
-    // No attempt logging for auth failures
-    const attemptLogs = logs.filter((l) => l.line.includes('metadata-edit'));
-    assert.equal(attemptLogs.length, 0);
+    // Auth failures log exactly once with attempt object (email is null)
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].type, 'error');
+    assert.ok(logs[0].line.includes('401'));
+    assert.ok(logs[0].line.includes('-'), 'email should be - (null) before auth succeeds');
+  } finally {
+    console.log = oldLog;
+    console.error = oldError;
+  }
+});
+
+test('POST bad origin (403) logs exactly once with email null', async () => {
+  const logs = [];
+  const oldLog = console.log;
+  const oldError = console.error;
+  console.log = (...args) => logs.push({ type: 'log', line: args.join(' ') });
+  console.error = (...args) => logs.push({ type: 'error', line: args.join(' ') });
+  try {
+    const handler = createHandler({ config, github: fakeGitHub(), now: () => NOW });
+    const badOriginPost = new Request(`${ORIGIN}/.netlify/functions/metadata-edit`, {
+      method: 'POST',
+      headers: { cookie: COOKIE, origin: 'https://evil.example', 'content-type': 'application/json' },
+      body: JSON.stringify({ id: 'usda-milk', changes: { title: 'x' } }),
+    });
+    const res = await handler(badOriginPost);
+    assert.equal(res.status, 403);
+    // Auth failures log exactly once with email null (not logged as alice@example.org)
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].type, 'error');
+    assert.ok(logs[0].line.includes('403'));
+    assert.ok(logs[0].line.includes('-'), 'email should be - (null) before auth succeeds');
+    assert.ok(!logs[0].line.includes('alice@example.org'), 'email must not be logged on auth failure');
   } finally {
     console.log = oldLog;
     console.error = oldError;
