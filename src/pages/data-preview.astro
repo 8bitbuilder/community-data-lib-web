@@ -1,6 +1,7 @@
 ---
 import Layout from '@layouts/Layout.astro';
 import { withBasePath } from '@lib/paths';
+import MetadataEditor from '@components/MetadataEditor.astro';
 
 const audience = (Astro.url.searchParams.get('audience') ?? '').trim();
 const tutorialHref = withBasePath('/data-resources');
@@ -41,6 +42,7 @@ const catalogHref = withBasePath('/complete-catalog');
     </div>
 
     <div id="preview-content" hidden>
+      <MetadataEditor />
       <nav class="preview-breadcrumb" aria-label="Breadcrumb">
         <a href={catalogHref} class="back-link">← Complete Catalog</a>
       </nav>
