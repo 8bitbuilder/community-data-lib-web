@@ -43,3 +43,20 @@ pipeline, remove it from `manual_tags` in a pull request.
 
 `npm run test:functions` runs the unit tests. For an end-to-end check use `netlify dev` with the
 variables above in `.env`, `SITE_ORIGIN=http://localhost:8888`, and `GITHUB_REPO` set to a fork.
+
+## Rollout order
+
+1. Merge the backend PR (tag vocabulary, `manual_tags` support, rebuild workflow, backend CI). Backend PRs run the
+   pytest suite, including vocabulary consistency; reviewers should wait for it to pass before merging.
+2. Set the Netlify environment variables and create the build hook plus the `NETLIFY_BUILD_HOOK` secret.
+3. Deploy the web changes. Until step 1 is done, editing returns 503 ("The tag vocabulary has not been published...").
+4. Run the manual end-to-end check from "Local testing".
+
+## Troubleshooting
+
+- No email arrives: check `RESEND_API_KEY`, `MAIL_FROM`, Resend domain verification, and the function logs
+  (`auth-request-link: email failed`).
+- "GitHub is unavailable" on every edit: check that `GITHUB_TOKEN` has the right scope and has not expired, and that
+  `GITHUB_REPO` is correct.
+- "Bad origin" or sign-in disabled: `SITE_ORIGIN` must exactly match the site's origin. Deploy previews have a
+  different origin, so editing is only available on the main site.

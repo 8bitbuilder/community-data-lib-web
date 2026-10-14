@@ -103,6 +103,7 @@ test('verify GET shows a confirm page and does NOT consume the link (email scann
     const html = await res.text();
     assert.match(html, /<form method="post"/);
     assert.ok(html.includes(token));
+    assert.equal(res.headers.get('referrer-policy'), 'same-origin');
   }
   assert.equal(store.data.size, 0);
 });
@@ -179,4 +180,16 @@ test('logout clears the cookie and requires same origin', async () => {
   assert.equal(res.status, 200);
   assert.match(res.headers.get('set-cookie'), /Max-Age=0/);
   assert.equal((await handler(new Request(`${URL_BASE}/auth-logout`, { method: 'POST', headers: { origin: 'https://evil.example' } }), {})).status, 403);
+});
+
+test('verify POST with Origin "null" (opaque origin) signs in', async () => {
+  const handler = verify(setup().deps);
+  const token = linkToken('alice@example.org', NOW + 60_000, 'nonce-null-origin');
+  const res = await handler(
+    new Request(`${URL_BASE}/auth-verify`, { method: 'POST', headers: { origin: 'null' }, body: new URLSearchParams({ token }) }),
+    {},
+  );
+  assert.equal(res.status, 303);
+  assert.equal(res.headers.get('location'), `${ORIGIN}/web/data-preview?auth=ok`);
+  assert.match(res.headers.get('set-cookie'), /^cdl_session=/);
 });

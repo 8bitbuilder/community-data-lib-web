@@ -38,9 +38,11 @@ export function createGitHub({ token, repo, fetchImpl = fetch }) {
     putFile: (path, { text, sha, branch, message }) =>
       api('PUT', `/contents/${path}`, { message, content: Buffer.from(text, 'utf8').toString('base64'), sha, branch }),
     openPullRequest: ({ title, body, head, base = 'main' }) => api('POST', '/pulls', { title, body, head, base }),
-    async listOpenPullRequests(prefix) {
+    async listOpenPullRequests(match) {
+      // match is a string prefix or a RegExp tested against the head branch name.
+      const test = typeof match === 'string' ? (ref) => ref.startsWith(match) : (ref) => match.test(ref);
       const pulls = (await api('GET', '/pulls?state=open&per_page=100')) ?? [];
-      return pulls.filter((p) => p.head.ref.startsWith(prefix)).map((p) => ({ number: p.number, url: p.html_url, title: p.title }));
+      return pulls.filter((p) => test(p.head.ref)).map((p) => ({ number: p.number, url: p.html_url, title: p.title }));
     },
   };
 }

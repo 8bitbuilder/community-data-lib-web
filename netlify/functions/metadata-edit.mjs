@@ -8,6 +8,8 @@ import { createGitHub, GitHubError } from './_lib/github.mjs';
 const VOCABULARY_PATH = 'data/tag_vocabulary.yml';
 const sourcePath = (id) => `data/sources/${id}.yml`;
 const branchPrefix = (id) => `metadata/${id}-`;
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const branchPattern = (id) => new RegExp(`^metadata/${escapeRe(id)}-\\d{8}T\\d{6}Z$`);
 
 function checkId(id) {
   if (typeof id !== 'string' || !/^[a-z0-9-]+$/.test(id)) throw new HttpError(400, 'Invalid dataset id', 'id');
@@ -17,7 +19,10 @@ function checkId(id) {
 async function loadAt(github, ref, id) {
   const [file, vocabFile] = await Promise.all([github.getFile(sourcePath(id), ref), github.getFile(VOCABULARY_PATH, ref)]);
   if (!file) throw new HttpError(404, `Dataset ${id} not found`);
-  if (!vocabFile) throw new Error(`${VOCABULARY_PATH} missing on ${ref}`);
+  if (!vocabFile) throw new HttpError(
+      503,
+      'The tag vocabulary has not been published to the backend repository yet. Ask an administrator to merge the backend changes first.',
+    );
   const vocab = readYaml(vocabFile.text);
   const vocabulary = { description_tags: vocab.description_tags ?? [], statistical_tags: vocab.statistical_tags ?? {} };
   return { file, current: readYaml(file.text) ?? {}, vocabulary };
@@ -159,7 +164,7 @@ export function createHandler({ config, github, now = Date.now }) {
           fields: pickEditable(current, vocabulary),
           manualTags: Array.isArray(current.manual_tags) ? current.manual_tags : [],
           vocabulary,
-          openPullRequests: await github.listOpenPullRequests(branchPrefix(id)),
+          openPullRequests: await github.listOpenPullRequests(branchPattern(id)),
         });
       }
 

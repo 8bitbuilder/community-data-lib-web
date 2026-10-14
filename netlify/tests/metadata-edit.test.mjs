@@ -76,7 +76,10 @@ test('GET returns editable fields, vocabulary, manual tags, and open PRs', async
   assert.deepEqual(body.vocabulary.description_tags, ['Agriculture', 'Population Data']);
   assert.deepEqual(body.manualTags, []);
   assert.deepEqual(body.openPullRequests, [{ number: 3, url: 'u', title: 't' }]);
-  assert.deepEqual(github.calls.find((c) => c[0] === 'list'), ['list', 'metadata/usda-milk-']);
+  const listed = github.calls.find((c) => c[0] === 'list')[1];
+  assert.ok(listed instanceof RegExp);
+  assert.ok(listed.test('metadata/usda-milk-20261014T153000Z'));
+  assert.ok(!listed.test('metadata/usda-milk-2025-20261014T153000Z'));
 });
 
 test('requires a session and a safe id', async () => {
@@ -345,7 +348,7 @@ test('POST createBranch 422 logs exactly once with 409', async () => {
   }
 });
 
-test('POST missing vocabulary logs exactly once with 500', async () => {
+test('POST missing vocabulary logs exactly once with 503', async () => {
   const logs = [];
   const oldLog = console.log;
   const oldError = console.error;
@@ -356,10 +359,11 @@ test('POST missing vocabulary logs exactly once with 500', async () => {
     const res = await createHandler({ config, github, now: () => NOW })(
       post({ id: 'usda-milk', changes: { title: 'New' } }),
     );
-    assert.equal(res.status, 500);
+    assert.equal(res.status, 503);
+    assert.match((await res.json()).error, /tag vocabulary has not been published/);
     assert.equal(logs.length, 1);
     assert.equal(logs[0].type, 'error');
-    assert.ok(logs[0].line.includes('500'));
+    assert.ok(logs[0].line.includes('503'));
   } finally {
     console.log = oldLog;
     console.error = oldError;
@@ -440,4 +444,11 @@ test('POST does not log secret values', async () => {
     console.log = oldLog;
     console.error = oldError;
   }
+});
+
+test('GET missing vocabulary returns 503 with a clear message', async () => {
+  const github = fakeGitHub({ 'data/sources/usda-milk.yml': DATASET });
+  const res = await createHandler({ config, github, now: () => NOW })(get('usda-milk'));
+  assert.equal(res.status, 503);
+  assert.match((await res.json()).error, /tag vocabulary has not been published/);
 });

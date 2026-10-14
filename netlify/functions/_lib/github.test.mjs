@@ -73,3 +73,19 @@ test('500 response throws GitHubError with status', async () => {
     assert.equal(err.status, 500);
   }
 });
+
+test('listOpenPullRequests with a RegExp matches only exact metadata branches', async () => {
+  const pull = (n, ref) => ({ number: n, html_url: `u${n}`, title: `t${n}`, head: { ref } });
+  const mockFetch = async () => ({
+    status: 200,
+    ok: true,
+    json: async () => [
+      pull(1, 'metadata/usda-milk-20261014T153000Z'),
+      pull(2, 'metadata/usda-milk-2025-20261014T153000Z'),
+    ],
+    text: async () => '',
+  });
+  const github = createGitHub({ token: 't', repo: 'o/r', fetchImpl: mockFetch });
+  const out = await github.listOpenPullRequests(/^metadata\/usda-milk-\d{8}T\d{6}Z$/);
+  assert.deepEqual(out, [{ number: 1, url: 'u1', title: 't1' }]);
+});

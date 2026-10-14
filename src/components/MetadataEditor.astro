@@ -175,6 +175,7 @@
     const { res, body } = await api('auth-request-link', { method: 'POST', body: JSON.stringify({ email }) });
     button.disabled = false;
     if (!res) return say(NETWORK_ERROR, true);
+    if (res.status === 403) return say('Editing is only available on the main site.', true);
     say(body?.message ?? body?.error ?? 'Something went wrong.', !res.ok);
   });
 

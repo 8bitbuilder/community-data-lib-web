@@ -35,7 +35,7 @@ export function createHandler({ config, store, now = Date.now }) {
         headers: {
           'content-type': 'text/html; charset=utf-8',
           'cache-control': 'no-store',
-          'referrer-policy': 'no-referrer',
+          'referrer-policy': 'same-origin',
           'x-frame-options': 'DENY',
           'content-security-policy': "frame-ancestors 'none'",
         },
@@ -44,7 +44,8 @@ export function createHandler({ config, store, now = Date.now }) {
     if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
 
     const origin = request.headers.get('origin');
-    if (origin && origin !== config.siteOrigin) return redirect('invalid');
+    // Browsers send the literal "null" Origin for some form posts; treat it like a missing Origin.
+    if (origin && origin !== 'null' && origin !== config.siteOrigin) return redirect('invalid');
 
     const token = (await request.formData().catch(() => null))?.get('token');
     const result = verifyToken(typeof token === 'string' ? token : null, config.authSecret, { purpose: 'link', now: now() });
