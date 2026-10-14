@@ -83,3 +83,29 @@ test('group key order does not count as a change', () => {
   const normalized = validateChanges({ anova_tags: { 'good-for-one-way-anova': true, 'good-for-two-way-anova': false } }, vocab);
   assert.deepEqual(toTopLevelUpdates(withGroup, normalized, vocab), {});
 });
+
+test('rejects inherited property names (constructor, toString, __proto__)', () => {
+  assert.deepEqual(fieldOf(() => validateChanges(JSON.parse('{"constructor":"x"}'), vocab)), [400, 'constructor']);
+  assert.deepEqual(fieldOf(() => validateChanges(JSON.parse('{"toString":"x"}'), vocab)), [400, 'toString']);
+  assert.deepEqual(fieldOf(() => validateChanges(JSON.parse('{"__proto__":{}}'), vocab)), [400, '__proto__']);
+});
+
+test('toTopLevelUpdates does not add manual_tags for inherited properties', () => {
+  const result = toTopLevelUpdates(current, { toString: 'x' }, vocab);
+  assert(!('manual_tags' in result), 'manual_tags should not be added for non-tag fields');
+});
+
+test('pickEditable handles non-object data gracefully', () => {
+  assert.deepEqual(pickEditable(null, vocab), pickEditable({}, vocab));
+  assert.deepEqual(pickEditable('x', vocab), pickEditable({}, vocab));
+});
+
+test('tag changes merge into existing manual_tags', () => {
+  const withExisting = { ...current, manual_tags: ['description_tags'] };
+  const normalized = validateChanges({ anova_tags: { 'good-for-one-way-anova': true, 'good-for-two-way-anova': false } }, vocab);
+  const updates = toTopLevelUpdates(withExisting, normalized, vocab);
+  assert.deepEqual(updates, {
+    anova_tags: { 'good-for-one-way-anova': true, 'good-for-two-way-anova': false },
+    manual_tags: ['anova_tags', 'description_tags'],
+  });
+});

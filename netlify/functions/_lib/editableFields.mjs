@@ -70,7 +70,7 @@ function validateTopicTags(value, allowed) {
 function validateGroup(value, keys, field) {
   if (!isPlainObject(value)) fail(field, 'must be an object');
   const given = Object.keys(value);
-  if (given.length !== keys.length || !keys.every((k) => k in value)) fail(field, 'must include exactly the vocabulary keys');
+  if (given.length !== keys.length || !keys.every((k) => Object.hasOwn(value, k))) fail(field, 'must include exactly the vocabulary keys');
   const out = {};
   for (const key of keys) {
     if (typeof value[key] !== 'boolean') fail(field, `${key} must be true or false`);
@@ -83,13 +83,13 @@ export function validateChanges(changes, vocabulary) {
   if (!isPlainObject(changes)) throw new HttpError(400, 'changes must be an object');
   const out = {};
   for (const [field, value] of Object.entries(changes)) {
-    if (field in SIMPLE) out[field] = SIMPLE[field](value, field);
+    if (Object.hasOwn(SIMPLE, field)) out[field] = SIMPLE[field](value, field);
     else if (field === 'provider') out.provider = validateProvider(value);
     else if (field === 'download') {
       onlyKeys(value, 'download', ['url']);
       out.download = { url: httpsUrl(value.url, 'download.url', { required: true }) };
     } else if (field === 'description_tags') out.description_tags = validateTopicTags(value, vocabulary.description_tags);
-    else if (field in vocabulary.statistical_tags) out[field] = validateGroup(value, vocabulary.statistical_tags[field], field);
+    else if (Object.hasOwn(vocabulary.statistical_tags, field)) out[field] = validateGroup(value, vocabulary.statistical_tags[field], field);
     else fail(field, 'is not editable');
   }
   if (Object.keys(out).length === 0) throw new HttpError(400, 'No changes submitted');
@@ -97,17 +97,18 @@ export function validateChanges(changes, vocabulary) {
 }
 
 export function pickEditable(data, vocabulary) {
+  const d = isPlainObject(data) ? data : {};
   const picked = {};
-  for (const field of TEXT_FIELDS) picked[field] = typeof data[field] === 'string' ? data[field] : data[field] == null ? '' : String(data[field]);
-  picked.sensitive = data.sensitive === true;
-  picked.requires_account = data.requires_account === true;
-  picked.student_suitability = SUITABILITY.includes(data.student_suitability) ? data.student_suitability : 'unreviewed';
-  const provider = isPlainObject(data.provider) ? data.provider : {};
+  for (const field of TEXT_FIELDS) picked[field] = typeof d[field] === 'string' ? d[field] : d[field] == null ? '' : String(d[field]);
+  picked.sensitive = d.sensitive === true;
+  picked.requires_account = d.requires_account === true;
+  picked.student_suitability = SUITABILITY.includes(d.student_suitability) ? d.student_suitability : 'unreviewed';
+  const provider = isPlainObject(d.provider) ? d.provider : {};
   picked.provider = { name: provider.name ?? '', agency: provider.agency ?? '', url: provider.url ?? '' };
-  picked.download = { url: isPlainObject(data.download) ? data.download.url ?? '' : '' };
-  picked.description_tags = Array.isArray(data.description_tags) ? data.description_tags : [];
+  picked.download = { url: isPlainObject(d.download) ? d.download.url ?? '' : '' };
+  picked.description_tags = Array.isArray(d.description_tags) ? d.description_tags : [];
   for (const [group, keys] of Object.entries(vocabulary.statistical_tags)) {
-    const existing = isPlainObject(data[group]) ? data[group] : {};
+    const existing = isPlainObject(d[group]) ? d[group] : {};
     picked[group] = Object.fromEntries(keys.map((k) => [k, existing[k] === true]));
   }
   return picked;
@@ -130,7 +131,7 @@ export function toTopLevelUpdates(current, normalized, vocabulary) {
         : value;
     if (canonical(merged) !== canonical(current[field])) updates[field] = merged;
   }
-  const tagFields = Object.keys(updates).filter((f) => f === 'description_tags' || f in vocabulary.statistical_tags);
+  const tagFields = Object.keys(updates).filter((f) => f === 'description_tags' || Object.hasOwn(vocabulary.statistical_tags, f));
   if (tagFields.length) {
     const existing = Array.isArray(current.manual_tags) ? current.manual_tags : [];
     const merged = [...new Set([...existing, ...tagFields])].sort();
