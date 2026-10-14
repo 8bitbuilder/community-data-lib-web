@@ -1,3 +1,11 @@
+export class GitHubError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+    this.name = 'GitHubError';
+  }
+}
+
 export function createGitHub({ token, repo, fetchImpl = fetch }) {
   async function api(method, path, body) {
     const res = await fetchImpl(`https://api.github.com/repos/${repo}${path}`, {
@@ -11,7 +19,7 @@ export function createGitHub({ token, repo, fetchImpl = fetch }) {
       body: body ? JSON.stringify(body) : undefined,
     });
     if (res.status === 404 && method === 'GET') return null;
-    if (!res.ok) throw new Error(`GitHub ${method} ${path} failed: HTTP ${res.status}`);
+    if (!res.ok) throw new GitHubError(`GitHub ${method} ${path} failed: HTTP ${res.status}`, res.status);
     return res.status === 204 ? {} : res.json();
   }
 

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHandler } from '../functions/metadata-edit.mjs';
+import { GitHubError } from '../functions/_lib/github.mjs';
 import { sessionCookie } from '../functions/_lib/session.mjs';
 import { readYaml } from '../functions/_lib/yamlEdit.mjs';
 
@@ -136,4 +137,71 @@ test('POST cleans up the branch when GitHub fails', async () => {
   assert.equal(res.status, 502);
   assert.match((await res.json()).error, /nothing was saved/);
   assert.deepEqual(github.calls.at(-1), ['deleteBranch', 'metadata/usda-milk-20261014T153000Z']);
+});
+
+test('GET returns 502 when GitHub fails', async () => {
+  const github = {
+    calls: [],
+    async getHeadSha() { throw new GitHubError('GitHub error', 500); },
+  };
+  const res = await createHandler({ config, github, now: () => NOW })(get('usda-milk'));
+  assert.equal(res.status, 502);
+  assert.match((await res.json()).error, /GitHub is unavailable/);
+});
+
+test('POST returns 502 when getHeadSha fails', async () => {
+  const github = {
+    calls: [],
+    async getHeadSha() { throw new GitHubError('GitHub error', 500); },
+  };
+  const res = await createHandler({ config, github, now: () => NOW })(post({ id: 'usda-milk', changes: { title: 'New' } }));
+  assert.equal(res.status, 502);
+  assert.match((await res.json()).error, /GitHub is unavailable/);
+});
+
+test('POST returns 409 when createBranch fails with 422 (conflict)', async () => {
+  const github = fakeGitHub();
+  const origCreateBranch = github.createBranch;
+  github.createBranch = async function(name, sha) {
+    github.calls.push(['createBranch', name, sha]);
+    throw new GitHubError('Branch already exists', 422);
+  };
+  const res = await createHandler({ config, github, now: () => NOW })(post({ id: 'usda-milk', changes: { title: 'New' } }));
+  assert.equal(res.status, 409);
+  assert.match((await res.json()).error, /Another edit.*just submitted/);
+  assert.ok(!github.calls.find((c) => c[0] === 'putFile'), 'should not call putFile');
+  assert.ok(!github.calls.find((c) => c[0] === 'deleteBranch'), 'should not call deleteBranch (branch not created)');
+});
+
+test('PR body handles \\r and \\r\\n newlines in values', async () => {
+  const github = fakeGitHub();
+  let capturedPrBody = '';
+  github.openPullRequest = async function(opts) {
+    capturedPrBody = opts.body;
+    return { number: 7, html_url: 'https://github.com/x/pull/7' };
+  };
+  const res = await createHandler({ config, github, now: () => NOW })(
+    post({ id: 'usda-milk', changes: { title: 'Line1\rLine2\r\nLine3' } }),
+  );
+  assert.equal(res.status, 201);
+  // The cell() function should replace \r and \r\n with spaces in field values
+  // So "Line1\rLine2\r\nLine3" becomes "Line1 Line2 Line3" in the table
+  assert.ok(capturedPrBody.includes('Line1 Line2 Line3'), 'should have replaced newlines with spaces in the value');
+});
+
+test('POST logs validation failure with field name', async () => {
+  const logs = [];
+  const oldLog = console.log;
+  console.log = (...args) => logs.push(args.join(' '));
+  try {
+    const handler = createHandler({ config, github: fakeGitHub(), now: () => NOW });
+    const res = await handler(post({ id: 'usda-milk', changes: { description_tags: ['Invalid Tag'] } }));
+    assert.equal(res.status, 400);
+    const log = logs.find((l) => l.includes('post') && l.includes('usda-milk'));
+    assert.ok(log, 'should log the failure');
+    assert.ok(log.includes('description_tags'), 'should include field name in log');
+    assert.ok(log.includes('400'), 'should include status code');
+  } finally {
+    console.log = oldLog;
+  }
 });
