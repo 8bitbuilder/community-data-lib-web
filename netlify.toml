@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build"
+  command = "rm -rf .backend-canonical && git clone --depth 1 https://github.com/community-data-libraries/backend.git .backend-canonical && BACKEND_ROOT=.backend-canonical npm run build"
   publish = "dist"
   functions = "netlify/functions"
 

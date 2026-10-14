@@ -63,3 +63,4 @@ temp/
 backend/pythonscripts/__pycache__/
 backend/database/*.db
 .venv/
+.backend-canonical/

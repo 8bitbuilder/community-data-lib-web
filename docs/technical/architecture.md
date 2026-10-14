@@ -93,6 +93,8 @@ Entries come from two sources:
 
 Decap CMS (`public/admin/config.yml`) manages exactly this one collection — it does not manage `data/geo/markers.geojson`, `community-submissions.json`, or backend YAML. In production it authenticates via `git-gateway` + Netlify Identity; locally via `npx decap-server` (`local_backend: true`).
 
+Dataset metadata (backend YAML) is edited separately through the magic-link metadata editor on `/data-preview`; see [metadata-editor.md](metadata-editor.md).
+
 ## Geographic markers
 
 Independent of the dataset pipeline. `data/geo/markers.geojson` is a GeoJSON `FeatureCollection` of `Point` features, validated against `data/geo/schema/marker.schema.json` (draft-07):
