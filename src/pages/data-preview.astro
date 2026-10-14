@@ -14,6 +14,7 @@ const catalogHref = withBasePath('/complete-catalog');
   </Fragment>
 
   <section class="preview-page" id="preview-page">
+    <MetadataEditor />
     <div id="loading-state" class="status-panel">
       <div class="loading-spinner" aria-hidden="true"></div>
       <p>Loading dataset preview…</p>
@@ -42,7 +43,6 @@ const catalogHref = withBasePath('/complete-catalog');
     </div>
 
     <div id="preview-content" hidden>
-      <MetadataEditor />
       <nav class="preview-breadcrumb" aria-label="Breadcrumb">
         <a href={catalogHref} class="back-link">← Complete Catalog</a>
       </nav>

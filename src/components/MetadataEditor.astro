@@ -37,6 +37,8 @@
     invalid: 'That sign-in link is not valid. Request a new one.',
   };
 
+  const NETWORK_ERROR = 'Network error — please try again.';
+
   const $ = (id: string) => document.getElementById(id) as HTMLElement;
   const root = $('metadata-editor');
   const message = $('editor-message');
@@ -51,9 +53,19 @@
   }
 
   async function api(path: string, init: RequestInit = {}) {
-    const res = await fetch(`${FN}/${path}`, { credentials: 'same-origin', ...init, headers: { 'content-type': 'application/json', ...(init.headers ?? {}) } });
-    const type = res.headers.get('content-type') ?? '';
-    return { res, body: type.includes('application/json') ? await res.json() : null };
+    let res: Response;
+    try {
+      res = await fetch(`${FN}/${path}`, { credentials: 'same-origin', ...init, headers: { 'content-type': 'application/json', ...(init.headers ?? {}) } });
+    } catch {
+      return { res: null as Response | null, body: null as any };
+    }
+    let body: any = null;
+    try {
+      if ((res.headers.get('content-type') ?? '').includes('application/json')) body = await res.json();
+    } catch {
+      body = null;
+    }
+    return { res: res as Response | null, body };
   }
 
   function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, any> = {}, children: (Node | string)[] = []) {
@@ -121,7 +133,8 @@
   async function openEditor() {
     say('Loading current metadata…');
     const { res, body } = await api(`metadata-edit?id=${encodeURIComponent(sourceId)}`);
-    if (!res.ok) return say(body?.error ?? 'Could not load metadata.', true);
+    if (!res) return say(NETWORK_ERROR, true);
+    if (!res.ok || !body?.fields) return say(body?.error ?? 'Could not load metadata.', true);
     original = body.fields;
     vocabulary = body.vocabulary;
     const prs = $('editor-open-prs');
@@ -133,8 +146,9 @@
 
   async function init() {
     const authResult = new URLSearchParams(location.search).get('auth');
-    const { res, body } = await api('auth-me').catch(() => ({ res: null as Response | null, body: null }));
+    const { res, body } = await api('auth-me');
     if (!res || ![200, 401, 403].includes(res.status)) return; // no Netlify Functions here
+    if (res.status === 200 && typeof body?.email !== 'string') return;
     root.hidden = false;
     if (authResult && AUTH_MESSAGES[authResult]) say(AUTH_MESSAGES[authResult], authResult !== 'ok');
     if (res.status === 403) say('Your editor access has been removed.', true);
@@ -154,8 +168,13 @@
 
   $('editor-signin-form').addEventListener('submit', async (event) => {
     event.preventDefault();
-    const email = new FormData(event.target as HTMLFormElement).get('email');
+    const formEl = event.target as HTMLFormElement;
+    const button = formEl.querySelector<HTMLButtonElement>('button[type=submit]')!;
+    const email = new FormData(formEl).get('email');
+    button.disabled = true;
     const { res, body } = await api('auth-request-link', { method: 'POST', body: JSON.stringify({ email }) });
+    button.disabled = false;
+    if (!res) return say(NETWORK_ERROR, true);
     say(body?.message ?? body?.error ?? 'Something went wrong.', !res.ok);
   });
 
@@ -170,9 +189,21 @@
     event.preventDefault();
     const changes = diffFields(original, readForm());
     if (Object.keys(changes).length === 0) return say('No changes to submit.');
+    const button = ($('editor-form') as HTMLFormElement).querySelector<HTMLButtonElement>('button[type=submit]')!;
+    button.disabled = true;
     const { res, body } = await api('metadata-edit', { method: 'POST', body: JSON.stringify({ id: sourceId, changes }) });
-    if (res.status === 401) return say('Your session expired. Sign in again.', true);
-    if (!res.ok) return say(body?.field ? `${body.field}: ${body.error}` : body?.error ?? 'Could not submit.', true);
+    if (!res) {
+      button.disabled = false;
+      return say(NETWORK_ERROR, true);
+    }
+    if (res.status === 401) {
+      button.disabled = false;
+      return say('Your session expired. Sign in again.', true);
+    }
+    if (!res.ok || typeof body?.prUrl !== 'string') {
+      button.disabled = false;
+      return say(body?.field ? `${body.field}: ${body.error}` : body?.error ?? 'Could not submit.', true);
+    }
     say(`Submitted for review: PR #${body.prNumber}.`);
     const link = el('a', { href: body.prUrl, target: '_blank', rel: 'noopener' }, [' View pull request']);
     message.append(link);

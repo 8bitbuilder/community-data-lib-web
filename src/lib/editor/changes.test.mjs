@@ -25,9 +25,23 @@ test('returns only changed fields', () => {
 });
 
 test('reordered tag lists are not a change; no edits is empty', () => {
+  const o = { ...structuredClone(original), description_tags: ['Agriculture', 'Dairy'] };
+  const edited = structuredClone(o);
+  edited.description_tags = ['Dairy', 'Agriculture'];
+  assert.deepEqual(diffFields(o, edited), {});
+});
+
+test('statistical group key order is not a change', () => {
   const edited = structuredClone(original);
-  edited.description_tags = ['Agriculture'];
+  edited.anova_tags = { b: true, a: false };
   assert.deepEqual(diffFields(original, edited), {});
+});
+
+test('null original text equals empty edited text', () => {
+  const o = { ...structuredClone(original), notes: null };
+  const edited = structuredClone(o);
+  edited.notes = '';
+  assert.deepEqual(diffFields(o, edited), {});
 });
 
 test('download changes send only the url', () => {
