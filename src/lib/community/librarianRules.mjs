@@ -5,6 +5,9 @@
  * librarian Netlify Function (netlify/functions/librarian-api.mjs) and the
  * /librarian/ page. Results use HTTP-style statuses: 400 invalid input,
  * 403 not a librarian of this library, 409 slug or county already registered.
+ *
+ * Librarian emails are private: they are kept in Netlify Blobs, never in the public
+ * community files, so they travel separately from the community record here.
  */
 
 /** Two-digit state FIPS codes; a county FIPS code starts with its state's code. */
@@ -53,11 +56,11 @@ export function slugify(value) {
     .replace(/-+$/, '');
 }
 
-/** Whether `email` is one of the community's librarians (case-insensitive). */
-export function isLibrarian(community, email) {
+/** Whether `email` is in the `librarians` email list (case-insensitive). */
+export function isLibrarian(librarians, email) {
   const target = normalizeEmail(email);
   if (!target) return false;
-  return (community?.librarian_emails ?? []).some((e) => normalizeEmail(e) === target);
+  return (librarians ?? []).some((e) => normalizeEmail(e) === target);
 }
 
 function text(value) {
@@ -70,7 +73,7 @@ function list(value) {
   return items.map((item) => String(item ?? '').trim()).filter(Boolean);
 }
 
-function uniqueEmails(value) {
+export function uniqueEmails(value) {
   return [...new Set(list(value).map(normalizeEmail))];
 }
 
@@ -78,7 +81,7 @@ function uniqueEmails(value) {
  * Turn form input into a community record (trimmed, deduplicated, canonical
  * key order). Does not validate; see validateCommunity.
  */
-export function buildCommunity(input, { slug, librarianEmails }) {
+export function buildCommunity(input, { slug }) {
   const community = {
     name: text(input.name),
     place_name: text(input.place_name),
@@ -88,7 +91,6 @@ export function buildCommunity(input, { slug, librarianEmails }) {
     county: text(input.county),
     county_fips: text(input.county_fips),
     zip_codes: [...new Set(list(input.zip_codes))],
-    librarian_emails: uniqueEmails(librarianEmails),
   };
   for (const key of Object.keys(community)) {
     if (community[key] === undefined) delete community[key];
@@ -137,18 +139,25 @@ export function validateCommunity(community) {
     add('zip_codes', `At most ${LIMITS.zipCodes} ZIP codes.`);
   }
 
-  const emails = community.librarian_emails;
-  if (emails.length === 0) add('librarian_emails', 'A library needs at least one librarian.');
-  if (emails.length > LIMITS.librarianEmails) {
-    add('librarian_emails', `At most ${LIMITS.librarianEmails} librarians.`);
-  }
-  const badEmails = emails.filter((email) => !isValidEmail(email));
-  if (badEmails.length > 0) add('librarian_emails', `Not valid emails: ${badEmails.join(', ')}.`);
-
   return errors;
 }
 
-/** Slug/county clashes with other registered libraries (`existing` excludes the one being edited). */
+/** Problems with a library's librarian email list. */
+export function validateLibrarians(emails) {
+  const errors = [];
+  const add = (message) => errors.push({ field: 'librarian_emails', message });
+  if (emails.length === 0) add('A library needs at least one librarian.');
+  if (emails.length > LIMITS.librarianEmails) add(`At most ${LIMITS.librarianEmails} librarians.`);
+  const badEmails = emails.filter((email) => !isValidEmail(email));
+  if (badEmails.length > 0) add(`Not valid emails: ${badEmails.join(', ')}.`);
+  return errors;
+}
+
+/**
+ * Slug/county clashes with other libraries, live or awaiting approval
+ * (`existing` excludes the one being edited). County clashes carry the other
+ * library so the page can point people to it.
+ */
 function findDuplicates(community, existing) {
   const errors = [];
   if (existing.some((other) => other.slug === community.slug)) {
@@ -160,45 +169,60 @@ function findDuplicates(community, existing) {
   if (clash) {
     errors.push({
       field: 'county_fips',
-      message: `County ${community.county_fips} already has a library: ${clash.name}. Contact its librarians instead.`,
+      message: clash.pending
+        ? `A library for county ${community.county_fips} is already awaiting approval.`
+        : `County ${community.county_fips} already has a library: ${clash.name}. Contact its librarian instead.`,
+      existing: { slug: clash.slug, name: clash.name, pending: Boolean(clash.pending) },
     });
   }
   return errors;
 }
 
-function result(community, errors, duplicates) {
+function result(community, librarians, errors, duplicates) {
   if (errors.length > 0) return { ok: false, status: 400, errors };
   if (duplicates.length > 0) return { ok: false, status: 409, errors: duplicates };
-  return { ok: true, community };
+  return { ok: true, community, librarians };
 }
 
 /**
  * A new library registered by `email` (a verified login). The registrant becomes its
- * first librarian; the slug defaults to the slugified library name.
+ * first librarian; the slug defaults to the slugified library name. `existing` lists
+ * live libraries and ones awaiting approval ({ slug, name, county_fips, pending }).
  */
 export function checkRegistration({ input, email, existing }) {
   if (!isValidEmail(email)) {
     return { ok: false, status: 403, errors: [{ field: null, message: 'Log in to register a library.' }] };
   }
   const slug = text(input.slug)?.toLowerCase() ?? slugify(input.name);
-  const community = buildCommunity(input, { slug, librarianEmails: [email] });
-  return result(community, validateCommunity(community), findDuplicates(community, existing));
+  const community = buildCommunity(input, { slug });
+  return result(
+    community,
+    [normalizeEmail(email)],
+    validateCommunity(community),
+    findDuplicates(community, existing),
+  );
 }
 
 /**
- * An edit to `current` by `email`. Only its librarians may edit it; the slug never
- * changes; librarian emails may be added or removed but at least one must remain.
+ * An edit to `current` (whose librarians are `librarians`) by `email`. Only its
+ * librarians may edit it; the slug never changes; librarian emails may be added or
+ * removed but at least one must remain.
  */
-export function checkUpdate({ current, input, email, existing }) {
-  if (!isLibrarian(current, email)) {
+export function checkUpdate({ current, librarians, input, email, existing }) {
+  if (!isLibrarian(librarians, email)) {
     return {
       ok: false,
       status: 403,
       errors: [{ field: null, message: 'Only this library’s librarians can edit it.' }],
     };
   }
-  const librarianEmails = input.librarian_emails ?? current.librarian_emails;
-  const community = buildCommunity(input, { slug: current.slug, librarianEmails });
+  const nextLibrarians = uniqueEmails(input.librarian_emails ?? librarians);
+  const community = buildCommunity(input, { slug: current.slug });
   const others = existing.filter((other) => other.slug !== current.slug);
-  return result(community, validateCommunity(community), findDuplicates(community, others));
+  return result(
+    community,
+    nextLibrarians,
+    [...validateCommunity(community), ...validateLibrarians(nextLibrarians)],
+    findDuplicates(community, others),
+  );
 }

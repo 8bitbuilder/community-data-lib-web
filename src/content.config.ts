@@ -67,9 +67,8 @@ const communitiesCollection = defineCollection({
       .regex(/^\d{5}$/)
       .optional(),
     zip_codes: z.array(z.string().regex(/^\d{5}$/)).default([]),
-    // Everyone who may edit this library through the librarian portal (/librarian/).
-    // Public on purpose: visitors can see who maintains a library.
-    librarian_emails: z.array(z.string().email()).default([]),
+    // Librarian emails are deliberately not here: these files are public, so the
+    // librarian portal keeps them in Netlify Blobs (see netlify/lib/librarianStore.mjs).
   }),
 });
 

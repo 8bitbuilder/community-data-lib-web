@@ -18,7 +18,6 @@ const FIELD_ORDER = [
   'county',
   'county_fips',
   'zip_codes',
-  'librarian_emails',
 ];
 
 /** Repo path of a community file. Throws on an unsafe slug so no other path can be written. */
@@ -27,15 +26,16 @@ export function communityPath(slug) {
   return `${COMMUNITIES_DIR}/${slug}.md`;
 }
 
-/** Parse a community file into { data, body }. Accepts the old single `librarian_email`. */
+/**
+ * Parse a community file into { data, body }. Librarian emails never belong in these
+ * public files, so any old `librarian_email(s)` fields are dropped.
+ */
 export function parseCommunityMarkdown(markdown) {
   const match = String(markdown).match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) throw new Error('Community file has no YAML frontmatter');
   const data = YAML.parse(match[1]) ?? {};
-  if (!data.librarian_emails) {
-    data.librarian_emails = data.librarian_email ? [data.librarian_email] : [];
-  }
   delete data.librarian_email;
+  delete data.librarian_emails;
   if (data.county_fips != null) data.county_fips = String(data.county_fips);
   data.zip_codes = (data.zip_codes ?? []).map(String);
   return { data, body: match[2] };
@@ -46,7 +46,7 @@ export function serializeCommunityMarkdown(community, body) {
   const ordered = {};
   for (const key of FIELD_ORDER) {
     const value = community[key];
-    if (value === undefined || (Array.isArray(value) && value.length === 0 && key !== 'librarian_emails')) {
+    if (value === undefined || (Array.isArray(value) && value.length === 0)) {
       continue;
     }
     ordered[key] = value;
