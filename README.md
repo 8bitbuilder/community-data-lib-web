@@ -42,34 +42,59 @@ Contribution guidelines are in [data/geo/README.md](data/geo/README.md).
 
 Community librarians register and maintain their community library at `/librarian/` (`/web/librarian/` with the base path). Site visitors never log in.
 
-- Anyone can sign up with Netlify Identity. Once their email is confirmed they can register a library: name, place name, description, state, county FIPS code, and ZIP codes. Their login email becomes the library's first entry in `librarian_emails`.
-- Each county can have one library, and each web address (slug) is unique; duplicates are rejected.
-- A librarian can edit only the libraries whose `librarian_emails` include their login email, and can add or remove other librarians (a library always keeps at least one).
-- Saves go through the `librarian-api` Netlify Function (`netlify/functions/librarian-api.mjs`). It verifies the Identity token, checks permissions, validates the fields, and commits `src/content/communities/<slug>.md` to GitHub. The commit triggers a normal Netlify build, so changes go live a few minutes later.
-- The rules live in `src/lib/community/librarianRules.mjs` and are covered by `npm test`.
+- **Registering**: anyone can sign up with Netlify Identity. Once their email is confirmed they can register a library: name, place name, description, state, county FIPS code, and ZIP codes. They become its first librarian.
+- **Approval**: a registration opens a pull request (branch `library/<slug>`) adding `src/content/communities/<slug>.md`. The team approves it by **merging** (it goes live on the next deploy) or rejects it by **closing** it. `.github/CODEOWNERS` requests a review from the team on these pull requests, which is the approval email.
+- **One library per county**: each county and each web address (slug) can have only one library, including ones awaiting approval. A rejected registration frees them again. When a county is taken, the portal links to that library and to the list of all libraries.
+- **Editing**: a librarian can edit only their own approved libraries, and can add or remove other librarians (a library always keeps at least one). Edits commit straight to `main`.
+- **Private emails**: librarian emails are never in the repo, commits, pull requests, or the built site. They live in the site's private [Netlify Blobs](https://docs.netlify.com/blobs/overview/) store `librarians` (one JSON record per library), which only the functions can read. Approval pull requests show a masked email (`j***@utk.edu`).
+- **Contacting a librarian**: each library page has a *Contact the librarian* form. The `library-contact` function forwards the message by email through [Resend](https://resend.com) with the visitor as Reply-To, so visitors never see a librarian's address.
+
+Code: `netlify/functions/librarian-api.mjs` and `library-contact.mjs`, with helpers in `netlify/lib/`. The permission and validation rules are in `src/lib/community/librarianRules.mjs`. All of it is covered by `npm test`.
+
+### Why a custom portal instead of Decap for librarians
+
+- **Decap can't limit a user to one library.** Anyone who can log into Decap can edit every community file (and, through Git Gateway, anything else in the repo). The portal only lets a librarian change the libraries they maintain.
+- **Git Gateway is deprecated by Netlify.** The portal commits through the GitHub API with a token the function holds, so it doesn't depend on Git Gateway.
+- **Private librarian emails.** Decap can only edit fields stored in the public repo; the portal keeps librarian emails in a private store.
+- **Self-service sign-up with approval and duplicate checks**, which Decap doesn't offer.
+
+Librarians can edit the same community fields they could in Decap (name, place name, description, state, county, county FIPS, ZIP codes) plus their library's list of librarians. They cannot change a library's web address, edit other libraries, or touch any other file. The team keeps Decap at `/admin` for direct edits.
 
 ### Netlify setup
 
 1. **Identity**: Site configuration > Identity > **Enable Identity** (if it isn't already).
-2. **Registration**: Identity > Registration preferences > **Open**, so new librarians can sign up. Leave email confirmation on (do not enable autoconfirm); the function only accepts confirmed emails.
-3. **Lock down Decap's Git Gateway**: once registration is open, any signed-up user could use Decap's Git Gateway to edit the repo. Under Identity > Services > Git Gateway, restrict access to a role (for example `admin`), then give that role to team members under Identity > Users > (user) > Edit settings.
-4. **GitHub token**: create a fine-grained personal access token (or a token for a bot account) with access to **only** `community-data-libraries/web` and **Contents: Read and write**. Note when it expires and rotate it before then.
-5. **Environment variables**: Site configuration > Environment variables, scoped to **Functions**:
+2. **Lock down Decap's Git Gateway first**: once registration is open, any signed-up user could use Decap's Git Gateway to edit the repo. Under Identity > Services > Git Gateway, restrict access to a role (for example `admin`), then give that role to team members under Identity > Users > (user) > Edit settings.
+3. **Registration**: Identity > Registration preferences > **Open**, so new librarians can sign up. Leave email confirmation on (do not enable autoconfirm); the functions only accept confirmed emails.
+4. **GitHub token**: create a [fine-grained personal access token](https://github.com/settings/personal-access-tokens/new) (ideally owned by the organization or a bot account):
+   - **Resource owner**: `community-data-libraries`; **Repository access**: *Only select repositories* > `community-data-libraries/web`.
+   - **Repository permissions**: **Contents: Read and write** (read files, create `library/<slug>` branches, commit edits) and **Pull requests: Read and write** (open approval pull requests and check whether they were merged). Metadata: Read-only is added automatically. Nothing else.
+   - Set an expiration and rotate the token before it expires. If `main` is protected, the token's account must be allowed to push to it, or librarian edits will fail.
+5. **Email for the contact form**: create a [Resend](https://resend.com) account, verify a sending domain (for example `communitydatalibraries.org`), and create an API key with *Sending access*.
+6. **Environment variables**: Site configuration > Environment variables, scoped to **Functions**:
 
    | Variable | Required | Value |
    | --- | --- | --- |
    | `LIBRARIAN_GITHUB_TOKEN` | yes | The token from step 4. Never commit it. |
    | `LIBRARIAN_GITHUB_REPO` | no | `owner/name`; defaults to `community-data-libraries/web` |
    | `LIBRARIAN_GITHUB_BRANCH` | no | Branch the site deploys from; defaults to `main` |
+   | `RESEND_API_KEY` | for the contact form | The Resend API key from step 5 |
+   | `CONTACT_FROM_EMAIL` | for the contact form | Sender on the verified domain, e.g. `Community Data Libraries <librarians@communitydatalibraries.org>` |
 
-   Without `LIBRARIAN_GITHUB_TOKEN` the portal loads but saving returns "not configured".
+   Without `LIBRARIAN_GITHUB_TOKEN` the portal loads but saving returns "not configured"; without the Resend variables the contact form says it isn't set up yet.
+7. **Librarians for existing libraries**: libraries created before the portal (Knox County) have no librarians until one is added. With the Netlify CLI linked to the site:
+
+   ```bash
+   netlify blobs:set librarians knox-county '{"emails":["librarian@example.org"],"status":"approved","name":"Knox County Data Library","county_fips":"47093"}'
+   ```
+
+   `netlify blobs:get librarians <slug>` shows a library's record, including the full email of whoever registered it.
 
 ### Testing
 
-- **Unit tests**: `npm test` covers the permission and validation rules and the function's handler, using a fake Identity service and an in-memory repo.
+- **Unit tests**: `npm test` covers the permission and validation rules, the approval flow, and the contact form, using a fake Identity service, an in-memory repo and Blobs store, and a fake email sender.
 - **Full flow locally** with the [Netlify CLI](https://docs.netlify.com/cli/get-started/) (needs Identity enabled on the deployed site):
   1. `npm install -g netlify-cli`, then `netlify login` and `netlify link` (pick the site).
-  2. Create a `.env` file (git-ignored) pointing saves at a **test branch of a fork**, so testing never publishes to the live site:
+  2. Create a `.env` file (git-ignored) pointing saves at a **test branch of a fork**, so testing never publishes to the live site (registrations open pull requests against that branch):
 
      ```bash
      LIBRARIAN_GITHUB_TOKEN=<fine-grained token with Contents read/write on the fork>
