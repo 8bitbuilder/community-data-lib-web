@@ -42,10 +42,109 @@ function prBody(id, email, current, updates) {
 
 const timestamp = (ms) => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
 
+function logAttempt(attempt) {
+  const idStr = attempt.id || '-';
+  const fieldsStr = attempt.fields.length > 0 ? ` [${attempt.fields.join(', ')}]` : '';
+  const statusStr = attempt.status || '?';
+  const prStr = attempt.pr ? ` PR #${attempt.pr}` : '';
+  const reasonStr = attempt.reason ? ` (${attempt.reason})` : '';
+  const logLine = `metadata-edit: ${attempt.email || '-'} ${idStr}${fieldsStr} -> ${statusStr}${prStr}${reasonStr}`;
+
+  if (attempt.status >= 200 && attempt.status < 300) {
+    console.log(logLine);
+  } else {
+    console.error(logLine);
+  }
+}
+
+async function handlePost(request, email, config, github, now) {
+  const attempt = { email, id: null, fields: [], status: null, pr: null, reason: null };
+  let response = null;
+  let body = null;
+  let id = null;
+  let branch = null;
+
+  try {
+    body = await request.json().catch(() => {
+      throw new HttpError(400, 'Invalid JSON');
+    });
+
+    attempt.id = String(body?.id ?? '').slice(0, 100);
+
+    // Extract fields early if present
+    if (body?.changes && typeof body.changes === 'object' && !Array.isArray(body.changes)) {
+      attempt.fields = Object.keys(body.changes).slice(0, 30).map((k) => k.slice(0, 50));
+    }
+
+    id = checkId(body?.id);
+    const head = await github.getHeadSha();
+    const { file, current, vocabulary } = await loadAt(github, head, id);
+    const changes = validateChanges(body.changes, vocabulary);
+    const updates = toTopLevelUpdates(current, changes, vocabulary);
+    if (Object.keys(updates).length === 0) throw new HttpError(400, 'Nothing changed');
+
+    branch = `${branchPrefix(id)}${timestamp(now())}`;
+    try {
+      await github.createBranch(branch, head);
+    } catch (err) {
+      if (err instanceof GitHubError && err.status === 422) {
+        throw new HttpError(409, 'Another edit to this dataset was just submitted. Please try again in a moment.');
+      }
+      throw err;
+    }
+
+    try {
+      await github.putFile(sourcePath(id), {
+        text: replaceTopLevelKeys(file.text, updates),
+        sha: file.sha,
+        branch,
+        message: `Update metadata for ${id}\n\nCo-Authored-By: ${email} <${email}>`,
+      });
+      const pr = await github.openPullRequest({
+        title: `Update metadata: ${current.title ?? id} (by ${email})`,
+        body: prBody(id, email, current, updates),
+        head: branch,
+      });
+      attempt.pr = pr.number;
+      attempt.status = 201;
+      response = json(201, { prUrl: pr.html_url, prNumber: pr.number });
+    } catch (err) {
+      // putFile/openPullRequest failures must delete the branch and return 502
+      await github.deleteBranch(branch).catch(() => {});
+      throw new HttpError(502, 'Could not open a pull request, so nothing was saved. Please try again.');
+    }
+  } catch (err) {
+    // Handle all errors: set attempt status and reason, construct response
+    if (err instanceof HttpError) {
+      attempt.status = err.status;
+      attempt.reason = err.message;
+      response = json(err.status, { error: err.message, ...(err.field ? { field: err.field } : {}) });
+    } else if (err instanceof GitHubError) {
+      attempt.status = 502;
+      attempt.reason = err.message;
+      response = json(502, { error: 'GitHub is unavailable right now, so nothing was saved. Please try again.' });
+    } else {
+      attempt.status = 500;
+      attempt.reason = 'unexpected error';
+      response = json(500, { error: 'Internal error' });
+    }
+  } finally {
+    logAttempt(attempt);
+  }
+
+  return response;
+}
+
 export function createHandler({ config, github, now = Date.now }) {
   return async (request) => {
     try {
-      const email = requireEditor(request, config, now());
+      let email;
+      try {
+        email = requireEditor(request, config, now());
+      } catch (err) {
+        // Log auth failures at handler level without POST attempt tracking
+        return toResponse(err);
+      }
 
       if (request.method === 'GET') {
         const id = checkId(new URL(request.url).searchParams.get('id'));
@@ -61,60 +160,11 @@ export function createHandler({ config, github, now = Date.now }) {
       }
 
       if (request.method !== 'POST') throw new HttpError(405, 'Method not allowed');
-      const body = await request.json().catch(() => {
-        throw new HttpError(400, 'Invalid JSON');
-      });
-      const id = checkId(body?.id);
-      const fields = body?.changes && typeof body.changes === 'object' ? Object.keys(body.changes) : [];
 
-      try {
-        const head = await github.getHeadSha();
-        const { file, current, vocabulary } = await loadAt(github, head, id);
-        const changes = validateChanges(body.changes, vocabulary);
-        const updates = toTopLevelUpdates(current, changes, vocabulary);
-        if (Object.keys(updates).length === 0) throw new HttpError(400, 'Nothing changed');
-
-        const branch = `${branchPrefix(id)}${timestamp(now())}`;
-        try {
-          await github.createBranch(branch, head);
-        } catch (err) {
-          if (err instanceof GitHubError && err.status === 422) {
-            throw new HttpError(409, 'Another edit to this dataset was just submitted. Please try again in a moment.');
-          }
-          throw err;
-        }
-
-        try {
-          await github.putFile(sourcePath(id), {
-            text: replaceTopLevelKeys(file.text, updates),
-            sha: file.sha,
-            branch,
-            message: `Update metadata for ${id}\n\nCo-Authored-By: ${email} <${email}>`,
-          });
-          const pr = await github.openPullRequest({
-            title: `Update metadata: ${current.title ?? id} (by ${email})`,
-            body: prBody(id, email, current, updates),
-            head: branch,
-          });
-          console.log(`metadata-edit: ${email} edited ${id} [${Object.keys(updates).join(', ')}] -> PR #${pr.number}`);
-          return json(201, { prUrl: pr.html_url, prNumber: pr.number });
-        } catch (err) {
-          console.error(`metadata-edit: ${email} edit of ${id} failed:`, err.message);
-          await github.deleteBranch(branch).catch(() => {});
-          throw new HttpError(502, 'Could not open a pull request, so nothing was saved. Please try again.');
-        }
-      } catch (err) {
-        // Log POST failures: GitHub errors, validation errors, no-ops
-        if (err instanceof HttpError && [400, 404, 409, 502].includes(err.status)) {
-          const fieldsStr = fields.length > 0 ? ` [${fields.join(', ')}]` : '';
-          console.log(`metadata-edit: ${email} post ${id}${fieldsStr} ${err.status}`);
-        } else if (err instanceof GitHubError) {
-          const fieldsStr = fields.length > 0 ? ` [${fields.join(', ')}]` : '';
-          console.log(`metadata-edit: ${email} post ${id}${fieldsStr} 502`);
-        }
-        throw err;
-      }
+      // Handle POST with its own tracking
+      return await handlePost(request, email, config, github, now);
     } catch (err) {
+      // Outer errors (GET failures, method not allowed)
       // Convert GitHubError at outer level to 502
       if (err instanceof GitHubError) {
         return toResponse(new HttpError(502, 'GitHub is unavailable right now, so nothing was saved. Please try again.'));

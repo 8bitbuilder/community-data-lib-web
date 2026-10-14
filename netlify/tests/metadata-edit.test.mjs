@@ -189,19 +189,226 @@ test('PR body handles \\r and \\r\\n newlines in values', async () => {
   assert.ok(capturedPrBody.includes('Line1 Line2 Line3'), 'should have replaced newlines with spaces in the value');
 });
 
-test('POST logs validation failure with field name', async () => {
+test('POST success logs exactly once with PR number', async () => {
   const logs = [];
   const oldLog = console.log;
-  console.log = (...args) => logs.push(args.join(' '));
+  const oldError = console.error;
+  console.log = (...args) => logs.push({ type: 'log', line: args.join(' ') });
+  console.error = (...args) => logs.push({ type: 'error', line: args.join(' ') });
+  try {
+    const github = fakeGitHub();
+    const res = await createHandler({ config, github, now: () => NOW })(
+      post({ id: 'usda-milk', changes: { title: 'Updated' } }),
+    );
+    assert.equal(res.status, 201);
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].type, 'log');
+    assert.ok(logs[0].line.includes('201'));
+    assert.ok(logs[0].line.includes('PR #7'));
+    assert.ok(logs[0].line.includes('usda-milk'));
+  } finally {
+    console.log = oldLog;
+    console.error = oldError;
+  }
+});
+
+test('POST validation failure logs exactly once', async () => {
+  const logs = [];
+  const oldLog = console.log;
+  const oldError = console.error;
+  console.log = (...args) => logs.push({ type: 'log', line: args.join(' ') });
+  console.error = (...args) => logs.push({ type: 'error', line: args.join(' ') });
   try {
     const handler = createHandler({ config, github: fakeGitHub(), now: () => NOW });
     const res = await handler(post({ id: 'usda-milk', changes: { description_tags: ['Invalid Tag'] } }));
     assert.equal(res.status, 400);
-    const log = logs.find((l) => l.includes('post') && l.includes('usda-milk'));
-    assert.ok(log, 'should log the failure');
-    assert.ok(log.includes('description_tags'), 'should include field name in log');
-    assert.ok(log.includes('400'), 'should include status code');
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].type, 'error');
+    assert.ok(logs[0].line.includes('400'));
+    assert.ok(logs[0].line.includes('usda-milk'));
+    assert.ok(logs[0].line.includes('description_tags'));
   } finally {
     console.log = oldLog;
+    console.error = oldError;
+  }
+});
+
+test('POST invalid JSON logs exactly once', async () => {
+  const logs = [];
+  const oldLog = console.log;
+  const oldError = console.error;
+  console.log = (...args) => logs.push({ type: 'log', line: args.join(' ') });
+  console.error = (...args) => logs.push({ type: 'error', line: args.join(' ') });
+  try {
+    const handler = createHandler({ config, github: fakeGitHub(), now: () => NOW });
+    const badRequest = new Request(`${ORIGIN}/.netlify/functions/metadata-edit`, {
+      method: 'POST',
+      headers: { cookie: COOKIE, origin: ORIGIN, 'content-type': 'application/json' },
+      body: '{invalid json',
+    });
+    const res = await handler(badRequest);
+    assert.equal(res.status, 400);
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].type, 'error');
+    assert.ok(logs[0].line.includes('400'));
+  } finally {
+    console.log = oldLog;
+    console.error = oldError;
+  }
+});
+
+test('POST invalid id logs exactly once', async () => {
+  const logs = [];
+  const oldLog = console.log;
+  const oldError = console.error;
+  console.log = (...args) => logs.push({ type: 'log', line: args.join(' ') });
+  console.error = (...args) => logs.push({ type: 'error', line: args.join(' ') });
+  try {
+    const handler = createHandler({ config, github: fakeGitHub(), now: () => NOW });
+    const res = await handler(post({ id: 'Bad_ID', changes: { title: 'x' } }));
+    assert.equal(res.status, 400);
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].type, 'error');
+    assert.ok(logs[0].line.includes('400'));
+    assert.ok(logs[0].line.includes('Bad_ID'));
+  } finally {
+    console.log = oldLog;
+    console.error = oldError;
+  }
+});
+
+test('POST missing dataset logs exactly once with 404', async () => {
+  const logs = [];
+  const oldLog = console.log;
+  const oldError = console.error;
+  console.log = (...args) => logs.push({ type: 'log', line: args.join(' ') });
+  console.error = (...args) => logs.push({ type: 'error', line: args.join(' ') });
+  try {
+    const handler = createHandler({ config, github: fakeGitHub(), now: () => NOW });
+    const res = await handler(post({ id: 'missing', changes: { title: 'x' } }));
+    assert.equal(res.status, 404);
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].type, 'error');
+    assert.ok(logs[0].line.includes('404'));
+    assert.ok(logs[0].line.includes('missing'));
+  } finally {
+    console.log = oldLog;
+    console.error = oldError;
+  }
+});
+
+test('POST putFile failure logs exactly once with 502', async () => {
+  const logs = [];
+  const oldLog = console.log;
+  const oldError = console.error;
+  console.log = (...args) => logs.push({ type: 'log', line: args.join(' ') });
+  console.error = (...args) => logs.push({ type: 'error', line: args.join(' ') });
+  try {
+    const github = fakeGitHub(undefined, { failPut: true });
+    const res = await createHandler({ config, github, now: () => NOW })(
+      post({ id: 'usda-milk', changes: { title: 'New' } }),
+    );
+    assert.equal(res.status, 502);
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].type, 'error');
+    assert.ok(logs[0].line.includes('502'));
+    assert.ok(logs[0].line.includes('usda-milk'));
+  } finally {
+    console.log = oldLog;
+    console.error = oldError;
+  }
+});
+
+test('POST createBranch 422 logs exactly once with 409', async () => {
+  const logs = [];
+  const oldLog = console.log;
+  const oldError = console.error;
+  console.log = (...args) => logs.push({ type: 'log', line: args.join(' ') });
+  console.error = (...args) => logs.push({ type: 'error', line: args.join(' ') });
+  try {
+    const github = fakeGitHub();
+    github.createBranch = async function(name, sha) {
+      github.calls.push(['createBranch', name, sha]);
+      throw new GitHubError('Branch already exists', 422);
+    };
+    const res = await createHandler({ config, github, now: () => NOW })(
+      post({ id: 'usda-milk', changes: { title: 'New' } }),
+    );
+    assert.equal(res.status, 409);
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].type, 'error');
+    assert.ok(logs[0].line.includes('409'));
+    assert.ok(!github.calls.find((c) => c[0] === 'putFile'));
+  } finally {
+    console.log = oldLog;
+    console.error = oldError;
+  }
+});
+
+test('POST missing vocabulary logs exactly once with 500', async () => {
+  const logs = [];
+  const oldLog = console.log;
+  const oldError = console.error;
+  console.log = (...args) => logs.push({ type: 'log', line: args.join(' ') });
+  console.error = (...args) => logs.push({ type: 'error', line: args.join(' ') });
+  try {
+    const github = fakeGitHub({ 'data/sources/usda-milk.yml': DATASET });
+    const res = await createHandler({ config, github, now: () => NOW })(
+      post({ id: 'usda-milk', changes: { title: 'New' } }),
+    );
+    assert.equal(res.status, 500);
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].type, 'error');
+    assert.ok(logs[0].line.includes('500'));
+  } finally {
+    console.log = oldLog;
+    console.error = oldError;
+  }
+});
+
+test('POST no session (requireEditor 401) does not log attempt', async () => {
+  const logs = [];
+  const oldLog = console.log;
+  const oldError = console.error;
+  console.log = (...args) => logs.push({ type: 'log', line: args.join(' ') });
+  console.error = (...args) => logs.push({ type: 'error', line: args.join(' ') });
+  try {
+    const handler = createHandler({ config, github: fakeGitHub(), now: () => NOW });
+    const noAuthPost = new Request(`${ORIGIN}/.netlify/functions/metadata-edit`, {
+      method: 'POST',
+      headers: { origin: ORIGIN, 'content-type': 'application/json' },
+      body: JSON.stringify({ id: 'usda-milk', changes: { title: 'x' } }),
+    });
+    const res = await handler(noAuthPost);
+    assert.equal(res.status, 401);
+    // No attempt logging for auth failures
+    const attemptLogs = logs.filter((l) => l.line.includes('metadata-edit'));
+    assert.equal(attemptLogs.length, 0);
+  } finally {
+    console.log = oldLog;
+    console.error = oldError;
+  }
+});
+
+test('POST does not log secret values', async () => {
+  const logs = [];
+  const oldLog = console.log;
+  const oldError = console.error;
+  console.log = (...args) => logs.push({ type: 'log', line: args.join(' ') });
+  console.error = (...args) => logs.push({ type: 'error', line: args.join(' ') });
+  try {
+    const github = fakeGitHub();
+    const secretValue = 'SECRET-VALUE-12345';
+    const res = await createHandler({ config, github, now: () => NOW })(
+      post({ id: 'usda-milk', changes: { title: secretValue } }),
+    );
+    assert.equal(res.status, 201);
+    const allLogText = logs.map((l) => l.line).join(' ');
+    assert.ok(!allLogText.includes(secretValue), 'should not log the secret title value');
+    // Email is part of the attempt logging, so it's ok if it's logged
+    assert.ok(allLogText.includes('alice@example.org'), 'should log email for accountability');
+  } finally {
+    console.log = oldLog;
+    console.error = oldError;
   }
 });

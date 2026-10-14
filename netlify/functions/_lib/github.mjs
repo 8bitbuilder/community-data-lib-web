@@ -26,7 +26,7 @@ export function createGitHub({ token, repo, fetchImpl = fetch }) {
   return {
     async getHeadSha(branch = 'main') {
       const ref = await api('GET', `/git/ref/heads/${branch}`);
-      if (!ref) throw new Error(`Branch ${branch} not found`);
+      if (!ref) throw new GitHubError(`Branch ${branch} not found`, 404);
       return ref.object.sha;
     },
     async getFile(path, ref) {
