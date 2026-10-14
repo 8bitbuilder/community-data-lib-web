@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { readYaml, replaceTopLevelKeys } from './yamlEdit.mjs';
+import { stringify } from 'yaml';
 
 const SRC = readFileSync(new URL('./fixtures/sample-source.yml', import.meta.url), 'utf8');
 
@@ -58,13 +59,26 @@ test('non-mapping roots are rejected', () => {
   assert.throws(() => replaceTopLevelKeys('- a\n- b\n', { title: 'x' }), /mapping/);
 });
 
-test('editing variable_types_tags in fixture preserves comment and blank line', () => {
-  // Replace variable_types_tags with a different set of tags
-  const out = replaceTopLevelKeys(SRC, { variable_types_tags: { 'all-discrete': true } });
-  // Comment should be preserved on the next line
-  assert.ok(out.includes('all-discrete: true\n# Canonical geography'), 'comment should follow the edited key-value');
-  // Verify the comment line is still there
-  assert.ok(out.includes('# Canonical geography and audience metadata'));
+test('editing variable_types_tags in fixture with exact check', () => {
+  // Read the current value and flip one boolean
+  const currentValue = readYaml(SRC).variable_types_tags;
+  const newValue = { ...currentValue, 'all-discrete': !currentValue['all-discrete'] };
+
+  // Find the exact boundaries of variable_types_tags in SRC
+  const startMarker = '\nvariable_types_tags:';
+  const endMarker = '\n\n# Canonical geography';
+  const startIdx = SRC.indexOf(startMarker) + 1; // +1 to skip the newline
+  const endIdx = SRC.indexOf(endMarker) + 1; // +1 to include the newline before the comment
+
+  // Build expected output by replacing the exact region
+  const block = stringify({ variable_types_tags: newValue }, { indentSeq: false, lineWidth: 80, minContentWidth: 0, version: '1.1' });
+  const expected = SRC.slice(0, startIdx) + block + SRC.slice(endIdx);
+
+  // Perform the replacement
+  const out = replaceTopLevelKeys(SRC, { variable_types_tags: newValue });
+
+  // Exact check
+  assert.equal(out, expected);
 });
 
 test('comments between keys are preserved on same line edit', () => {
@@ -101,4 +115,46 @@ test('invalid YAML with duplicate keys is rejected by replaceTopLevelKeys', () =
     () => replaceTopLevelKeys('a: 1\nb: 2\na: 3\n', { a: 9 }),
     /Invalid YAML/
   );
+});
+
+test('block sequence: edits preserve following keys', () => {
+  const yaml = 'a: 1\nlist:\n- x\n- y\nc: 3\n';
+  const out = replaceTopLevelKeys(yaml, { c: 7, list: ['z'] });
+  assert.equal(out, 'a: 1\nlist:\n- z\nc: 7\n');
+});
+
+test('nested map: comments are preserved', () => {
+  const yaml = 'a:\n  x: 1\n  y: 2\n# cm\nb: 2\n';
+  const out = replaceTopLevelKeys(yaml, { a: 9 });
+  assert.equal(out, 'a: 9\n# cm\nb: 2\n');
+});
+
+test('nested map with internal comment: trailing comment preserved', () => {
+  const yaml = 'a:\n  x: 1\n  # in\n  y: 2\n  # tail\nb: 2\n';
+  const out = replaceTopLevelKeys(yaml, { a: 9 });
+  assert.equal(out, 'a: 9\n  # tail\nb: 2\n');
+});
+
+test('block literal scalar: following keys preserved', () => {
+  const yaml = 'a: |\n  x\n  y\nb: 2\n';
+  const out = replaceTopLevelKeys(yaml, { a: 'q' });
+  assert.equal(out, 'a: q\nb: 2\n');
+});
+
+test('block literal with trailing comment: comment preserved', () => {
+  const yaml = 'a: |\n  x\n  y\n\n# c\nb: 2\n';
+  const out = replaceTopLevelKeys(yaml, { a: 'q' });
+  assert.equal(out, 'a: q\n\n# c\nb: 2\n');
+});
+
+test('block literal with indented hash: hash is content', () => {
+  const yaml = 'a: |\n  x\n  # y\nb: 2\n';
+  const out = replaceTopLevelKeys(yaml, { a: 'q' });
+  assert.equal(out, 'a: q\nb: 2\n');
+});
+
+test('null value on same line as key', () => {
+  const yaml = 'a:\nb: 2\n';
+  const out = replaceTopLevelKeys(yaml, { a: 1 });
+  assert.equal(out, 'a: 1\nb: 2\n');
 });

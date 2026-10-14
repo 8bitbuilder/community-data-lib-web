@@ -1,4 +1,4 @@
-import { isMap, parseDocument, stringify } from 'yaml';
+import { isMap, isScalar, parseDocument, stringify } from 'yaml';
 
 // Match PyYAML's output (block lists flush with their key) and quote YAML 1.1
 // lookalikes such as "yes" or "2025" so the Python pipeline reads strings back.
@@ -36,16 +36,51 @@ export function replaceTopLevelKeys(text, updates) {
       continue;
     }
     const start = pairs[index].key.range[0];
-    // End at the end of the line containing the value's last character.
-    // If value exists, start from its range[1]; otherwise use key's range[1].
-    let end = pairs[index].value?.range[1] ?? pairs[index].key.range[1];
-    // Scan to include the newline at the end of the line
-    while (end < text.length && text[end] !== '\n') {
-      end++;
+    const limit = index + 1 < pairs.length ? pairs[index + 1].key.range[0] : text.length;
+
+    // Use line-based algorithm to handle block values correctly
+    const region = text.slice(start, limit);
+    const lines = region.match(/[^\n]*\n|[^\n]+$/g) || [];
+
+    // Determine if value is a block scalar
+    const isBlockScalar = isScalar(pairs[index].value) &&
+      (pairs[index].value.type === 'BLOCK_LITERAL' || pairs[index].value.type === 'BLOCK_FOLDED');
+
+    // Walk backwards to find trailing lines (comments, blank lines, document markers)
+    let lastNonTrailingIdx = 0;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      const isBlank = trimmed === '';
+      const isMarker = trimmed === '...' || trimmed === '---';
+      const isComment = trimmed.startsWith('#');
+
+      if (isBlank || isMarker) {
+        // Trailing
+        continue;
+      }
+
+      if (isComment) {
+        // Comment is trailing if: value is not a block scalar OR line has zero indentation
+        const leadingSpaces = line.match(/^(\s*)/)[1].length;
+        const isZeroIndent = leadingSpaces === 0;
+        if (!isBlockScalar || isZeroIndent) {
+          // Trailing
+          continue;
+        }
+      }
+
+      // First non-trailing line found
+      lastNonTrailingIdx = i;
+      break;
     }
-    if (end < text.length && text[end] === '\n') {
-      end++;
+
+    // Calculate end position: sum of lengths of lines up to and including lastNonTrailingIdx
+    let end = start;
+    for (let i = 0; i <= lastNonTrailingIdx && i < lines.length; i++) {
+      end += lines[i].length;
     }
+
     edits.push([start, end, block]);
   }
 
