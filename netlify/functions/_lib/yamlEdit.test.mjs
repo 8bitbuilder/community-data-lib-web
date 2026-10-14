@@ -20,7 +20,10 @@ test('no updates leaves the file byte-identical', () => {
 test('replacing title changes exactly one line', () => {
   const out = replaceTopLevelKeys(SRC, { title: 'New Title' });
   assert.equal(readYaml(out).title, 'New Title');
-  assert.equal(changedLines(SRC, out).length, 1);
+  const changed = changedLines(SRC, out);
+  assert.equal(changed.length, 1);
+  // Line count should be unchanged
+  assert.equal(SRC.split('\n').length, out.split('\n').length);
 });
 
 test('untouched values keep their exact source text (floats, long strings)', () => {
@@ -53,4 +56,49 @@ test('YAML 1.1 lookalikes are quoted so PyYAML keeps them as strings', () => {
 
 test('non-mapping roots are rejected', () => {
   assert.throws(() => replaceTopLevelKeys('- a\n- b\n', { title: 'x' }), /mapping/);
+});
+
+test('editing variable_types_tags in fixture preserves comment and blank line', () => {
+  // Replace variable_types_tags with a different set of tags
+  const out = replaceTopLevelKeys(SRC, { variable_types_tags: { 'all-discrete': true } });
+  // Comment should be preserved on the next line
+  assert.ok(out.includes('all-discrete: true\n# Canonical geography'), 'comment should follow the edited key-value');
+  // Verify the comment line is still there
+  assert.ok(out.includes('# Canonical geography and audience metadata'));
+});
+
+test('comments between keys are preserved on same line edit', () => {
+  const yaml = 'a: 1\n# note about b\n\nb: 2\n';
+  const out = replaceTopLevelKeys(yaml, { a: 9 });
+  assert.equal(out, 'a: 9\n# note about b\n\nb: 2\n');
+});
+
+test('trailing comment on same key is preserved', () => {
+  const yaml1 = 'b: 2\n# end\n';
+  const out1 = replaceTopLevelKeys(yaml1, { b: 9 });
+  assert.equal(out1, 'b: 9\n# end\n');
+
+  const yaml2 = 'b: 2\n...\n';
+  const out2 = replaceTopLevelKeys(yaml2, { b: 9 });
+  assert.equal(out2, 'b: 9\n...\n');
+});
+
+test('two edits in one call', () => {
+  const yaml = 'a: 1\nb: 2\nc: 3\n';
+  const out = replaceTopLevelKeys(yaml, { a: 10, c: 30 });
+  assert.equal(out, 'a: 10\nb: 2\nc: 30\n');
+});
+
+test('invalid YAML with duplicate keys is rejected by readYaml', () => {
+  assert.throws(
+    () => readYaml('a: 1\nb: 2\na: 3\n'),
+    /Invalid YAML/
+  );
+});
+
+test('invalid YAML with duplicate keys is rejected by replaceTopLevelKeys', () => {
+  assert.throws(
+    () => replaceTopLevelKeys('a: 1\nb: 2\na: 3\n', { a: 9 }),
+    /Invalid YAML/
+  );
 });

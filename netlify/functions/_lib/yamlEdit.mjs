@@ -4,15 +4,25 @@ import { isMap, parseDocument, stringify } from 'yaml';
 // lookalikes such as "yes" or "2025" so the Python pipeline reads strings back.
 const BLOCK_OPTIONS = { indentSeq: false, lineWidth: 80, minContentWidth: 0, version: '1.1' };
 
-export const readYaml = (text) => parseDocument(text, { version: '1.1' }).toJS();
+export const readYaml = (text) => {
+  const doc = parseDocument(text, { version: '1.1' });
+  if (doc.errors.length > 0) {
+    throw new Error(`Invalid YAML: ${doc.errors[0].message}`);
+  }
+  return doc.toJS();
+};
 
 /**
  * Replace the source text of each top-level key in `updates`, append keys
  * that are not present, and leave every other byte untouched. Re-serializing
  * the whole document would re-wrap long strings and turn `-181533.0` into an int.
+ * Comments, blank lines, and trailing markers between edited keys are preserved.
  */
 export function replaceTopLevelKeys(text, updates) {
   const doc = parseDocument(text, { version: '1.1' });
+  if (doc.errors.length > 0) {
+    throw new Error(`Invalid YAML: ${doc.errors[0].message}`);
+  }
   if (!isMap(doc.contents)) throw new Error('YAML root must be a mapping');
   const pairs = doc.contents.items;
   const edits = [];
@@ -26,7 +36,16 @@ export function replaceTopLevelKeys(text, updates) {
       continue;
     }
     const start = pairs[index].key.range[0];
-    const end = index + 1 < pairs.length ? pairs[index + 1].key.range[0] : text.length;
+    // End at the end of the line containing the value's last character.
+    // If value exists, start from its range[1]; otherwise use key's range[1].
+    let end = pairs[index].value?.range[1] ?? pairs[index].key.range[1];
+    // Scan to include the newline at the end of the line
+    while (end < text.length && text[end] !== '\n') {
+      end++;
+    }
+    if (end < text.length && text[end] === '\n') {
+      end++;
+    }
     edits.push([start, end, block]);
   }
 
