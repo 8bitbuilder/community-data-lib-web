@@ -32,11 +32,8 @@ export function createHandler({ config, store, sendMail, now = Date.now }) {
 
     const token = signToken({ email, exp: now() + LINK_TTL_MS, nonce: newNonce(), purpose: 'link' }, config.authSecret);
     const link = `${config.siteOrigin}/.netlify/functions/auth-verify?token=${encodeURIComponent(token)}`;
-    try {
-      await sendMail({ to: email, link });
-    } catch (err) {
-      console.error('auth-request-link: email failed:', err.message);
-    }
+    const delivery = sendMail({ to: email, link }).catch((err) => console.error('auth-request-link: email failed:', err.message));
+    if (typeof context?.waitUntil === 'function') context.waitUntil(delivery);
     return json(200, RESPONSE);
   };
 }

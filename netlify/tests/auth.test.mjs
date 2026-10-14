@@ -8,6 +8,21 @@ import { createHandler as verify } from '../functions/auth-verify.mjs';
 import { createHandler as me } from '../functions/auth-me.mjs';
 import { createHandler as logout } from '../functions/auth-logout.mjs';
 
+// Silence handler logging during tests
+const originalLog = console.log;
+const originalWarn = console.warn;
+const originalError = console.error;
+test.before(() => {
+  console.log = () => {};
+  console.warn = () => {};
+  console.error = () => {};
+});
+test.after(() => {
+  console.log = originalLog;
+  console.warn = originalWarn;
+  console.error = originalError;
+});
+
 const ORIGIN = 'https://cdl.example';
 const config = { authSecret: 's'.repeat(32), editorEmails: 'alice@example.org', siteOrigin: ORIGIN, previewPath: '/web/data-preview' };
 const NOW = 1_800_000_000_000;
@@ -56,6 +71,27 @@ test('request-link: email failure still returns the same 200', async () => {
   assert.equal((await handler(post('auth-request-link', { email: 'alice@example.org' }), {})).status, 200);
 });
 
+test('request-link: no timing leak (never-resolving sendMail, context.waitUntil)', async () => {
+  const { deps } = setup();
+  let waitUntilCalled = false;
+  const handler = requestLink({ ...deps, sendMail: () => new Promise(() => {}) });
+  const context = { ip: '1.2.3.4', waitUntil: (p) => { waitUntilCalled = true; } };
+  const promise = handler(post('auth-request-link', { email: 'alice@example.org' }), context);
+  const race = Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 200))]);
+  const res = await race;
+  assert.equal(res.status, 200);
+  assert.equal(waitUntilCalled, true);
+});
+
+test('request-link: unknown email does not call context.waitUntil', async () => {
+  const { deps } = setup();
+  let waitUntilCalled = false;
+  const handler = requestLink(deps);
+  const context = { ip: '1.2.3.4', waitUntil: (p) => { waitUntilCalled = true; } };
+  await handler(post('auth-request-link', { email: 'unknown@example.org' }), context);
+  assert.equal(waitUntilCalled, false);
+});
+
 test('verify GET shows a confirm page and does NOT consume the link (email scanners)', async () => {
   const { store, deps } = setup();
   const handler = verify(deps);
@@ -69,6 +105,15 @@ test('verify GET shows a confirm page and does NOT consume the link (email scann
     assert.ok(html.includes(token));
   }
   assert.equal(store.data.size, 0);
+});
+
+test('verify GET response has anti-framing security headers', async () => {
+  const { deps } = setup();
+  const handler = verify(deps);
+  const token = linkToken();
+  const res = await handler(new Request(`${URL_BASE}/auth-verify?token=${encodeURIComponent(token)}`), {});
+  assert.equal(res.headers.get('x-frame-options'), 'DENY');
+  assert.equal(res.headers.get('content-security-policy'), "frame-ancestors 'none'");
 });
 
 test('verify POST signs in once, then reports the link as used', async () => {
@@ -99,6 +144,25 @@ test('verify redirects expired, invalid, and revoked links without a cookie', as
   }
   const get = await handler(new Request(`${URL_BASE}/auth-verify?token=garbage`), {});
   assert.equal(get.headers.get('location'), `${ORIGIN}/web/data-preview?auth=invalid`);
+});
+
+test('verify POST rejects mismatched origin and does not consume nonce', async () => {
+  const { deps } = setup();
+  const handler = verify(deps);
+  const token = linkToken('alice@example.org', NOW + 60_000, 'nonce-reuse');
+  const formWithOrigin = (t, origin) =>
+    new Request(`${URL_BASE}/auth-verify`, {
+      method: 'POST',
+      headers: { origin },
+      body: new URLSearchParams({ token: t }),
+    });
+  const evilRes = await handler(formWithOrigin(token, 'https://evil.example'), {});
+  assert.equal(evilRes.headers.get('location'), `${ORIGIN}/web/data-preview?auth=invalid`);
+  assert.equal(evilRes.headers.get('set-cookie'), null);
+  const goodRes = await handler(formWithOrigin(token, ORIGIN), {});
+  assert.equal(goodRes.status, 303);
+  assert.equal(goodRes.headers.get('location'), `${ORIGIN}/web/data-preview?auth=ok`);
+  assert.match(goodRes.headers.get('set-cookie'), /^cdl_session=/);
 });
 
 test('me returns the email for a session and 401 without one', async () => {

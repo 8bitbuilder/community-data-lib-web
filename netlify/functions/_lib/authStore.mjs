@@ -5,9 +5,8 @@ export async function getAuthStore() {
 
 export async function consumeNonce(store, nonce, exp) {
   const key = `nonce/${nonce}`;
-  if (await store.get(key, { type: 'json' })) return false;
-  await store.setJSON(key, { exp });
-  return true;
+  const result = await store.setJSON(key, { exp }, { onlyIfNew: true });
+  return result.modified;
 }
 
 export async function hitRateLimit(store, key, { limit, windowMs }, now = Date.now()) {

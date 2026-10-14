@@ -32,10 +32,19 @@ export function createHandler({ config, store, now = Date.now }) {
       if (!result.payload) return redirect(result.error);
       return new Response(confirmPage(token), {
         status: 200,
-        headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' },
+        headers: {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'no-store',
+          'referrer-policy': 'no-referrer',
+          'x-frame-options': 'DENY',
+          'content-security-policy': "frame-ancestors 'none'",
+        },
       });
     }
     if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+
+    const origin = request.headers.get('origin');
+    if (origin && origin !== config.siteOrigin) return redirect('invalid');
 
     const token = (await request.formData().catch(() => null))?.get('token');
     const result = verifyToken(typeof token === 'string' ? token : null, config.authSecret, { purpose: 'link', now: now() });
