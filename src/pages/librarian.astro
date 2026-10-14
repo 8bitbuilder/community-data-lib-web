@@ -5,13 +5,14 @@ import { LIMITS, STATE_FIPS } from '@lib/community/librarianRules.mjs';
 
 const states = Object.keys(STATE_FIPS).sort();
 const communityBase = withBasePath('/communities/');
+const allLibrariesHref = withBasePath('/create-community-library/#existing');
 ---
 
 <Layout
   title="Librarian Portal"
   description="Register a community data library and keep its details up to date."
 >
-  <section class="portal" data-community-base={communityBase}>
+  <section class="portal" data-community-base={communityBase} data-all-libraries={allLibrariesHref}>
     <header class="page-header">
       <p class="eyebrow">Community Libraries</p>
       <h1>Librarian portal</h1>
@@ -27,7 +28,8 @@ const communityBase = withBasePath('/communities/');
       <h2>Sign in to manage a library</h2>
       <p>
         Create an account with your email address. We'll send a confirmation link; once your email is
-        confirmed you can register a library and you'll be listed as its first librarian.
+        confirmed you can register a library and you'll be its first librarian. New libraries go live
+        once the Community Data Libraries team approves them.
       </p>
       <div class="actions">
         <button type="button" id="signup-btn">Create an account</button>
@@ -133,8 +135,8 @@ const communityBase = withBasePath('/communities/');
         <fieldset id="librarians-field" class="librarians" hidden>
           <legend>Librarians</legend>
           <p class="field-hint">
-            Everyone listed can edit this library. Emails are public. A library always keeps at least one
-            librarian.
+            Everyone listed can edit this library. These emails stay private: visitors reach you through the
+            contact form on your library's page. A library always keeps at least one librarian.
           </p>
           <ul id="librarian-list" class="librarian-list"></ul>
           <div class="add-librarian">
@@ -167,10 +169,22 @@ const communityBase = withBasePath('/communities/');
       county?: string;
       county_fips?: string;
       zip_codes?: string[];
-      librarian_emails: string[];
+    };
+    type Library = {
+      slug: string;
+      name: string;
+      status: 'pending' | 'approved' | 'rejected';
+      published: boolean;
+      community: Community | null;
+      librarians: string[];
+      pull_request_url: string | null;
     };
     type IdentityUser = { email: string; jwt: () => Promise<string> };
-    type FieldError = { field: string | null; message: string };
+    type FieldError = {
+      field: string | null;
+      message: string;
+      existing?: { slug: string; name: string; pending: boolean };
+    };
 
     const API = '/api/librarian/libraries';
     type NetlifyIdentity = {
@@ -183,13 +197,14 @@ const communityBase = withBasePath('/communities/');
     const identity = (window as unknown as { netlifyIdentity?: NetlifyIdentity }).netlifyIdentity;
     const portal = document.querySelector<HTMLElement>('.portal')!;
     const communityBase = portal.dataset.communityBase ?? '/communities/';
+    const allLibrariesHref = portal.dataset.allLibraries ?? '/create-community-library/#existing';
     const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
     const form = $('library-form') as HTMLFormElement;
     const slugInput = $('f-slug') as HTMLInputElement;
     const nameInput = $('f-name') as HTMLInputElement;
     let currentUser: IdentityUser | null = null;
-    let editing: Community | null = null;
+    let editing: Library | null = null;
     let librarians: string[] = [];
     let slugTouched = false;
 
@@ -252,30 +267,43 @@ const communityBase = withBasePath('/communities/');
       loadLibraries();
     }
 
+    const STATUS_TEXT: Record<Library['status'], string> = {
+      pending: 'Awaiting approval',
+      approved: 'Live',
+      rejected: 'Not approved',
+    };
+
     async function loadLibraries() {
       const list = $('library-list');
       $('libraries-loading').hidden = false;
       $('library-empty').hidden = true;
       list.innerHTML = '';
       try {
-        const { libraries } = (await api('GET')) as { libraries: Community[] };
+        const { libraries } = (await api('GET')) as { libraries: Library[] };
         list.innerHTML = '';
         for (const library of libraries) {
           const item = document.createElement('li');
-          const link = document.createElement('a');
-          link.href = `${communityBase}${library.slug}/`;
-          link.textContent = library.name;
+          const live = library.status === 'approved' && library.published && library.community;
+          const title = document.createElement(live ? 'a' : 'span');
+          title.className = 'library-name';
+          if (title instanceof HTMLAnchorElement) title.href = `${communityBase}${library.slug}/`;
+          title.textContent = library.name;
           const meta = document.createElement('span');
           meta.className = 'library-meta';
-          meta.textContent = [library.state_code, library.county_fips && `FIPS ${library.county_fips}`]
+          const status =
+            library.status === 'approved' && !library.published ? 'Approved, publishing…' : STATUS_TEXT[library.status];
+          meta.textContent = [status, library.community?.county_fips && `FIPS ${library.community.county_fips}`]
             .filter(Boolean)
             .join(' · ');
-          const edit = document.createElement('button');
-          edit.type = 'button';
-          edit.className = 'button-secondary';
-          edit.textContent = 'Edit';
-          edit.addEventListener('click', () => openForm(library));
-          item.append(link, meta, edit);
+          item.append(title, meta);
+          if (live) {
+            const edit = document.createElement('button');
+            edit.type = 'button';
+            edit.className = 'button-secondary';
+            edit.textContent = 'Edit';
+            edit.addEventListener('click', () => openForm(library));
+            item.append(edit);
+          }
           list.append(item);
         }
         $('library-empty').hidden = libraries.length > 0;
@@ -301,12 +329,32 @@ const communityBase = withBasePath('/communities/');
       const message = err instanceof Error ? err.message : String(err);
       const errors = err instanceof ApiError ? err.errors : [];
       const general: string[] = [];
-      for (const { field, message: fieldMessage } of errors) {
+      for (const { field, message: fieldMessage, existing } of errors) {
         const target = field && form.querySelector<HTMLElement>(`[data-error-for="${field}"]`);
-        if (target) target.textContent = [target.textContent, fieldMessage].filter(Boolean).join(' ');
-        else general.push(fieldMessage);
+        if (!target) {
+          general.push(fieldMessage);
+          continue;
+        }
+        target.append(document.createTextNode(`${target.textContent ? ' ' : ''}${fieldMessage}`));
+        if (existing) target.append(' ', existingLibraryLinks(existing));
       }
       $('form-error').textContent = [message, ...general].join(' ');
+    }
+
+    /** "Visit Knox County Data Library · See all libraries" for a county that's taken. */
+    function existingLibraryLinks(existing: NonNullable<FieldError['existing']>) {
+      const links = document.createElement('span');
+      if (!existing.pending) {
+        const visit = document.createElement('a');
+        visit.href = `${communityBase}${existing.slug}/`;
+        visit.textContent = `Visit ${existing.name}`;
+        links.append(visit, ' · ');
+      }
+      const all = document.createElement('a');
+      all.href = allLibrariesHref;
+      all.textContent = 'See all libraries';
+      links.append(all);
+      return links;
     }
 
     function renderLibrarians() {
@@ -336,7 +384,7 @@ const communityBase = withBasePath('/communities/');
       $('slug-preview').textContent = (editing?.slug ?? slugInput.value) || '…';
     }
 
-    function openForm(library: Community | null) {
+    function openForm(library: Library | null) {
       editing = library;
       clearErrors();
       form.reset();
@@ -345,21 +393,22 @@ const communityBase = withBasePath('/communities/');
       $('form-title').textContent = isEdit ? `Edit ${library!.name}` : 'Register a new library';
       $('form-intro').textContent = isEdit
         ? 'Changes are published when you save; the site takes a few minutes to rebuild.'
-        : 'You will be the first librarian. You can add colleagues after it is registered.';
+        : 'You will be the first librarian. The team reviews new libraries before they go live; once yours is approved you can edit it and add colleagues here.';
       $('save-btn').textContent = isEdit ? 'Save changes' : 'Register library';
       slugInput.disabled = isEdit;
       $('librarians-field').hidden = !isEdit;
 
-      if (library) {
-        setValue('name', library.name);
-        setValue('slug', library.slug);
-        setValue('place_name', library.place_name ?? '');
-        setValue('county', library.county ?? '');
-        setValue('description', library.description ?? '');
-        setValue('state_code', library.state_code);
-        setValue('county_fips', library.county_fips ?? '');
-        setValue('zip_codes', (library.zip_codes ?? []).join(', '));
-        librarians = [...library.librarian_emails];
+      const community = library?.community;
+      if (library && community) {
+        setValue('name', community.name);
+        setValue('slug', community.slug);
+        setValue('place_name', community.place_name ?? '');
+        setValue('county', community.county ?? '');
+        setValue('description', community.description ?? '');
+        setValue('state_code', community.state_code);
+        setValue('county_fips', community.county_fips ?? '');
+        setValue('zip_codes', (community.zip_codes ?? []).join(', '));
+        librarians = [...library.librarians];
         renderLibrarians();
       }
       updateSlugPreview();
@@ -416,17 +465,29 @@ const communityBase = withBasePath('/communities/');
       const saveBtn = $('save-btn') as HTMLButtonElement;
       saveBtn.disabled = true;
       try {
-        const { community } = (await api(editing ? 'PUT' : 'POST', editing ? `/${editing.slug}` : '', payload)) as {
+        const result = (await api(editing ? 'PUT' : 'POST', editing ? `/${editing.slug}` : '', payload)) as {
           community: Community;
+          librarians?: string[];
+          published?: boolean;
         };
-        const href = `${communityBase}${community.slug}/`;
-        const stillLibrarian = community.librarian_emails.includes(normalizeEmail(currentUser?.email));
-        showStatus(
-          `${editing ? 'Saved' : 'Registered'} <strong>${escapeHtml(community.name)}</strong>. ` +
-            `The site rebuilds in a few minutes; it will then be live at <a href="${href}">${escapeHtml(href)}</a>.` +
-            (stillLibrarian ? '' : ' You removed yourself as a librarian, so you can no longer edit it.'),
-          true,
-        );
+        const name = `<strong>${escapeHtml(result.community.name)}</strong>`;
+        if (!editing) {
+          showStatus(
+            `Thanks! ${name} was sent to the Community Data Libraries team for approval. ` +
+              'You can edit it and add colleagues here once it is approved.',
+            true,
+          );
+        } else {
+          const href = `${communityBase}${result.community.slug}/`;
+          const stillLibrarian = (result.librarians ?? []).includes(normalizeEmail(currentUser?.email));
+          showStatus(
+            (result.published
+              ? `Saved ${name}. The site rebuilds in a few minutes; then the changes are live at <a href="${href}">${escapeHtml(href)}</a>.`
+              : `Saved the librarians for ${name}.`) +
+              (stillLibrarian ? '' : ' You removed yourself as a librarian, so you can no longer edit it.'),
+            true,
+          );
+        }
         form.hidden = true;
         editing = null;
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -592,7 +653,7 @@ const communityBase = withBasePath('/communities/');
       border-bottom: 1px solid var(--color-border);
     }
 
-    .library-list :global(a) {
+    .library-list :global(.library-name) {
       font-weight: 600;
     }
 

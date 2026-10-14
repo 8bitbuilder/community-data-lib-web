@@ -55,7 +55,7 @@ const librarianPortalHref = withBasePath('/librarian/');
       <ol>
         <li>
           <strong>Check the list below.</strong> Each county can have one library. If yours already has
-          one, contact its librarians instead of creating a duplicate.
+          one, use the contact form on its page to reach its librarian instead of creating a duplicate.
         </li>
         <li>
           <strong>Create a librarian account.</strong> Sign up in the librarian portal with your email
@@ -75,15 +75,16 @@ const librarianPortalHref = withBasePath('/librarian/');
           ZIP codes. You become its first librarian and can add colleagues afterwards.
         </li>
         <li>
-          <strong>Publish.</strong> Saving publishes your library: the site rebuilds within a few minutes and
-          it appears on the list below. Come back to the portal any time to edit it.
+          <strong>Approval.</strong> The Community Data Libraries team reviews new libraries. Once approved,
+          the site rebuilds within a few minutes and your library appears on the list below. After that,
+          your edits in the portal publish right away.
         </li>
       </ol>
       <a href={librarianPortalHref} class="button">Open the librarian portal</a>
       <p class="note">Only librarians sign in. Visitors never need an account.</p>
     </section>
 
-    <section class="existing" aria-labelledby="existing-heading">
+    <section class="existing" id="existing" aria-labelledby="existing-heading">
       <h2 id="existing-heading">Existing community libraries</h2>
       {
         communities.length > 0 ? (
@@ -97,17 +98,6 @@ const librarianPortalHref = withBasePath('/librarian/');
                   {[community.data.county, community.data.state_code].filter(Boolean).join(', ')}
                   {community.data.county_fips && ` · FIPS ${community.data.county_fips}`}
                 </span>
-                {community.data.librarian_emails.length > 0 && (
-                  <span class="community-meta">
-                    Librarians:{' '}
-                    {community.data.librarian_emails.map((email, i) => (
-                      <>
-                        {i > 0 && ', '}
-                        <a href={`mailto:${email}`}>{email}</a>
-                      </>
-                    ))}
-                  </span>
-                )}
               </li>
             ))}
           </ul>
@@ -226,7 +216,7 @@ const librarianPortalHref = withBasePath('/librarian/');
       border-bottom: 1px solid var(--color-border);
     }
 
-    .community-item > a {
+    .community-item a {
       font-weight: 600;
     }
 
