@@ -17,6 +17,8 @@ edits appear on the next build. This also keeps the Data Preview API
 
 ## Netlify environment variables
 
+See [environment-variables.md](environment-variables.md) for what each variable does, how to rotate it, and the local-development variables.
+
 | Variable | Value |
 |---|---|
 | `EDITOR_EMAILS` | Comma-separated approved emails. Removing one revokes access immediately. |
