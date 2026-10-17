@@ -218,17 +218,7 @@ export function normalizeDescriptionTags(tags: BackendSource['description_tags']
     .map(([tag]) => tag);
 }
 
-export function getPedagogicalTags(source: BackendSource, limit = 8): string[] {
-  const tags: string[] = [];
-  for (const [key, value] of Object.entries(source)) {
-    if (!key.endsWith('_tags') || key === 'description_tags') continue;
-    if (typeof value !== 'object' || value === null) continue;
-    for (const [tagName, active] of Object.entries(value as Record<string, boolean>)) {
-      if (active) tags.push(tagName.replace(/-/g, ' '));
-    }
-  }
-  return tags.slice(0, limit);
-}
+export { getPedagogicalTags } from './tags';
 
 export function buildCatalogDescription(source: BackendSource): string {
   const provider = source.provider?.name ?? 'a government data provider';

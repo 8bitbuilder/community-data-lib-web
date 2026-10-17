@@ -21,6 +21,7 @@
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx,.astro",
     "format": "prettier --write .",
     "test": "node --test --experimental-strip-types tests/*.test.ts",
+    "test:functions": "node --test \"netlify/**/*.test.mjs\" \"src/lib/editor/*.test.mjs\"",
     "check": "npm run lint && npm run validate:geo && npm test && npm run build"
   },
   "repository": {
@@ -43,8 +44,9 @@
   "homepage": "https://github.com/community-data-libraries/web#readme",
   "dependencies": {
     "@astrojs/react": "^5.0.4",
-    "astro": "^6.1.9",
+    "@netlify/blobs": "^10.7.13",
     "adm-zip": "^0.5.16",
+    "astro": "^6.1.9",
     "csv-parse": "^5.6.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
