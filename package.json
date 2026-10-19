@@ -21,6 +21,7 @@
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx,.astro",
     "format": "prettier --write .",
     "test": "node --test --experimental-strip-types tests/*.test.ts",
+    "test:functions": "node --test \"netlify/**/*.test.mjs\" \"src/lib/editor/*.test.mjs\"",
     "check": "npm run lint && npm run validate:geo && npm test && npm run build"
   },
   "repository": {

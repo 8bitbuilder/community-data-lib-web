@@ -88,14 +88,14 @@ export async function loadCatalogSources() {
 
 // All active analysis tags: the catalog's pedagogical filter needs every one, and
 // cards only display the first few anyway.
-function extractPedagogicalTags(source) {
+export function extractPedagogicalTags(source) {
   // Curated pedagogical tags come first and keep their exact names.
   const tags = Object.entries(source.pedagogical_tags ?? {})
     .filter(([, active]) => active)
     .map(([name]) => name);
   for (const [key, value] of Object.entries(source)) {
-    if (!key.endsWith('_tags') || key === 'description_tags' || key === 'pedagogical_tags') continue;
-    if (typeof value !== 'object' || value === null) continue;
+    if (!key.endsWith('_tags') || key === 'description_tags' || key === 'pedagogical_tags' || key === 'manual_tags') continue;
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) continue;
     for (const [tagName, active] of Object.entries(value)) {
       if (active) tags.push(tagName.replace(/-/g, ' '));
     }
