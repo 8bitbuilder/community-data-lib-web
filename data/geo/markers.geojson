@@ -15,12 +15,8 @@
         "name": "Annual Estimates of the Resident Population by Single Year of Age and Sex for the United States: April 1 2020 to July 1 2025",
         "category": "dataset",
         "tags": [
-          "business-finance",
-          "children-families",
-          "economy",
-          "election",
-          "prek-12-education",
-          "energy-environment"
+          "business-economy",
+          "population-data"
         ],
         "region": "US",
         "locationLabel": "U.S. Census Bureau headquarters, Suitland, MD (approximate)",
@@ -41,7 +37,7 @@
         "name": "County Estimates All Data 2025",
         "category": "dataset",
         "tags": [
-          "energy-environment",
+          "business-economy",
           "population-data"
         ],
         "region": "US",
@@ -63,10 +59,7 @@
         "name": "National State Estimates All Data 2025",
         "category": "dataset",
         "tags": [
-          "economy",
-          "energy-environment",
-          "government-administration",
-          "housing-buildings",
+          "business-economy",
           "population-data"
         ],
         "region": "US",
@@ -88,10 +81,7 @@
         "name": "National State Population Change 2020-2025",
         "category": "dataset",
         "tags": [
-          "economy",
-          "energy-environment",
-          "government-administration",
-          "housing-buildings",
+          "business-economy",
           "population-data"
         ],
         "region": "US",
@@ -114,11 +104,7 @@
         "category": "dataset",
         "tags": [
           "agriculture",
-          "economy",
-          "energy-environment",
-          "government-administration",
-          "health-social-services",
-          "housing-buildings"
+          "business-economy"
         ],
         "region": "US",
         "locationLabel": "USDA headquarters, Washington, DC (approximate)",
