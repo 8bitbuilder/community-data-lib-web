@@ -2,7 +2,7 @@
 import Layout from '@layouts/Layout.astro';
 import { getCollection } from 'astro:content';
 import { canAudienceAccess, extractPedagogicalTags, type AudienceRole } from '@lib/data/libraryAccess';
-import { withBasePath } from '@lib/paths';
+import { catalogEntryHref, withBasePath } from '@lib/paths';
 
 const resources = await getCollection('master-library');
 
@@ -73,11 +73,7 @@ function formatDate(date: Date | undefined): string {
 }
 
 function getPreviewHref(resource: (typeof resources)[number]): string {
-  const source = resource.data.sourceId;
-  if (!source) {
-    return resource.data.url ?? withBasePath('/complete-catalog');
-  }
-  return withBasePath(`/data-preview?source=${encodeURIComponent(source)}&audience=AUDIENCE_PLACEHOLDER`);
+  return catalogEntryHref(resource.data, 'AUDIENCE_PLACEHOLDER');
 }
 ---
 

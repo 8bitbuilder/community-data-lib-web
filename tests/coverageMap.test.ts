@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import {
   buildBoundaryIndex,
+  classForCount,
+  countClasses,
   countsByCounty,
   coverageLabel,
   datasetsForCounty,
@@ -96,6 +98,19 @@ test('coverage labels', () => {
   );
   const many = ['47093', '47037', '21111', '47001'].map((geoid) => ({ level: 'county' as const, geoid }));
   assert.equal(coverageLabel(many, index), 'Jefferson County, KY; County 47001; Davidson County, TN; +1 more');
+});
+
+test('count classes: one per distinct count when they fit, equal ranges otherwise', () => {
+  assert.deepEqual(countClasses([7, 7, 0, 7], 5), [{ min: 7, max: 7, step: 2 }]);
+  assert.deepEqual(countClasses([7, 8], 5), [
+    { min: 7, max: 7, step: 0 },
+    { min: 8, max: 8, step: 4 },
+  ]);
+  assert.deepEqual(countClasses([], 5), []);
+  const wide = countClasses([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 5);
+  assert.deepEqual(wide.map((c) => [c.min, c.max]), [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]]);
+  assert.equal(classForCount(0, wide), null);
+  assert.equal(classForCount(6, wide)?.step, 2);
 });
 
 test('unknownCoverageFips reports FIPS codes missing from the boundary data', () => {

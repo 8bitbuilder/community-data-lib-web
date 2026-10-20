@@ -160,6 +160,40 @@ export function unknownCoverageFips(datasets: CoverageDataset[], index: Boundary
   return unknown;
 }
 
+export interface CountClass {
+  min: number;
+  max: number;
+  /** Index into the color ramp, 0 = lightest. */
+  step: number;
+}
+
+/**
+ * Legend classes for the count view. Zero gets no class (no fill). With no more
+ * distinct counts than ramp steps, each count is its own class, spread across
+ * the ramp; otherwise counts are split into `steps` equal integer ranges.
+ */
+export function countClasses(counts: Iterable<number>, steps: number): CountClass[] {
+  const values = [...new Set([...counts].filter((n) => n > 0))].sort((a, b) => a - b);
+  if (values.length === 0) return [];
+  if (values.length <= steps) {
+    const spread = (i: number) =>
+      values.length === 1 ? Math.floor((steps - 1) / 2) : Math.round((i * (steps - 1)) / (values.length - 1));
+    return values.map((n, i) => ({ min: n, max: n, step: spread(i) }));
+  }
+  const min = values[0];
+  const max = values[values.length - 1];
+  const width = (max - min + 1) / steps;
+  return Array.from({ length: steps }, (_, i) => ({
+    min: Math.ceil(min + i * width),
+    max: i === steps - 1 ? max : Math.ceil(min + (i + 1) * width) - 1,
+    step: i,
+  })).filter((c) => c.min <= c.max);
+}
+
+export function classForCount(count: number, classes: CountClass[]): CountClass | null {
+  return classes.find((c) => count >= c.min && count <= c.max) ?? null;
+}
+
 /** Datasets with no coverage: not painted on the map, listed in a "not mapped" note. */
 export function unmappedDatasets<T extends CoverageDataset>(datasets: T[]): T[] {
   return datasets.filter((dataset) => dataset.coverage.length === 0);
