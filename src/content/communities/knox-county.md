@@ -23,7 +23,6 @@ zip_codes:
   - "37931"
   - "37932"
   - "37934"
-librarian_email: librarian@knoxdata.org
 ---
 
 Community data library hub for Knox County, Tennessee.

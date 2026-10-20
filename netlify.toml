@@ -3,6 +3,10 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[build.environment]
+  # GITHUB_REPO is a public repo identifier (owner/name), not a credential.
+  SECRETS_SCAN_OMIT_KEYS = "GITHUB_REPO"
+
 # ── Form submission webhook ──────────────────────────────────────────────────
 # Triggers the submission-notify function whenever a new form submission
 # arrives from the "resource-submission" Netlify Form.
