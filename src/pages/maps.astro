@@ -331,6 +331,7 @@ const mapData = {
 
       function renderLegend() {
         legendEl.replaceChildren();
+        noteEl.textContent = '';
         if (mode === 'dataset') {
           const dataset = data.datasets.find((d) => d.id === datasetSelect.value);
           if (!dataset) return;
@@ -515,6 +516,14 @@ const mapData = {
       min-width: 0;
     }
 
+    /* Beside the map the panel scrolls on its own; below it, it grows with the page. */
+    @media (min-width: 900px) {
+      .map-panel {
+        max-height: 640px;
+        overflow: auto;
+      }
+    }
+
     #map {
       height: 560px;
       border: 1px solid var(--color-border);
@@ -581,8 +590,6 @@ const mapData = {
     }
 
     .map-panel {
-      max-height: 640px;
-      overflow: auto;
       border: 1px solid var(--color-border);
       border-radius: var(--radius-lg);
       background: var(--color-surface);
