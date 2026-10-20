@@ -52,10 +52,6 @@ studentSuitability: "unreviewed"
 granularity: "nation"
 coverage:
   - { level: "nation", geoid: "US" }
-location:
-  latitude: 38.8882
-  longitude: -77.0303
-  label: "USDA headquarters, Washington, DC (approximate)"
 url: "https://www.ers.usda.gov/data-products/dairy-data"
 featured: false
 difficulty: "beginner"

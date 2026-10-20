@@ -26,17 +26,15 @@ In development, the Astro dev server proxies `/api/sources` and `/api/health` to
 
 Base URL (direct): `http://localhost:4323`
 
-## Geographic Markers
+## Coverage Map
 
-- Canonical markers stored in [data/geo/markers.geojson](data/geo/markers.geojson).
-- Properties validated against [data/geo/schema/marker.schema.json](data/geo/schema/marker.schema.json).
-- Lint and validate locally:
+`/maps` shades U.S. counties by how many catalog datasets cover them, using each dataset's canonical `coverage` (nation, state FIPS, or county FIPS, from the backend). Boundaries are the Census cartographic boundary files in [public/geo/boundaries/](public/geo/boundaries/README.md), committed and refreshed by hand:
 
 ```bash
-npm run validate:geo
+npm run geo:boundaries
 ```
 
-Contribution guidelines are in [data/geo/README.md](data/geo/README.md).
+The build fails if a dataset's coverage uses a FIPS code that isn't in those files.
 
 ## Librarian Portal (community libraries)
 
@@ -119,7 +117,7 @@ To use Decap on Netlify: enable Identity, enable **Git Gateway** under Identity 
 
 - Site architecture, routing, content model, CI/CD: [docs/technical/architecture.md](docs/technical/architecture.md)
 - Netlify deployment: [docs/technical/netlify.md](docs/technical/netlify.md)
-- Geo data branching guidance: [docs/technical/geo-branching.md](docs/technical/geo-branching.md)
+- Coverage map boundary files: [public/geo/boundaries/README.md](public/geo/boundaries/README.md)
 - Community library structure: [docs/data/community-library-structure.md](docs/data/community-library-structure.md)
 - Datasheet requirements: [docs/data/datasheet-requirements.md](docs/data/datasheet-requirements.md)
 - DecapCMS implementation: [docs/technical/decapcms-implementation.md](docs/technical/decapcms-implementation.md)

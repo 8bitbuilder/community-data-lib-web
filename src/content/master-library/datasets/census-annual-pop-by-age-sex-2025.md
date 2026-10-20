@@ -50,10 +50,6 @@ studentSuitability: "unreviewed"
 granularity: "nation"
 coverage:
   - { level: "nation", geoid: "US" }
-location:
-  latitude: 38.8468
-  longitude: -76.9296
-  label: "U.S. Census Bureau headquarters, Suitland, MD (approximate)"
 url: "https://www.census.gov/data/datasets/time-series/demo/popest/2020s-national-detail.html"
 featured: false
 difficulty: "beginner"
