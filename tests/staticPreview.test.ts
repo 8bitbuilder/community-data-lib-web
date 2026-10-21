@@ -46,7 +46,7 @@ test('chooseSlice uses the county file when the dataset has one, and explains wh
 
 test('rowsMeta reports truncated county slices honestly', () => {
   assert.equal(rowsMeta({ rows: [], rows_included: 41, rows_total: 3204 }, 41, 'the dataset'), 'Showing 41 of 41 rows (3,204 in the dataset; the preview file holds the first 41)');
-  assert.equal(rowsMeta({ rows: [], rows_included: 1, rows_total: 1 }, 1, 'Knox County, TN'), 'Showing 1 of 1 rows in Knox County, TN');
+  assert.equal(rowsMeta({ rows: [], rows_included: 1, rows_total: 1 }, 1, 'Knox County, TN'), 'Showing 1 of 1 row in Knox County, TN');
 });
 
 const variables: PreviewVariable[] = [

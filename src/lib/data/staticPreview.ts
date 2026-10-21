@@ -107,7 +107,8 @@ export function chooseSlice(
 
 /** "Showing 100 of 244 rows (337 in the full dataset)" style summary for the table. */
 export function rowsMeta(file: RowFile, shown: number, scope: string): string {
-  const parts = [`Showing ${shown.toLocaleString('en-US')} of ${file.rows_included.toLocaleString('en-US')} rows`];
+  const noun = file.rows_included === 1 ? 'row' : 'rows';
+  const parts = [`Showing ${shown.toLocaleString('en-US')} of ${file.rows_included.toLocaleString('en-US')} ${noun}`];
   if (file.rows_included < file.rows_total) {
     parts.push(`(${file.rows_total.toLocaleString('en-US')} in ${scope}; the preview file holds the first ${file.rows_included.toLocaleString('en-US')})`);
   } else {
