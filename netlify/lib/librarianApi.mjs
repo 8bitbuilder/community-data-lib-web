@@ -1,26 +1,38 @@
 /**
- * Librarian portal API (served by netlify/functions/librarian-api.mjs).
+ * Librarian API (served by netlify/functions/librarian-api.mjs).
  *
  * Every route needs a Netlify Identity login. Permission and validation rules live
- * in src/lib/community/librarianRules.mjs; this module wires them to HTTP, to the
- * public community files (GitHub), and to the private librarian records (Blobs).
+ * in src/lib/community/librarianRules.mjs; this module wires them to HTTP and to
+ * Netlify Database (netlify/lib/communityDb.mjs). Functions only handle these
+ * librarian reads and writes; they never read or filter datasets.
  *
- * Routes:
- *   GET  /api/librarian/libraries        libraries the logged-in user maintains, with status
- *   POST /api/librarian/libraries        register a library: opens a pull request for approval
- *   PUT  /api/librarian/libraries/:slug  edit an approved library the user maintains
+ * Routes (all under /api/librarian/libraries):
+ *   GET    /                         libraries the user edits (+ pending ones, for admins)
+ *   POST   /                         register a library (pending; the user becomes its first editor)
+ *   GET    /:slug                    one library with its editors (editors and admins)
+ *   PUT    /:slug                    edit a library (editors)
+ *   POST   /:slug/editors            add an editor { email } (editors)
+ *   DELETE /:slug/editors/:email     remove an editor (editors; never the last one)
+ *   POST   /:slug/approve            approve a pending library (admins)
+ *   DELETE /:slug                    reject a pending library (admins)
  *
- * Librarian emails never go into commits, pull requests, or community files; only a
- * masked form of the registrant's email appears in the approval pull request.
+ * Writes check the Origin header (the login is a cookie). Approving a library or
+ * editing an approved one rebuilds the site through the build hook.
  */
 
+import { describeCounty } from '../../src/lib/community/geoVocabulary.mjs';
 import {
+  checkAddEditor,
   checkRegistration,
+  checkRemoveEditor,
+  checkReview,
   checkUpdate,
-  isLibrarian,
+  isAdmin,
+  isAllowedOrigin,
+  isEditor,
+  rebuildReason,
 } from '../../src/lib/community/librarianRules.mjs';
-import { serializeCommunityMarkdown } from '../../src/lib/community/communityFile.mjs';
-import { ConflictError } from './githubCommunityStore.mjs';
+import { ConflictError } from './communityDb.mjs';
 
 const MAX_BODY_BYTES = 20_000;
 const PREFIX = '/api/librarian/libraries';
@@ -33,6 +45,7 @@ function json(status, payload) {
 }
 
 const error = (status, message, errors = []) => json(status, { error: message, errors });
+const refused = (check) => error(check.status, check.errors[0]?.message ?? 'Not allowed.', check.errors);
 
 async function readJson(request) {
   const raw = await request.text();
@@ -45,173 +58,139 @@ async function readJson(request) {
   }
 }
 
-/** "jane.doe@utk.edu" -> "j***@utk.edu", enough for a reviewer without publishing it. */
-export function maskEmail(email) {
-  const [local = '', domain = ''] = String(email).split('@');
-  return `${local.slice(0, 1)}***@${domain}`;
-}
-
-function approvalRequest(community, email) {
-  const rows = [
-    ['Library', community.name],
-    ['Place', community.place_name],
-    ['State', community.state_code],
-    ['County', community.county],
-    ['County FIPS', community.county_fips],
-    ['ZIP codes', community.zip_codes.join(', ')],
-    ['Description', community.description],
-    ['Registered by', `${maskEmail(email)} (confirmed Netlify Identity login)`],
-  ].filter(([, value]) => value);
-  return [
-    'A new community library was registered through the librarian portal.',
-    '',
-    '| Field | Value |',
-    '| --- | --- |',
-    ...rows.map(([field, value]) => `| ${field} | ${String(value).replace(/[|\r\n]+/g, ' ')} |`),
-    '',
-    '**Merge to approve** (the library goes live on the next deploy). **Close to reject.**',
-    'The full registrant email is in the site\'s Netlify Blobs store "librarians".',
-  ].join('\n');
+/** "/api/librarian/libraries/knox-county/editors/a%40b.org" -> ['knox-county', 'editors', 'a@b.org'] */
+export function routeParts(pathname) {
+  const rest = pathname.replace(/\/+$/, '');
+  if (rest !== PREFIX && !rest.startsWith(`${PREFIX}/`)) return null;
+  return rest
+    .slice(PREFIX.length)
+    .split('/')
+    .filter(Boolean)
+    .map((part) => decodeURIComponent(part));
 }
 
 /**
  * @param {object} deps
- * @param {(request: Request) => Promise<{ email: string } | null>} deps.verifyUser
- * @param {ReturnType<typeof import('./githubCommunityStore.mjs').createGitHubCommunityStore> | null} deps.github
- *   null when the function isn't configured (no GitHub token).
- * @param {ReturnType<typeof import('./librarianStore.mjs').createLibrarianStore> | null} deps.librarians
- * @param {() => string} [deps.now]
+ * @param {(request: Request) => Promise<{ email: string, roles: string[] } | null>} deps.verifyUser
+ * @param {(() => ReturnType<typeof import('./communityDb.mjs').createCommunityDb>) | null} deps.db
+ *   null when the site has no database configured.
+ * @param {(reason: string) => Promise<string>} deps.rebuild
+ * @param {ReturnType<typeof import('../../src/lib/community/geoVocabulary.mjs').createVocabulary>} deps.vocabulary
  */
-export function createLibrarianHandler({ verifyUser, github, librarians, now = () => new Date().toISOString() }) {
-  /** Bring a pending record up to date with its pull request (merged = approved, closed = rejected). */
-  async function resolveStatus(slug, record) {
-    if (record.status !== 'pending' || !record.pull_request) return record;
-    const pull = await github.getPullRequest(record.pull_request);
-    const status = pull?.merged ? 'approved' : pull?.state === 'closed' ? 'rejected' : 'pending';
-    if (status === record.status) return record;
-    const updated = { ...record, status };
-    await librarians.set(slug, updated);
-    return updated;
-  }
+export function createLibrarianHandler({ verifyUser, db: openDb, rebuild, vocabulary }) {
+  /** A library as the pages show it: stored fields plus state and county names. */
+  const view = (community) => ({ ...community, ...(describeCounty(vocabulary, community.county_fips) ?? {}) });
 
-  /** Live libraries plus ones awaiting approval, for duplicate checks. */
-  async function knownLibraries() {
-    const live = (await github.list()).map((entry) => entry.community);
-    const pending = [];
-    for (const record of await librarians.list()) {
-      const current = await resolveStatus(record.slug, record);
-      if (current.status === 'pending' && !live.some((c) => c.slug === record.slug)) {
-        pending.push({ slug: record.slug, name: record.name, county_fips: record.county_fips, pending: true });
-      }
-    }
-    return [...live, ...pending];
-  }
-
-  async function listMine(email) {
-    const mine = (await librarians.list()).filter((record) => isLibrarian(record.emails, email));
-    const libraries = [];
-    for (const record of mine) {
-      const { slug } = record;
-      const current = await resolveStatus(slug, record);
-      const file = current.status === 'approved' ? await github.get(slug) : null;
-      libraries.push({
-        slug,
-        name: file?.community.name ?? current.name,
-        status: current.status,
-        // Approved but not yet on the main branch (deploy in progress) counts as unpublished.
-        published: Boolean(file),
-        community: file?.community ?? current.community ?? null,
-        librarians: current.emails,
-        pull_request_url: current.pull_request_url ?? null,
-      });
-    }
-    return libraries.sort((a, b) => a.name.localeCompare(b.name));
-  }
-
-  async function register(user, input) {
-    const result = checkRegistration({ input, email: user.email, existing: await knownLibraries() });
-    if (!result.ok) return error(result.status, 'The library could not be registered.', result.errors);
-
-    const { community } = result;
-    const record = {
-      emails: result.librarians,
-      status: 'pending',
-      name: community.name,
-      county_fips: community.county_fips,
-      community,
-      created_at: now(),
-    };
-    // Claim the slug before opening the pull request; release it if that fails.
-    await librarians.set(community.slug, record);
-    let pull;
-    try {
-      pull = await github.proposeNew(community, {
-        message: `Register community library ${community.slug}`,
-        title: `New community library: ${community.name}`,
-        body: approvalRequest(community, user.email),
-      });
-    } catch (err) {
-      await librarians.delete(community.slug);
-      throw err;
-    }
-    await librarians.set(community.slug, { ...record, pull_request: pull.number, pull_request_url: pull.url });
-    return json(202, { community, status: 'pending', pull_request_url: pull.url });
-  }
-
-  async function update(user, slug, input) {
-    const record = await librarians.get(slug).catch(() => null);
-    if (!record || !isLibrarian(record.emails, user.email)) {
-      return error(403, 'Only this library’s librarians can edit it.');
-    }
-    const current = await resolveStatus(slug, record);
-    if (current.status !== 'approved') {
-      return error(409, current.status === 'pending'
-        ? 'This library is still awaiting approval. You can edit it once it is approved.'
-        : 'This library was not approved. Register it again or contact the team.');
-    }
-    const file = await github.get(slug);
-    if (!file) return error(409, 'This library is approved but not published yet. Try again in a few minutes.');
-
-    const result = checkUpdate({
-      current: file.community,
-      librarians: current.emails,
-      input,
-      email: user.email,
-      existing: await knownLibraries(),
-    });
-    if (!result.ok) return error(result.status, 'The library could not be saved.', result.errors);
-
-    const fileChanged =
-      serializeCommunityMarkdown(result.community, file.body) !== serializeCommunityMarkdown(file.community, file.body);
-    if (fileChanged) {
-      await github.update(result.community, file.body, file.sha, `Update community library ${slug}`);
-    }
-    await librarians.set(slug, { ...current, emails: result.librarians, name: result.community.name, county_fips: result.community.county_fips });
-    return json(200, { community: result.community, librarians: result.librarians, published: fileChanged });
+  async function maybeRebuild(action, community) {
+    const reason = rebuildReason(action, community);
+    return reason ? rebuild(reason) : 'not needed';
   }
 
   return async function handle(request) {
-    const { pathname } = new URL(request.url);
-    const rest = pathname.replace(/\/+$/, '');
-    if (rest !== PREFIX && !rest.startsWith(`${PREFIX}/`)) return error(404, 'Not found');
-    const slug = rest === PREFIX ? null : decodeURIComponent(rest.slice(PREFIX.length + 1));
+    const parts = routeParts(new URL(request.url).pathname);
+    if (!parts) return error(404, 'Not found');
+    if (!openDb) return error(503, 'The librarian portal is not configured on this site yet (no database).');
 
-    if (!github || !librarians) return error(503, 'The librarian portal is not configured on this site yet.');
-
-    const user = await verifyUser(request);
+    const user = await verifyUser(request).catch(() => null);
     if (!user) return error(401, 'Log in with a confirmed email to continue.');
+    if (request.method !== 'GET' && !isAllowedOrigin(request)) {
+      return error(403, 'This request did not come from the librarian pages of this site.');
+    }
+
+    const db = openDb();
+    const [slug, sub, subject] = parts;
+    const method = request.method;
+
+    async function body() {
+      const parsed = await readJson(request);
+      if (parsed.tooLarge) return { response: error(413, 'Request is too large.') };
+      if (!parsed.value) return { response: error(400, 'Send the details as JSON.') };
+      return { value: parsed.value };
+    }
 
     try {
-      if (request.method === 'GET' && !slug) {
-        return json(200, { email: user.email, libraries: await listMine(user.email) });
+      // ── Collection ───────────────────────────────────────────────
+      if (!slug) {
+        if (method === 'GET') {
+          const admin = isAdmin(user);
+          return json(200, {
+            email: user.email,
+            isAdmin: admin,
+            libraries: (await db.listForEditor(user.email)).map(view),
+            pending: admin ? (await db.listPending()).map(view) : [],
+          });
+        }
+        if (method === 'POST') {
+          const input = await body();
+          if (input.response) return input.response;
+          const check = checkRegistration({ input: input.value, user, existing: await db.listAll(), vocabulary });
+          if (!check.ok) return error(check.status, 'The library could not be registered.', check.errors);
+          await db.create(check.community, user.email);
+          return json(201, { library: view({ ...check.community, approved: false, editors: check.editors }) });
+        }
+        return error(405, 'Method not allowed');
       }
-      if ((request.method === 'POST' && !slug) || (request.method === 'PUT' && slug)) {
-        const body = await readJson(request);
-        if (body.tooLarge) return error(413, 'Request is too large.');
-        if (!body.value) return error(400, 'Send the library details as JSON.');
-        return slug ? await update(user, slug, body.value) : await register(user, body.value);
+
+      const current = await db.get(slug);
+      if (!current) return error(404, 'No such library.');
+      const editor = isEditor(current.editors, user.email);
+
+      // ── One library ──────────────────────────────────────────────
+      if (!sub) {
+        if (method === 'GET') {
+          if (!editor && !isAdmin(user)) return error(403, 'Only this library’s editors can see its settings.');
+          return json(200, { library: view(current), canEdit: editor, isAdmin: isAdmin(user) });
+        }
+        if (method === 'PUT') {
+          const input = await body();
+          if (input.response) return input.response;
+          const others = (await db.listAll()).filter((c) => c.slug !== slug);
+          const check = checkUpdate({ current, editors: current.editors, input: input.value, user, existing: others, vocabulary });
+          if (!check.ok) return error(check.status, 'The library could not be saved.', check.errors);
+          const updated = await db.update(slug, check.community);
+          return json(200, {
+            library: view({ ...updated, editors: current.editors }),
+            rebuild: await maybeRebuild('update', updated),
+          });
+        }
+        if (method === 'DELETE') {
+          const check = checkReview({ user, community: current });
+          if (!check.ok) return refused(check);
+          await db.reject(slug);
+          return json(200, { rejected: slug });
+        }
+        return error(405, 'Method not allowed');
       }
-      return error(405, 'Method not allowed');
+
+      if (sub === 'approve' && !subject) {
+        if (method !== 'POST') return error(405, 'Method not allowed');
+        const check = checkReview({ user, community: current });
+        if (!check.ok) return refused(check);
+        const approved = await db.approve(slug, user.email);
+        return json(200, {
+          library: view({ ...approved, editors: current.editors }),
+          rebuild: await maybeRebuild('approve', approved),
+        });
+      }
+
+      if (sub === 'editors') {
+        if (method === 'POST' && !subject) {
+          const input = await body();
+          if (input.response) return input.response;
+          const check = checkAddEditor({ editors: current.editors, user, email: input.value.email });
+          if (!check.ok) return refused(check);
+          await db.addEditor(slug, check.email, user.email);
+          return json(201, { editors: [...current.editors, check.email] });
+        }
+        if (method === 'DELETE' && subject) {
+          const check = checkRemoveEditor({ editors: current.editors, user, email: subject });
+          if (!check.ok) return refused(check);
+          await db.removeEditor(slug, check.email);
+          return json(200, { editors: current.editors.filter((e) => e !== check.email) });
+        }
+        return error(405, 'Method not allowed');
+      }
+      return error(404, 'Not found');
     } catch (err) {
       if (err instanceof ConflictError) {
         return error(409, 'This library changed or was just registered by someone else. Reload and try again.');

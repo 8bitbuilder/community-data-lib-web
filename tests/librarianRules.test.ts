@@ -1,207 +1,187 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 
+import { createVocabulary } from '../src/lib/community/geoVocabulary.mjs';
 import {
+  checkAddEditor,
   checkRegistration,
+  checkRemoveEditor,
+  checkReview,
   checkUpdate,
-  isLibrarian,
+  isAdmin,
+  isAllowedOrigin,
+  isEditor,
+  rebuildReason,
   slugify,
 } from '../src/lib/community/librarianRules.mjs';
-import {
-  communityPath,
-  parseCommunityMarkdown,
-  serializeCommunityMarkdown,
-} from '../src/lib/community/communityFile.mjs';
+import { parseCommunityMarkdown } from '../src/lib/community/communityFile.mjs';
 
-const knox = {
-  name: 'Knox County Data Library',
-  place_name: 'Knoxville',
-  slug: 'knox-county',
-  state_code: 'TN',
-  county: 'Knox County',
-  county_fips: '47093',
-  zip_codes: ['37901', '37902'],
-};
-const knoxLibrarians = ['librarian@knoxdata.org', 'helper@knoxdata.org'];
+const vocabulary = createVocabulary({
+  vintage: 2025,
+  states: [
+    { geoid: '47', name: 'Tennessee', usps: 'TN' },
+    { geoid: '37', name: 'North Carolina', usps: 'NC' },
+  ],
+  counties: [
+    { geoid: '47093', name: 'Knox County', state: 'TN' },
+    { geoid: '47037', name: 'Davidson County', state: 'TN' },
+    { geoid: '37183', name: 'Wake County', state: 'NC' },
+  ],
+});
 
-const davidsonInput = {
-  name: 'Davidson County Data Library',
-  place_name: 'Nashville',
-  state_code: 'tn',
-  county_fips: '47037',
-  zip_codes: '37201, 37203 37203',
-};
+const knox = { slug: 'knox-county', name: 'Knox County Data Library', place_name: 'Knoxville', county_fips: '47093', approved: true };
+const knoxEditors = ['librarian@knoxdata.org', 'helper@knoxdata.org'];
+const editor = { email: 'librarian@knoxdata.org', roles: [] };
+const stranger = { email: 'stranger@example.org', roles: [] };
+const admin = { email: 'team@cdl.org', roles: ['admin'] };
 
-const errorFields = (result: { errors?: { field: string | null }[] }) =>
-  (result.errors ?? []).map((e) => e.field);
+const davidsonInput = { name: 'Davidson County Data Library', place_name: ' Nashville ', county_fips: '47037' };
 
-const edit = (changes: Record<string, unknown>, email = 'librarian@knoxdata.org', existing = [knox]) =>
-  checkUpdate({ current: knox, librarians: knoxLibrarians, input: { ...knox, ...changes }, email, existing });
+const fields = (result: { errors?: { field: string | null }[] }) => (result.errors ?? []).map((e) => e.field);
 
 // ── Registration ─────────────────────────────────────────────
 
-test('a logged-in user registers a library and becomes its first librarian', () => {
-  const result = checkRegistration({ input: davidsonInput, email: 'New@Example.org ', existing: [knox] });
+test('anyone logged in can register a library and becomes its first editor', () => {
+  const result = checkRegistration({ input: davidsonInput, user: { email: 'New@Example.org ', roles: [] }, existing: [knox], vocabulary });
   assert.equal(result.ok, true);
   assert.deepEqual(result.community, {
+    slug: 'davidson-county-data-library',
     name: 'Davidson County Data Library',
     place_name: 'Nashville',
-    slug: 'davidson-county-data-library',
-    state_code: 'TN',
     county_fips: '47037',
-    zip_codes: ['37201', '37203'],
   });
-  assert.deepEqual(result.librarians, ['new@example.org']);
+  assert.deepEqual(result.editors, ['new@example.org']);
 });
 
-test('registration is rejected when the slug is already registered', () => {
+test('state and county names in the input are ignored: they come from the FIPS code', () => {
   const result = checkRegistration({
-    input: { ...davidsonInput, slug: 'knox-county' },
-    email: 'new@example.org',
-    existing: [knox],
+    input: { ...davidsonInput, state_code: 'XX', county: 'Wrong County', zip_codes: ['1'] },
+    user: stranger,
+    existing: [],
+    vocabulary,
   });
-  assert.equal(result.ok, false);
-  assert.equal(result.status, 409);
-  assert.deepEqual(errorFields(result), ['slug']);
+  assert.equal(result.ok, true);
+  assert.deepEqual(Object.keys(result.community).sort(), ['county_fips', 'name', 'place_name', 'slug']);
 });
 
-test('registration is rejected when the county FIPS is already registered, pointing to that library', () => {
-  const result = checkRegistration({
-    input: { ...davidsonInput, name: 'Another Knox Library', county_fips: '47093' },
-    email: 'new@example.org',
-    existing: [knox],
-  });
-  assert.equal(result.ok, false);
-  assert.equal(result.status, 409);
-  assert.deepEqual(errorFields(result), ['county_fips']);
-  assert.match(result.errors[0].message, /Knox County Data Library/);
-  assert.deepEqual(result.errors[0].existing, { slug: 'knox-county', name: 'Knox County Data Library', pending: false });
+test('registration needs a login', () => {
+  assert.equal(checkRegistration({ input: davidsonInput, user: null, existing: [], vocabulary }).status, 403);
+  assert.equal(checkRegistration({ input: davidsonInput, user: { email: '' }, existing: [], vocabulary }).status, 403);
 });
 
-test('a county awaiting approval also blocks a second registration', () => {
-  const pending = { slug: 'davidson', name: 'Davidson', county_fips: '47037', pending: true };
-  const result = checkRegistration({ input: davidsonInput, email: 'new@example.org', existing: [pending] });
-  assert.equal(result.status, 409);
-  assert.match(result.errors[0].message, /awaiting approval/);
-  assert.equal(result.errors[0].existing.pending, true);
-});
-
-test('bad county FIPS codes are rejected', () => {
-  for (const county_fips of ['4709', '47O93', '470930', '47000', '']) {
-    const result = checkRegistration({
-      input: { ...davidsonInput, county_fips },
-      email: 'new@example.org',
-      existing: [],
-    });
+test('the county must be a county in the Census vocabulary', () => {
+  for (const county_fips of ['', '4709', '47O93', '47000', '47999', '09001']) {
+    const result = checkRegistration({ input: { ...davidsonInput, county_fips }, user: stranger, existing: [], vocabulary });
     assert.equal(result.status, 400, county_fips);
-    assert.deepEqual(errorFields(result), ['county_fips'], county_fips);
+    assert.deepEqual(fields(result), ['county_fips'], county_fips);
   }
 });
 
-test('a county FIPS from a different state is rejected', () => {
-  const result = checkRegistration({
-    input: { ...davidsonInput, county_fips: '37183' },
-    email: 'new@example.org',
-    existing: [],
-  });
-  assert.equal(result.status, 400);
-  assert.match(result.errors[0].message, /start with 47/);
+test('a slug or county that is already taken is a 409, pointing at the other library', () => {
+  const slugTaken = checkRegistration({ input: { ...davidsonInput, slug: 'knox-county' }, user: stranger, existing: [knox], vocabulary });
+  assert.equal(slugTaken.status, 409);
+  assert.deepEqual(fields(slugTaken), ['slug']);
+
+  const countyTaken = checkRegistration({ input: { ...davidsonInput, county_fips: '47093' }, user: stranger, existing: [knox], vocabulary });
+  assert.equal(countyTaken.status, 409);
+  assert.match(countyTaken.errors[0].message, /already has a library: Knox County Data Library/);
+  assert.deepEqual(countyTaken.errors[0].existing, { slug: 'knox-county', name: 'Knox County Data Library', pending: false });
+
+  const pending = { slug: 'davidson', name: 'Davidson', county_fips: '47037', approved: false };
+  const waiting = checkRegistration({ input: davidsonInput, user: stranger, existing: [pending], vocabulary });
+  assert.match(waiting.errors[0].message, /awaiting approval/);
+  assert.equal(waiting.errors[0].existing.pending, true);
 });
 
-test('other invalid fields are reported together', () => {
+test('invalid fields are reported together', () => {
   const result = checkRegistration({
-    input: { name: '', state_code: 'XX', county_fips: '47037', zip_codes: ['3720', 'abcde'] },
-    email: 'new@example.org',
+    input: { name: '', slug: 'Bad Slug!', county_fips: '47037', description: 'x'.repeat(501) },
+    user: stranger,
     existing: [],
+    vocabulary,
   });
   assert.equal(result.status, 400);
-  assert.deepEqual(errorFields(result).sort(), ['name', 'slug', 'state_code', 'zip_codes']);
-});
-
-test('registration requires a verified login email', () => {
-  const result = checkRegistration({ input: davidsonInput, email: '', existing: [] });
-  assert.equal(result.status, 403);
+  assert.deepEqual(fields(result).sort(), ['description', 'name', 'slug']);
 });
 
 // ── Editing ──────────────────────────────────────────────────
 
-test('a librarian can edit their library, case-insensitively', () => {
-  const result = edit({ description: 'Updated' }, 'LIBRARIAN@knoxdata.org');
+const edit = (input: Record<string, unknown>, user = editor, existing: object[] = []) =>
+  checkUpdate({ current: knox, editors: knoxEditors, input: { ...knox, ...input }, user, existing, vocabulary });
+
+test('editors can edit their library (case-insensitive email) but never its slug', () => {
+  const result = edit({ description: 'Updated', slug: 'new-slug' }, { email: 'LIBRARIAN@knoxdata.org', roles: [] });
   assert.equal(result.ok, true);
   assert.equal(result.community.description, 'Updated');
-  assert.deepEqual(result.librarians, knoxLibrarians);
+  assert.equal(result.community.slug, 'knox-county');
 });
 
-test('someone who is not a librarian of the library cannot edit it', () => {
-  const result = edit({ name: 'Taken over' }, 'stranger@example.org');
-  assert.equal(result.ok, false);
-  assert.equal(result.status, 403);
+test('people who are not editors cannot edit, admins included', () => {
+  assert.equal(edit({ name: 'Taken over' }, stranger).status, 403);
+  assert.equal(edit({ name: 'Taken over' }, admin).status, 403);
 });
 
-test('librarians can add and remove other librarians', () => {
-  const result = edit(
-    { librarian_emails: ['librarian@knoxdata.org', 'Teacher@School.edu'] },
-    'helper@knoxdata.org',
-  );
-  assert.equal(result.ok, true);
-  assert.deepEqual(result.librarians, ['librarian@knoxdata.org', 'teacher@school.edu']);
-  assert.equal('librarian_emails' in result.community, false);
+test('moving a library to a county another library has is a 409', () => {
+  const davidson = { slug: 'davidson', name: 'Davidson Library', county_fips: '47037', approved: true };
+  assert.equal(edit({ county_fips: '47037' }, editor, [davidson]).status, 409);
+  assert.equal(edit({ county_fips: '37183' }, editor, [davidson]).ok, true);
 });
 
-test('the last librarian email cannot be removed, and bad emails are rejected', () => {
-  const empty = edit({ librarian_emails: [] });
-  assert.equal(empty.status, 400);
-  assert.deepEqual(errorFields(empty), ['librarian_emails']);
+// ── Editors ──────────────────────────────────────────────────
 
-  const bad = edit({ librarian_emails: ['librarian@knoxdata.org', 'not-an-email'] });
-  assert.equal(bad.status, 400);
-  assert.match(bad.errors[0].message, /not-an-email/);
+test('editors can add editors; duplicates, bad emails and outsiders are refused', () => {
+  assert.deepEqual(checkAddEditor({ editors: knoxEditors, user: editor, email: ' Teacher@School.edu ' }), { ok: true, email: 'teacher@school.edu' });
+  assert.equal(checkAddEditor({ editors: knoxEditors, user: editor, email: 'HELPER@knoxdata.org' }).status, 409);
+  assert.equal(checkAddEditor({ editors: knoxEditors, user: editor, email: 'not an email' }).status, 400);
+  assert.equal(checkAddEditor({ editors: knoxEditors, user: stranger, email: 'x@y.org' }).status, 403);
+  const full = Array.from({ length: 10 }, (_, i) => `e${i}@x.org`);
+  assert.equal(checkAddEditor({ editors: full, user: { email: 'e0@x.org' }, email: 'new@x.org' }).status, 400);
 });
 
-test('an edit cannot change the slug or take another library’s county', () => {
-  const davidson = { ...knox, name: 'Davidson', slug: 'davidson', county_fips: '47037' };
-  const renamed = edit({ slug: 'somewhere-else' }, undefined, [knox, davidson]);
-  assert.equal(renamed.ok, true);
-  assert.equal(renamed.community.slug, 'knox-county');
-
-  const clash = edit({ county_fips: '47037' }, undefined, [knox, davidson]);
-  assert.equal(clash.status, 409);
-  assert.deepEqual(errorFields(clash), ['county_fips']);
+test('editors can remove editors, themselves included, but never the last one', () => {
+  assert.deepEqual(checkRemoveEditor({ editors: knoxEditors, user: editor, email: 'Helper@knoxdata.org' }), { ok: true, email: 'helper@knoxdata.org' });
+  assert.equal(checkRemoveEditor({ editors: knoxEditors, user: editor, email: 'librarian@knoxdata.org' }).ok, true);
+  assert.equal(checkRemoveEditor({ editors: ['solo@x.org'], user: { email: 'solo@x.org' }, email: 'solo@x.org' }).status, 409);
+  assert.equal(checkRemoveEditor({ editors: knoxEditors, user: editor, email: 'nobody@x.org' }).status, 404);
+  assert.equal(checkRemoveEditor({ editors: knoxEditors, user: stranger, email: 'helper@knoxdata.org' }).status, 403);
 });
 
-test('isLibrarian and slugify handle edge cases', () => {
-  assert.equal(isLibrarian([], ''), false);
-  assert.equal(isLibrarian(undefined, 'a@b.org'), false);
-  assert.equal(isLibrarian(['A@B.org'], ' a@b.org '), true);
-  assert.equal(slugify('  Ñandú County: Data Library!  '), 'nandu-county-data-library');
+// ── Approval ─────────────────────────────────────────────────
+
+test('only admins approve or reject, and only libraries that are waiting', () => {
+  const pending = { ...knox, approved: false };
+  assert.equal(isAdmin(admin), true);
+  assert.equal(isAdmin(editor), false);
+  assert.deepEqual(checkReview({ user: admin, community: pending }), { ok: true });
+  assert.equal(checkReview({ user: editor, community: pending }).status, 403);
+  assert.equal(checkReview({ user: admin, community: knox }).status, 409);
+  assert.equal(checkReview({ user: admin, community: null }).status, 404);
 });
 
-// ── Community files ──────────────────────────────────────────
-
-test('the Knox County file parses, round-trips, and holds no emails', async () => {
-  const markdown = await readFile(new URL('../src/content/communities/knox-county.md', import.meta.url), 'utf8');
-  assert.doesNotMatch(markdown, /@/);
-  const { data, body } = parseCommunityMarkdown(markdown);
-  assert.equal(data.county_fips, '47093');
-
-  const again = parseCommunityMarkdown(serializeCommunityMarkdown(data, body));
-  assert.deepEqual(again.data, data);
-  assert.equal(again.body.trim(), body.trim());
+test('only writes that change public pages rebuild the site', () => {
+  assert.match(rebuildReason('approve', knox)!, /Approve community library knox-county/);
+  assert.match(rebuildReason('update', knox)!, /Update community library knox-county/);
+  assert.equal(rebuildReason('update', { ...knox, approved: false }), null);
+  for (const action of ['register', 'reject', 'add-editor', 'remove-editor'] as const) {
+    assert.equal(rebuildReason(action, knox), null, action);
+  }
 });
 
-test('old librarian email fields are dropped and never written back', () => {
-  const { data } = parseCommunityMarkdown(
-    '---\nname: X\nslug: x\nstate_code: TN\ncounty_fips: 47093\nlibrarian_email: a@b.org\nlibrarian_emails: [c@d.org]\n---\nBody\n',
-  );
-  assert.equal(data.librarian_email, undefined);
-  assert.equal(data.librarian_emails, undefined);
-  assert.equal(data.county_fips, '47093');
-  assert.doesNotMatch(serializeCommunityMarkdown({ ...data, librarian_emails: ['c@d.org'] }, ''), /@/);
+// ── Requests ─────────────────────────────────────────────────
+
+test('writes must come from this site (the login is a cookie)', () => {
+  const request = (origin?: string) =>
+    new Request('https://cdl.example/api/librarian/libraries', { method: 'POST', headers: origin ? { Origin: origin } : {} });
+  assert.equal(isAllowedOrigin(request('https://cdl.example')), true);
+  assert.equal(isAllowedOrigin(request('https://evil.example')), false);
+  assert.equal(isAllowedOrigin(request()), false);
+  assert.equal(isAllowedOrigin(request('https://preview.cdl.example'), ['https://preview.cdl.example']), true);
 });
 
-test('community paths only accept safe slugs', () => {
-  assert.equal(communityPath('knox-county'), 'src/content/communities/knox-county.md');
-  assert.throws(() => communityPath('../../netlify.toml'));
-  assert.throws(() => communityPath('Knox County'));
+test('helpers', () => {
+  assert.equal(slugify('  Café Library, Knox!  '), 'cafe-library-knox');
+  assert.equal(isEditor(knoxEditors, ' HELPER@knoxdata.org'), true);
+  assert.equal(isEditor(knoxEditors, ''), false);
+  const { data } = parseCommunityMarkdown('---\nname: Knox\ncounty_fips: 47093\nlibrarian_emails: [a@b.org]\n---\nBody');
+  assert.deepEqual(data, { name: 'Knox', county_fips: '47093' });
 });

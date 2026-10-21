@@ -1,9 +1,9 @@
 /**
  * "Contact the librarian" messages (served by netlify/functions/library-contact.mjs).
  *
- * Visitors never see a librarian's email: the form posts here, this looks the
- * librarians up in the private Blobs store, and forwards the message by email with
- * the visitor's address as Reply-To.
+ * Visitors never see an editor's email: the form posts here, this looks the
+ * library's editors up in Netlify Database, and forwards the message by email with
+ * the visitor's address as Reply-To. Only approved libraries receive messages.
  *
  *   POST /api/library-contact  { slug, name, email, message, website, started_at }
  *
@@ -56,16 +56,15 @@ export function createResendSender({ apiKey, from, fetch = globalThis.fetch }) {
 
 /**
  * @param {object} deps
- * @param {{ get: (slug: string) => Promise<object | null> } | null} deps.librarians Private librarian records.
+ * @param {{ get: (slug: string) => Promise<{ name: string, approved: boolean, editors: string[] } | null> } | null} deps.libraries
+ *   Library records with their editors (netlify/lib/communityDb.mjs); null without a database.
  * @param {((email: object) => Promise<void>) | null} deps.send null when email isn't configured.
- * @param {((slug: string) => Promise<unknown>) | null} [deps.isLive] Whether the library is on the site;
- *   lets a just-merged library receive mail before its record is marked approved.
  * @param {() => number} [deps.now]
  */
-export function createContactHandler({ librarians, send, isLive = null, now = Date.now }) {
+export function createContactHandler({ libraries, send, now = Date.now }) {
   return async function handle(request) {
     if (request.method !== 'POST') return fail(405, 'Method not allowed');
-    if (!librarians || !send) return fail(503, 'The contact form is not set up on this site yet.');
+    if (!libraries || !send) return fail(503, 'The contact form is not set up on this site yet.');
 
     const raw = await request.text();
     if (raw.length > MAX_BODY_BYTES) return fail(413, 'Message is too long.');
@@ -87,17 +86,14 @@ export function createContactHandler({ librarians, send, isLive = null, now = Da
     if (errors.length > 0) return json(400, { error: errors.join(' '), errors });
 
     const slug = String(input.slug ?? '');
-    const record = SLUG_PATTERN.test(slug) ? await librarians.get(slug).catch(() => null) : null;
-    const reachable =
-      record?.emails?.length > 0 &&
-      (record.status === 'approved' || (record.status === 'pending' && isLive && (await isLive(slug).catch(() => null))));
-    if (!reachable) return fail(404, 'This library isn’t receiving messages yet.');
+    const record = SLUG_PATTERN.test(slug) ? await libraries.get(slug).catch(() => null) : null;
+    if (!record?.approved || !(record.editors?.length > 0)) return fail(404, 'This library isn’t receiving messages yet.');
 
     const name = String(input.name).trim();
     const email = normalizeEmail(input.email);
     try {
       await send({
-        to: record.emails,
+        to: record.editors,
         replyTo: email,
         subject: `Message for ${record.name} from the Community Data Libraries site`,
         text: [
@@ -106,8 +102,8 @@ export function createContactHandler({ librarians, send, isLive = null, now = Da
           String(input.message).trim(),
           '',
           '---',
-          'Reply to this email to answer them directly. You received this because you are a librarian',
-          'for this library; manage librarians in the librarian portal.',
+          'Reply to this email to answer them directly. You received this because you are an editor',
+          'of this library; manage editors in the librarian portal.',
         ].join('\n'),
       });
     } catch (err) {

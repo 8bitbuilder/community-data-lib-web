@@ -5,20 +5,20 @@ import { createContactHandler, createResendSender } from '../netlify/lib/library
 import contactFunction, { config } from '../netlify/functions/library-contact.mjs';
 
 const NOW = 1_800_000_000_000;
-const records: Record<string, unknown> = {
-  'knox-county': { emails: ['librarian@knoxdata.org', 'helper@knoxdata.org'], status: 'approved', name: 'Knox County Data Library' },
-  pending: { emails: ['p@x.org'], status: 'pending', name: 'Pending Library' },
-  rejected: { emails: ['r@x.org'], status: 'rejected', name: 'Rejected Library' },
+// Library records as netlify/lib/communityDb.mjs returns them.
+const libraries: Record<string, { name: string; approved: boolean; editors: string[] }> = {
+  'knox-county': { name: 'Knox County Data Library', approved: true, editors: ['librarian@knoxdata.org', 'helper@knoxdata.org'] },
+  pending: { name: 'Pending Library', approved: false, editors: ['p@x.org'] },
+  orphan: { name: 'No Editors', approved: true, editors: [] },
 };
 
-function setup({ live = [] as string[] } = {}) {
+function setup() {
   const sent: { to: string[]; replyTo: string; subject: string; text: string }[] = [];
   const handle = createContactHandler({
-    librarians: { get: async (slug: string) => records[slug] ?? null },
+    libraries: { get: async (slug: string) => libraries[slug] ?? null },
     send: async (email) => {
       sent.push(email);
     },
-    isLive: async (slug: string) => (live.includes(slug) ? {} : null),
     now: () => NOW,
   });
   return { sent, handle };
@@ -36,7 +36,7 @@ const message = {
 const post = (handle: (r: Request) => Promise<Response>, body: unknown) =>
   handle(new Request('https://cdl.example/api/library-contact', { method: 'POST', body: JSON.stringify(body) }));
 
-test('a message is forwarded to the librarians with the visitor as reply-to', async () => {
+test('a message is forwarded to the library editors with the visitor as reply-to', async () => {
   const { handle, sent } = setup();
   const res = await post(handle, message);
   assert.equal(res.status, 200);
@@ -45,7 +45,7 @@ test('a message is forwarded to the librarians with the visitor as reply-to', as
   assert.equal(sent[0].replyTo, 'pat@school.edu');
   assert.match(sent[0].subject, /Knox County Data Library/);
   assert.match(sent[0].text, /population data/);
-  assert.doesNotMatch(await res.text(), /knoxdata/, 'librarian emails never reach the visitor');
+  assert.doesNotMatch(await res.text(), /knoxdata/, 'editor emails never reach the visitor');
 });
 
 test('bots (honeypot filled or instant submit) get a quiet success and nothing is sent', async () => {
@@ -64,16 +64,15 @@ test('invalid messages are rejected with reasons', async () => {
   assert.equal(sent.length, 0);
 });
 
-test('only live libraries receive messages', async () => {
-  const { handle, sent } = setup({ live: ['pending'] });
-  for (const slug of ['missing', 'rejected', '../etc']) {
+test('only approved libraries with editors receive messages', async () => {
+  const { handle, sent } = setup();
+  for (const slug of ['missing', 'pending', 'orphan', '../etc']) {
     assert.equal((await post(handle, { ...message, slug })).status, 404, slug);
   }
-  assert.equal((await post(handle, { ...message, slug: 'pending' })).status, 200, 'merged but not yet marked approved');
-  assert.deepEqual(sent.map((s) => s.to), [['p@x.org']]);
+  assert.equal(sent.length, 0);
 });
 
-test('without Resend configured the function reports it is not set up', async () => {
+test('without Resend or a database configured the function reports it is not set up', async () => {
   assert.equal(config.path, '/api/library-contact');
   const res = await contactFunction(
     new Request('https://cdl.example/api/library-contact', { method: 'POST', body: JSON.stringify(message) }),
