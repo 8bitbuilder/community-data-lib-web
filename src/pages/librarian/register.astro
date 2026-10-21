@@ -1,0 +1,119 @@
+---
+import LibrarianPage from '@components/librarian/LibrarianPage.astro';
+import CountyPicker from '@components/librarian/CountyPicker.astro';
+import { LIMITS } from '@lib/community/librarianRules.mjs';
+import { withBasePath } from '@lib/paths';
+
+const communityBase = withBasePath('/communities/');
+---
+
+<LibrarianPage
+  title="Register a Community Library"
+  description="Register a community data library for your county."
+  heading="Register a library"
+  intro="A community library is a view of the main catalog filtered to one county, with a landing page for teachers, students and community members."
+>
+  <form class="card" id="register-form" novalidate hidden>
+    <div class="field">
+      <label for="f-name">Library name <span class="required">*</span></label>
+      <input id="f-name" name="name" type="text" maxlength={LIMITS.name} required placeholder="e.g. Knox County Data Library" />
+      <p class="field-error" data-error-for="name"></p>
+    </div>
+
+    <CountyPicker />
+
+    <div class="field-row">
+      <div class="field">
+        <label for="f-place">Place name</label>
+        <input id="f-place" name="place_name" type="text" maxlength={LIMITS.placeName} placeholder="e.g. Knoxville" />
+        <p class="field-hint">Used in "Data for …". Defaults to the library name.</p>
+        <p class="field-error" data-error-for="place_name"></p>
+      </div>
+      <div class="field">
+        <label for="f-slug">Web address</label>
+        <input id="f-slug" name="slug" type="text" maxlength={LIMITS.slug} pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="knox-county" />
+        <p class="field-hint">
+          <code>{communityBase}<span id="slug-preview">…</span>/</code>. It can't be changed later.
+        </p>
+        <p class="field-error" data-error-for="slug"></p>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="f-description">Description</label>
+      <textarea id="f-description" name="description" maxlength={LIMITS.description} rows="3"></textarea>
+      <p class="field-error" data-error-for="description"></p>
+    </div>
+
+    <p class="form-error" role="alert"></p>
+    <div class="actions"><button type="submit">Register library</button></div>
+  </form>
+
+  <section class="card" id="registered" hidden>
+    <h2>Registered</h2>
+    <p id="registered-text"></p>
+    <div class="actions">
+      <a class="button" id="registered-edit" href="#">Edit details and editors</a>
+      <a class="button button-secondary" href={withBasePath('/librarian/')}>My libraries</a>
+    </div>
+  </section>
+</LibrarianPage>
+
+<script>
+  import { slugify } from '@lib/community/librarianRules.mjs';
+  import { api, ApiError, pages, requireUser, showFieldErrors, showStatus } from '@lib/librarian/client';
+  import { initCountyPicker } from '@lib/librarian/countyPicker';
+
+  const form = document.getElementById('register-form') as HTMLFormElement;
+  const nameInput = document.getElementById('f-name') as HTMLInputElement;
+  const slugInput = document.getElementById('f-slug') as HTMLInputElement;
+  const preview = document.getElementById('slug-preview') as HTMLElement;
+  const county = initCountyPicker(document.querySelector('[data-county-picker]') as HTMLElement);
+  let slugEdited = false;
+
+  function updateSlug() {
+    if (!slugEdited) slugInput.value = slugify(nameInput.value);
+    preview.textContent = slugInput.value || '…';
+  }
+  nameInput.addEventListener('input', updateSlug);
+  slugInput.addEventListener('input', () => {
+    slugEdited = slugInput.value !== '';
+    preview.textContent = slugInput.value || '…';
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const button = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+    button.disabled = true;
+    try {
+      const { library } = await api('', {
+        method: 'POST',
+        body: {
+          name: data.get('name'),
+          place_name: data.get('place_name'),
+          slug: data.get('slug'),
+          description: data.get('description'),
+          county_fips: county.value(),
+        },
+      });
+      form.hidden = true;
+      document.getElementById('registered-text')!.textContent =
+        `${library.name} (${library.county}, ${library.state_code}) is registered and waiting for the Community Data ` +
+        'Libraries team to approve it. You are its first editor; it goes live on the site once approved.';
+      (document.getElementById('registered-edit') as HTMLAnchorElement).href = pages.edit(library.slug);
+      document.getElementById('registered')!.hidden = false;
+    } catch (err) {
+      if (err instanceof ApiError) showFieldErrors(form, err.errors, err.message);
+      else showStatus(err instanceof Error ? err.message : String(err), 'error');
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  requireUser()
+    .then((user) => {
+      if (user) form.hidden = false;
+    })
+    .catch((err) => showStatus(err instanceof Error ? err.message : String(err), 'error'));
+</script>

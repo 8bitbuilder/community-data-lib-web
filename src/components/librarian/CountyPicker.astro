@@ -1,0 +1,38 @@
+---
+// Searchable county field (combobox) for the librarian forms. The options are every
+// county in the Census vocabulary (src/data/geo-vocabulary.json), embedded in the page;
+// only the register and edit pages use it. The chosen GEOID goes into a hidden input
+// named `county_fips`. Behavior: src/lib/librarian/countyPicker.ts.
+import vocabulary from '@data/geo-vocabulary.json';
+
+interface Props {
+  id?: string;
+}
+
+const { id = 'county' } = Astro.props;
+const stateNames = new Map(vocabulary.states.map((s) => [s.usps, s.name]));
+// [GEOID, county name, state name, USPS code]
+const options = vocabulary.counties.map((c) => [c.geoid, c.name, stateNames.get(c.state) ?? c.state, c.state]);
+---
+
+<div class="field county-picker" data-county-picker id={`${id}-picker`}>
+  <label for={`${id}-search`}>County <span class="required">*</span></label>
+  <input
+    id={`${id}-search`}
+    type="text"
+    role="combobox"
+    autocomplete="off"
+    aria-autocomplete="list"
+    aria-expanded="false"
+    aria-controls={`${id}-options`}
+    placeholder="Start typing a county or state, e.g. Knox Tennessee"
+  />
+  <ul class="county-options" id={`${id}-options`} role="listbox" aria-label="Matching counties" hidden></ul>
+  <input type="hidden" name="county_fips" data-county-value />
+  <p class="county-chosen" data-county-chosen aria-live="polite"></p>
+  <p class="field-hint">
+    The county your library serves. Its datasets, map and catalog are filtered by this county's Census code.
+  </p>
+  <p class="field-error" data-error-for="county_fips"></p>
+  <script type="application/json" data-county-options set:html={JSON.stringify(options)} />
+</div>

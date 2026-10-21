@@ -1,0 +1,185 @@
+---
+import LibrarianPage from '@components/librarian/LibrarianPage.astro';
+---
+
+<LibrarianPage
+  title="Librarian Login"
+  description="Log in to register or manage a community data library."
+  heading="Log in"
+  intro="Librarians log in to register a community library and keep its details up to date. Visitors never need an account."
+>
+  <p class="note card" id="identity-missing" hidden>
+    Logging in only works on the deployed site: Netlify Identity is not available on this copy (for example on
+    localhost).
+  </p>
+
+  <form class="card" id="login-form" novalidate>
+    <h2>Log in</h2>
+    <div class="field">
+      <label for="login-email">Email</label>
+      <input id="login-email" name="email" type="email" autocomplete="email" required />
+    </div>
+    <div class="field">
+      <label for="login-password">Password</label>
+      <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+    </div>
+    <p class="form-error" role="alert"></p>
+    <div class="actions">
+      <button type="submit">Log in</button>
+      <button type="button" class="button-secondary" data-show="forgot-form">Forgot your password?</button>
+    </div>
+  </form>
+
+  <form class="card" id="signup-form" novalidate>
+    <h2>Create an account</h2>
+    <p class="note">
+      We'll email you a confirmation link. Once your email is confirmed you can register your community's library;
+      the Community Data Libraries team approves new libraries before they go live.
+    </p>
+    <div class="field">
+      <label for="signup-email">Email</label>
+      <input id="signup-email" name="email" type="email" autocomplete="email" required />
+    </div>
+    <div class="field">
+      <label for="signup-password">Password</label>
+      <input id="signup-password" name="password" type="password" autocomplete="new-password" minlength="8" required />
+      <p class="field-hint">At least 8 characters.</p>
+    </div>
+    <p class="form-error" role="alert"></p>
+    <div class="actions"><button type="submit">Create account</button></div>
+  </form>
+
+  <form class="card" id="forgot-form" novalidate hidden>
+    <h2>Reset your password</h2>
+    <div class="field">
+      <label for="forgot-email">Email</label>
+      <input id="forgot-email" name="email" type="email" autocomplete="email" required />
+    </div>
+    <p class="form-error" role="alert"></p>
+    <div class="actions"><button type="submit">Email me a reset link</button></div>
+  </form>
+
+  <form class="card" id="password-form" novalidate hidden>
+    <h2 id="password-title">Choose a new password</h2>
+    <div class="field">
+      <label for="new-password">New password</label>
+      <input id="new-password" name="password" type="password" autocomplete="new-password" minlength="8" required />
+    </div>
+    <p class="form-error" role="alert"></p>
+    <div class="actions"><button type="submit">Save password</button></div>
+  </form>
+</LibrarianPage>
+
+<script>
+  import {
+    acceptInvite,
+    getUser,
+    handleAuthCallback,
+    login,
+    requestPasswordRecovery,
+    signup,
+    updateUser,
+  } from '@netlify/identity';
+  import { identityAvailable, nextPage, showStatus } from '@lib/librarian/client';
+
+  const next = nextPage(new URLSearchParams(location.search).get('next'));
+  const forms = ['login-form', 'signup-form', 'forgot-form', 'password-form'].map(
+    (id) => document.getElementById(id) as HTMLFormElement
+  );
+  const [loginForm, signupForm, forgotForm, passwordForm] = forms;
+
+  const value = (form: HTMLFormElement, name: string) => String(new FormData(form).get(name) ?? '').trim();
+  const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+  function only(...visible: HTMLFormElement[]) {
+    for (const form of forms) form.hidden = !visible.includes(form);
+  }
+
+  /** Run a form's action with its button disabled and errors shown in the form. */
+  function handle(form: HTMLFormElement, action: () => Promise<void>) {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+      const error = form.querySelector('.form-error') as HTMLElement;
+      error.textContent = '';
+      button.disabled = true;
+      try {
+        await action();
+      } catch (err) {
+        error.textContent = message(err);
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
+  async function init() {
+    if (!(await identityAvailable())) {
+      document.getElementById('identity-missing')!.hidden = false;
+      for (const form of forms) form.querySelectorAll('input, button').forEach((el) => el.setAttribute('disabled', ''));
+      return;
+    }
+
+    // Links in Identity emails (confirmation, invite, password reset) land here.
+    let inviteToken: string | null = null;
+    try {
+      const result = await handleAuthCallback();
+      if (result?.type === 'recovery') {
+        only(passwordForm);
+        showStatus('Choose a new password to finish resetting it.');
+        return wire();
+      }
+      if (result?.type === 'invite') {
+        inviteToken = result.token ?? null;
+        document.getElementById('password-title')!.textContent = 'Choose a password to accept your invitation';
+        only(passwordForm);
+        return wire();
+      }
+      if (result) {
+        location.href = next;
+        return;
+      }
+    } catch (err) {
+      showStatus(`That link didn't work: ${message(err)}`, 'error');
+    }
+
+    if (await getUser().catch(() => null)) {
+      location.href = next;
+      return;
+    }
+    wire();
+
+    function wire() {
+      document.querySelector('[data-show="forgot-form"]')?.addEventListener('click', () => {
+        forgotForm.hidden = false;
+        (document.getElementById('forgot-email') as HTMLInputElement).focus();
+      });
+      handle(loginForm, async () => {
+        await login(value(loginForm, 'email'), value(loginForm, 'password'));
+        location.href = next;
+      });
+      handle(signupForm, async () => {
+        const user = await signup(value(signupForm, 'email'), value(signupForm, 'password'));
+        if (user.confirmedAt) {
+          location.href = next;
+          return;
+        }
+        only(loginForm);
+        showStatus(`Check ${value(signupForm, 'email')} for a confirmation link, then log in.`);
+      });
+      handle(forgotForm, async () => {
+        await requestPasswordRecovery(value(forgotForm, 'email'));
+        showStatus('If that email has an account, we sent it a link to reset the password.');
+        forgotForm.hidden = true;
+      });
+      handle(passwordForm, async () => {
+        const password = value(passwordForm, 'password');
+        if (inviteToken) await acceptInvite(inviteToken, password);
+        else await updateUser({ password });
+        location.href = next;
+      });
+    }
+  }
+
+  init().catch((err) => showStatus(message(err), 'error'));
+</script>
