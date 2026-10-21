@@ -1,6 +1,6 @@
 # Web Architecture
 
-`web/` is a static Astro site (`output: 'static'`) that renders the CDL dataset catalog for different audiences, plus a county coverage map and a content-editing CMS. This document covers the site's structure, routing, content model, its relationship to the backend, and CI/CD. For the data-pipeline side, see [`backend/docs/PIPELINE.md`](../../../backend/docs/PIPELINE.md); for how the two projects fit together, see the repo-root [`ARCHITECTURE.md`](../../../ARCHITECTURE.md).
+`web/` is a static Astro site (`output: 'static'`) that renders the CDL dataset catalog for different audiences, plus a county coverage map, static data previews, and a content-editing CMS. This document covers the site's structure, routing, content model, its relationship to the backend, and CI/CD. For the data-pipeline side, see [`backend/docs/PIPELINE.md`](../../../backend/docs/PIPELINE.md); for how the two projects fit together, see the repo-root [`ARCHITECTURE.md`](../../../ARCHITECTURE.md).
 
 ## Tech stack
 
@@ -12,7 +12,8 @@
 | Language | TypeScript, `astro/tsconfigs/strict`, path aliases `@components/*`, `@layouts/*`, `@content/*`, `@lib/*`, `@data/*` |
 | Content layer | Astro Content Collections — one collection, `master-library`, loaded via `glob()` from `src/content/master-library/**/*.md` |
 | Local backend (dev) | Plain Node `http` server mirrored at `web/backend/`, run with `node --experimental-sqlite` |
-| Map | Leaflet 1.9.4 (from unpkg) with Census cartographic boundary GeoJSON; `mapshaper` (dev) builds the boundary files |
+| Map | Leaflet 1.9.4 (from unpkg) and `topojson-client` with one Census cartographic boundary TopoJSON file; `mapshaper` (dev) builds it |
+| Data previews | Static Tier 1 files from the backend (`public/previews/`, copied at build) |
 | CMS | Decap CMS, static admin at `public/admin/` |
 | Hosting | Netlify (`netlify.toml`, functions, forms) and GitHub Pages (`.github/workflows/astro.yml`) |
 | CI | GitHub Actions: `ci.yml` (lint/validate/build), `astro.yml` (Pages deploy) |
@@ -28,9 +29,11 @@
 | `sync:catalog` | Generates `src/content/master-library/datasets/*.md` from backend YAML |
 | `backend:import` | Runs canonical backend's SQLite importer, copies `sources.db` into the mirror |
 | `backend:pipeline` | Runs variable extraction for pipeline-ready sources, then `backend:import` |
-| `prebuild` | `sync:backend-yaml && check:backend-yaml && sync:catalog` (auto-runs before `build`) |
+| `check:geo` | Fails if any catalog coverage or community FIPS code is not in `src/data/geo-vocabulary.json` |
+| `sync:previews` | Copies the backend's Tier 1 preview files into `public/previews/` (gitignored, incremental, 250 KB per file limit) |
+| `prebuild` | `sync:backend-yaml && check:backend-yaml && sync:catalog && check:geo && sync:previews` (auto-runs before `build`) |
 | `build` | `astro build` |
-| `geo:boundaries` | Downloads the Census state/county cartographic boundary files into `public/geo/boundaries/` (manual; not in `prebuild`) |
+| `geo:boundaries` | Builds the TopoJSON boundary file and the county vocabulary from the Census files (manual; not in `prebuild`; `--from`, `--backend`) |
 | `lint` | `eslint . --ext .ts,.tsx,.js,.jsx,.astro` |
 | `check` | `lint && test && build` — full local gate |
 
@@ -42,16 +45,20 @@ web/
 ├── docs/               this documentation
 ├── netlify/functions/  Netlify Forms webhook (submission-notify.js)
 ├── public/admin/       Decap CMS static admin app
-├── public/geo/boundaries/  Census state and county boundaries for /maps (generated, committed)
+├── public/geo/boundaries/  Census TopoJSON boundaries for /maps (generated, committed)
+├── public/previews/    Tier 1 preview files copied from the backend at build time (gitignored)
 ├── scripts/            sync/validation scripts (Node ESM, run directly)
 └── src/
     ├── components/     Navigation.astro, etc.
     ├── content/         master-library/ — the one content collection (hand-authored + generated)
     ├── content.config.ts  Zod schema for master-library
+    ├── data/geo-vocabulary.json  every state and county GEOID (Census 2025), from geo:boundaries
     ├── layouts/          Layout.astro (site shell), CommunityLayout.astro (per-community branding)
     ├── lib/
     │   ├── api/backend.ts        typed client for the live backend proxy (preview/chart/datasheet)
+    │   ├── community/geoVocabulary.mjs  state and county lookups over the vocabulary (pure, tested)
     │   ├── data/coverageMap.ts    pure coverage logic for /maps (FIPS expansion, counts, labels)
+    │   ├── data/staticPreview.ts  Data Preview logic over the static files (pure, tested)
     │   ├── data/libraryAccess.ts  audience-access logic (teacher/student/community + sensitive-keyword filter)
     │   └── paths.ts               withBasePath() for GH-Pages base path handling
     ├── pages/            routes — see below
@@ -68,7 +75,7 @@ Content/catalog pages:
 - `/community-library` — community-submitted resources browser
 - `/community-member`, `/student`, `/teacher` — audience-specific views (via `extractThemes()`/`libraryAccess.ts`)
 - `/data-resources` — submission/lesson-plan links
-- `/data-preview` — interactive dataset preview (ApexCharts), requires `backend:dev` running locally
+- `/data-preview` — dataset preview from static Tier 1 files (ApexCharts); `?community=<slug>` opens that county's rows. See [previews.md](previews.md)
 - `/submit` — resource submission form (Netlify Forms)
 - `/maps` — county coverage map: counties shaded by how many datasets cover them, or one dataset's coverage
 - `/example-community-library/{index,catalog,data-resources,map}` — a reference community-library implementation (Knox County, TN) using `CommunityLayout`
@@ -78,8 +85,9 @@ Static (build-time-rendered) API routes, `src/pages/api/*.ts`:
 - `/api/complete-catalog.json` — full catalog (community-visible subset)
 - `/api/master-library.json` — legacy alias of the above
 - `/api/community.json` — `community-submissions.json`
+- `/geo/county-names.json` — county and state names by FIPS code, for the Data Preview county picker
 
-These are pre-rendered static files (because `output: 'static'`) — distinct from the *live* backend proxy (`/api/sources`, `/api/health`), which only exists via the Vite dev proxy or `PUBLIC_API_BASE_URL` in production, and is used only by `/data-preview`.
+These are pre-rendered static files (because `output: 'static'`). The old preview API (`/api/sources`, `/api/health`) exists only in local development, through the Vite dev proxy to `npm run backend:dev`; the deployed `/data-preview` reads static files.
 
 ## Content model
 
@@ -96,11 +104,11 @@ Dataset metadata (backend YAML) is edited separately through the magic-link meta
 
 ## Coverage map
 
-`/maps` shows where each catalog dataset applies, from its canonical `coverage` (backend `source_coverage`: `nation`, a 2-digit state FIPS, or a 5-digit county FIPS) passed through `sync:catalog` into frontmatter. Coverage is defined by FIPS codes only; the geometry is for display.
+`/maps` shows where each catalog dataset applies, from its canonical `coverage` (`nation`, a state FIPS or a county FIPS, from the backend's `source_coverage`). Coverage is defined by FIPS codes only; the geometry is for display. Boundaries, the county vocabulary and the build check are described in [coverage-and-boundaries.md](coverage-and-boundaries.md).
 
-- **Boundaries**: `public/geo/boundaries/` holds the Census cartographic boundary files (states and counties, 1:20m) as GeoJSON keyed by GEOID, with a provenance README. `npm run geo:boundaries` regenerates them; the vintage and resolution are pinned at the top of `scripts/build-geo-boundaries.mjs`. The download is not part of `prebuild`.
-- **Logic**: `src/lib/data/coverageMap.ts` (pure, tested in `tests/coverageMap.test.ts`) expands coverage to counties (nation → every county, state → its counties, county → itself), counts datasets per county, and builds coverage labels. Datasets with no coverage are listed as "not mapped".
-- **Build check**: `src/pages/maps.astro` fails the build if any coverage FIPS code is missing from the boundary files.
+## Data previews
+
+Tier 1 static preview files (exported by the backend, copied at build) are described in [previews.md](previews.md).
 
 ## CI/CD
 

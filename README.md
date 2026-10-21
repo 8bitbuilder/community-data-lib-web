@@ -1,6 +1,6 @@
 # Community Data Libraries - Web
 
-Astro-based site for Community Data Libraries (CDL). This repo also hosts geographic marker data for mapping resources.
+Astro-based site for Community Data Libraries (CDL). Dataset metadata comes from the sibling `backend` repo (its SQLite export is the source of truth).
 
 ## Development
 
@@ -9,32 +9,26 @@ npm install
 npm run dev
 ```
 
-## Backend Starter
+## Data previews
 
-A minimal backend is available in `backend/` and reads YAML source files from `backend/data/sources/`.
+The Data Preview page (`/data-preview?source=<id>`) reads static preview files that the backend exports (`python pythonscripts/export_previews.py` writes `data/exports/previews/`). `npm run sync:previews` copies them into the gitignored `public/previews/` during `prebuild`. Every file stays under 250 KB. Netlify Functions never read or filter datasets. `?community=<slug>` opens the preview on that library's county. Details: [docs/technical/previews.md](docs/technical/previews.md).
 
-For data preview pages, run **both** servers in separate terminals:
+For backend work, the old preview API still runs locally (development only):
 
 ```bash
 npm run backend:dev   # preview API on http://localhost:4323
-npm run dev           # Astro site on http://localhost:4321/web
+npm run dev           # Astro site on http://localhost:4321/web (proxies /api/sources to it)
 ```
-
-In development, the Astro dev server proxies `/api/sources` and `/api/health` to the preview API, so you usually do not need `PUBLIC_API_BASE_URL` in `.env`.
-
-**In production (Netlify)** there is no preview API. The Data Preview page reads static preview files that the backend exports (`data/exports/previews/`, copied to `public/previews/` at build time); Netlify Functions never read or filter datasets. The dev API above is optional, for working on the backend.
-
-Base URL (direct): `http://localhost:4323`
 
 ## Coverage Map
 
-`/maps` shades U.S. counties by how many catalog datasets cover them, using each dataset's canonical `coverage` (nation, state FIPS, or county FIPS, from the backend). Boundaries are the Census cartographic boundary files in [public/geo/boundaries/](public/geo/boundaries/README.md), committed and refreshed by hand:
+`/maps` shades U.S. counties by how many catalog datasets cover them, from each dataset's canonical `coverage` (nation, state FIPS or county FIPS, from the backend). Click a county to list its datasets. The boundaries are one TopoJSON file built from the Census cartographic boundary files (2025, 1:20m) and committed. The same county file produces `src/data/geo-vocabulary.json`, the site's list of valid state and county codes:
 
 ```bash
-npm run geo:boundaries
+npm run geo:boundaries -- --backend ../backend   # by hand; never part of the build
 ```
 
-The build fails if a dataset's coverage uses a FIPS code that isn't in those files.
+`npm run check:geo` (in `prebuild`) fails the build if any coverage or community FIPS code isn't in the vocabulary. Details: [docs/technical/coverage-and-boundaries.md](docs/technical/coverage-and-boundaries.md).
 
 ## Librarian Portal (community libraries)
 
@@ -117,7 +111,8 @@ To use Decap on Netlify: enable Identity, enable **Git Gateway** under Identity 
 
 - Site architecture, routing, content model, CI/CD: [docs/technical/architecture.md](docs/technical/architecture.md)
 - Netlify deployment: [docs/technical/netlify.md](docs/technical/netlify.md)
-- Coverage map boundary files: [public/geo/boundaries/README.md](public/geo/boundaries/README.md)
+- Coverage model, boundaries and county vocabulary: [docs/technical/coverage-and-boundaries.md](docs/technical/coverage-and-boundaries.md) and [public/geo/boundaries/README.md](public/geo/boundaries/README.md)
+- Data previews (Tier 1 static files): [docs/technical/previews.md](docs/technical/previews.md)
 - Community library structure: [docs/data/community-library-structure.md](docs/data/community-library-structure.md)
 - Datasheet requirements: [docs/data/datasheet-requirements.md](docs/data/datasheet-requirements.md)
 - DecapCMS implementation: [docs/technical/decapcms-implementation.md](docs/technical/decapcms-implementation.md)
