@@ -1,8 +1,8 @@
 function resolveApiBase(): string {
   const configured = import.meta.env.PUBLIC_API_BASE_URL?.trim();
   if (configured) return configured.replace(/\/$/, '');
-  // Same origin: in dev, Astro proxies /api/* to backend/server.mjs (see astro.config.mjs);
-  // on Netlify, /api/* is served by netlify/functions/preview-api.mjs.
+  // Same origin: in dev, Astro proxies /api/* to backend/server.mjs (see astro.config.mjs).
+  // Development only; the deployed Data Preview page reads static files instead.
   return '';
 }
 

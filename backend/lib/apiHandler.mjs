@@ -1,9 +1,9 @@
 /**
- * Preview API routing shared by the local dev server (backend/server.mjs) and the
- * Netlify Function (netlify/functions/preview-api.mjs).
+ * Preview API routing for the local dev server (backend/server.mjs). Development
+ * only: the deployed site reads static preview files (public/previews/) and never
+ * reads or filters datasets at request time.
  *
- * Uses the standard Fetch API Request/Response so it runs unchanged in Node's
- * http server (via a small adapter) and in Netlify Functions.
+ * Uses the standard Fetch API Request/Response, adapted to Node's http server.
  *
  * Routes:
  *   GET /api/health
