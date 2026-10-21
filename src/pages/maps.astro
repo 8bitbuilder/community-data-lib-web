@@ -1,8 +1,7 @@
 ---
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { getCollection } from 'astro:content';
 import Layout from '@layouts/Layout.astro';
+import vocabulary from '@data/geo-vocabulary.json';
 import { catalogEntryHref, withBasePath } from '@lib/paths';
 import {
   buildBoundaryIndex,
@@ -10,24 +9,18 @@ import {
   isNational,
   unknownCoverageFips,
   unmappedDatasets,
-  type BoundaryArea,
 } from '@lib/data/coverageMap';
 
-// Census cartographic boundary files written by `npm run geo:boundaries`
+// Census cartographic boundary file written by `npm run geo:boundaries`
 // (scripts/build-geo-boundaries.mjs). Geometry is for display only; coverage
-// comes from each dataset's FIPS codes.
-const BOUNDARY_FILES = {
-  states: 'us-states-2025-20m.geojson',
-  counties: 'us-counties-2025-20m.geojson',
-};
+// comes from each dataset's FIPS codes, checked against the vocabulary written
+// from the same county file.
+const BOUNDARY_FILE = 'us-2025-20m.topo.json';
 
-function readAreas(file: string): BoundaryArea[] {
-  const raw = readFileSync(path.join(process.cwd(), 'public/geo/boundaries', file), 'utf8');
-  const features: { properties: { GEOID: string; name: string; state: string } }[] = JSON.parse(raw).features;
-  return features.map(({ properties: p }) => ({ geoid: p.GEOID, name: p.name, state: p.state }));
-}
-
-const index = buildBoundaryIndex(readAreas(BOUNDARY_FILES.states), readAreas(BOUNDARY_FILES.counties));
+const index = buildBoundaryIndex(
+  vocabulary.states.map((s) => ({ geoid: s.geoid, name: s.name, state: s.usps })),
+  vocabulary.counties
+);
 
 const entries = await getCollection('master-library');
 const datasets = entries
@@ -41,7 +34,7 @@ const datasets = entries
   }))
   .sort((a, b) => a.title.localeCompare(b.title));
 
-// Build-time check: every coverage FIPS code must exist in the boundary files.
+// Also checked in prebuild (scripts/check-geo-vocabulary.mjs); kept here so the page never renders bad codes.
 const unknown = unknownCoverageFips(datasets, index);
 if (unknown.length > 0) {
   throw new Error(
@@ -57,10 +50,7 @@ const states = [...index.states.values()].sort((a, b) => a.name.localeCompare(b.
 
 const mapData = {
   datasets: mapped,
-  boundaries: {
-    states: withBasePath(`/geo/boundaries/${BOUNDARY_FILES.states}`),
-    counties: withBasePath(`/geo/boundaries/${BOUNDARY_FILES.counties}`),
-  },
+  boundaries: withBasePath(`/geo/boundaries/${BOUNDARY_FILE}`),
 };
 ---
 
@@ -161,6 +151,7 @@ const mapData = {
   <script type="application/json" id="map-data" set:html={JSON.stringify(mapData)} />
 
   <script>
+    import { feature, mesh } from 'topojson-client';
     import {
       buildBoundaryIndex,
       classForCount,
@@ -181,12 +172,16 @@ const mapData = {
     interface BoundaryFeature {
       type: 'Feature';
       id: string;
-      properties: { GEOID: string; name: string; state: string };
+      properties: { name: string; state: string };
       geometry: unknown;
     }
     interface BoundaryCollection {
       type: 'FeatureCollection';
       features: BoundaryFeature[];
+    }
+    interface BoundaryTopology {
+      type: 'Topology';
+      objects: { states: unknown; counties: unknown };
     }
 
     // One-hue ordinal ramp (validated: monotone lightness, light end >= 2:1 on white).
@@ -201,7 +196,7 @@ const mapData = {
 
     const data = JSON.parse(document.getElementById('map-data')?.textContent ?? '{}') as {
       datasets: MapDataset[];
-      boundaries: { states: string; counties: string };
+      boundaries: string;
     };
 
     const mapEl = document.getElementById('map') as HTMLElement;
@@ -229,14 +224,14 @@ const mapData = {
       });
     }
 
-    async function fetchBoundaries(url: string): Promise<BoundaryCollection> {
+    async function fetchBoundaries(url: string): Promise<BoundaryTopology> {
       const response = await fetch(url);
       if (!response.ok) throw new Error(`Unable to load the map boundaries (HTTP ${response.status}).`);
       return response.json();
     }
 
     const toAreas = (collection: BoundaryCollection): BoundaryArea[] =>
-      collection.features.map(({ properties: p }) => ({ geoid: p.GEOID, name: p.name, state: p.state }));
+      collection.features.map(({ id, properties: p }) => ({ geoid: id, name: p.name, state: p.state }));
 
     const plural = (n: number, word: string, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
 
@@ -251,11 +246,9 @@ const mapData = {
     }
 
     async function init() {
-      const [, statesGeo, countiesGeo] = await Promise.all([
-        loadLeaflet(),
-        fetchBoundaries(data.boundaries.states),
-        fetchBoundaries(data.boundaries.counties),
-      ]);
+      const [, topology] = await Promise.all([loadLeaflet(), fetchBoundaries(data.boundaries)]);
+      const statesGeo = feature(topology, topology.objects.states) as BoundaryCollection;
+      const countiesGeo = feature(topology, topology.objects.counties) as BoundaryCollection;
 
       const index = buildBoundaryIndex(toAreas(statesGeo), toAreas(countiesGeo));
       const counts = countsByCounty(data.datasets, index);
@@ -319,7 +312,8 @@ const mapData = {
         },
       }).addTo(map);
 
-      L.geoJSON(statesGeo, {
+      // State lines as one mesh: each shared border is drawn once.
+      L.geoJSON(mesh(topology, topology.objects.states), {
         renderer,
         style: { color: OUTLINE, weight: 1, fill: false },
         interactive: false,
