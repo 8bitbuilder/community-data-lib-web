@@ -9,7 +9,8 @@ const communities = (await getCollection('communities')).sort((a, b) =>
   a.data.name.localeCompare(b.data.name)
 );
 
-const librarianPortalHref = withBasePath('/librarian/');
+const registerHref = withBasePath('/librarian/register/');
+const loginHref = withBasePath('/librarian/login/');
 ---
 
 <Layout
@@ -40,8 +41,8 @@ const librarianPortalHref = withBasePath('/librarian/');
         <h2>What you maintain</h2>
         <ul>
           <li>Your community's name and web address (slug).</li>
-          <li>Its geographic identifiers, especially the five-digit county FIPS code.</li>
-          <li>Who else can edit it: add colleagues as librarians by email.</li>
+          <li>The county it serves, picked from the Census list of U.S. counties.</li>
+          <li>Who else can edit it: add colleagues as editors by email.</li>
         </ul>
         <p class="note">
           Dataset details are maintained in the main library. To add a dataset, use
@@ -55,32 +56,24 @@ const librarianPortalHref = withBasePath('/librarian/');
       <ol>
         <li>
           <strong>Check the list below.</strong> Each county can have one library. If yours already has
-          one, use the contact form on its page to reach its librarian instead of creating a duplicate.
+          one, use the contact form on its page to reach its editors instead of creating a duplicate.
         </li>
         <li>
-          <strong>Create a librarian account.</strong> Sign up in the librarian portal with your email
+          <strong>Create a librarian account.</strong> <a href={loginHref}>Sign up</a> with your email
           address and confirm it from the email we send you.
         </li>
         <li>
-          <strong>Look up your county FIPS code.</strong> It is the five-digit code for your county (for
-          example, Knox County, Tennessee is <code>47093</code>). The
-          <a
-            href="https://www.census.gov/library/reference/code-lists/ansi.html"
-            target="_blank"
-            rel="noopener noreferrer">Census ANSI code lists</a
-          > include every county.
-        </li>
-        <li>
-          <strong>Register your library.</strong> In the portal, enter its name, state, county FIPS code, and
-          ZIP codes. You become its first librarian and can add colleagues afterwards.
+          <strong>Register your library.</strong> Enter its name and pick your county by typing its name
+          (for example, <em>Knox Tennessee</em>). You become its first editor and can add colleagues
+          afterwards.
         </li>
         <li>
           <strong>Approval.</strong> The Community Data Libraries team reviews new libraries. Once approved,
           the site rebuilds within a few minutes and your library appears on the list below. After that,
-          your edits in the portal publish right away.
+          your edits in the portal are published on the next rebuild, a few minutes later.
         </li>
       </ol>
-      <a href={librarianPortalHref} class="button">Open the librarian portal</a>
+      <a href={registerHref} class="button">Register a library</a>
       <p class="note">Only librarians sign in. Visitors never need an account.</p>
     </section>
 
