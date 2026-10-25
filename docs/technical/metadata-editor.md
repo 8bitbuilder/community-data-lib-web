@@ -12,8 +12,7 @@ is saved.
 Design: `backend/docs/superpowers/specs/2026-10-14-metadata-editor-auth-design.md`.
 
 The Netlify build clones `community-data-libraries/backend@main` and syncs its data, so merged
-edits appear on the next build. This also keeps the Data Preview API
-(`netlify/functions/preview-api.mjs`, served from the synced backend export) current.
+edits appear on the next build, including the Data Preview page's static preview files.
 
 ## Netlify environment variables
 

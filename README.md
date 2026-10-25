@@ -1,6 +1,6 @@
 # Community Data Libraries - Web
 
-Astro-based site for Community Data Libraries (CDL). This repo also hosts geographic marker data for mapping resources.
+Astro-based site for Community Data Libraries (CDL). Dataset metadata comes from the sibling `backend` repo (its SQLite export is the source of truth).
 
 ## Development
 
@@ -9,34 +9,26 @@ npm install
 npm run dev
 ```
 
-## Backend Starter
+## Data previews
 
-A minimal backend is available in `backend/` and reads YAML source files from `backend/data/sources/`.
+The Data Preview page (`/data-preview?source=<id>`) reads static preview files that the backend exports (`python pythonscripts/export_previews.py` writes `data/exports/previews/`). `npm run sync:previews` copies them into the gitignored `public/previews/` during `prebuild`. Every file stays under 250 KB. Netlify Functions never read or filter datasets. `?community=<slug>` opens the preview on that library's county. Details: [docs/technical/previews.md](docs/technical/previews.md).
 
-For data preview pages, run **both** servers in separate terminals:
+For backend work, the old preview API still runs locally (development only):
 
 ```bash
 npm run backend:dev   # preview API on http://localhost:4323
-npm run dev           # Astro site on http://localhost:4321/web
+npm run dev           # Astro site on http://localhost:4321/web (proxies /api/sources to it)
 ```
 
-In development, the Astro dev server proxies `/api/sources` and `/api/health` to the preview API, so you usually do not need `PUBLIC_API_BASE_URL` in `.env`.
+## Coverage Map
 
-**In production (Netlify)** the same `/api/*` routes are served by a Netlify Function, `netlify/functions/preview-api.mjs`; no separate server runs. The function and `backend/server.mjs` share `backend/lib/apiHandler.mjs`. The function reads sources from the SQLite export (`backend/data/exports/catalog.json`) and uses the Node preview engine (no pandas). Excel (`.xlsx`) datasets and sources without a direct download link return "can't be previewed yet" instead of an error page.
-
-Base URL (direct): `http://localhost:4323`
-
-## Geographic Markers
-
-- Canonical markers stored in [data/geo/markers.geojson](data/geo/markers.geojson).
-- Properties validated against [data/geo/schema/marker.schema.json](data/geo/schema/marker.schema.json).
-- Lint and validate locally:
+`/maps` shades U.S. counties by how many catalog datasets cover them, from each dataset's canonical `coverage` (nation, state FIPS or county FIPS, from the backend). Click a county to list its datasets. The boundaries are one TopoJSON file built from the Census cartographic boundary files (2025, 1:20m) and committed. The same county file produces `src/data/geo-vocabulary.json`, the site's list of valid state and county codes:
 
 ```bash
-npm run validate:geo
+npm run geo:boundaries -- --backend ../backend   # by hand; never part of the build
 ```
 
-Contribution guidelines are in [data/geo/README.md](data/geo/README.md).
+`npm run check:geo` (in `prebuild`) fails the build if any coverage or community FIPS code isn't in the vocabulary. Details: [docs/technical/coverage-and-boundaries.md](docs/technical/coverage-and-boundaries.md).
 
 ## Librarian Portal (community libraries)
 
@@ -119,7 +111,8 @@ To use Decap on Netlify: enable Identity, enable **Git Gateway** under Identity 
 
 - Site architecture, routing, content model, CI/CD: [docs/technical/architecture.md](docs/technical/architecture.md)
 - Netlify deployment: [docs/technical/netlify.md](docs/technical/netlify.md)
-- Geo data branching guidance: [docs/technical/geo-branching.md](docs/technical/geo-branching.md)
+- Coverage model, boundaries and county vocabulary: [docs/technical/coverage-and-boundaries.md](docs/technical/coverage-and-boundaries.md) and [public/geo/boundaries/README.md](public/geo/boundaries/README.md)
+- Data previews (Tier 1 static files): [docs/technical/previews.md](docs/technical/previews.md)
 - Community library structure: [docs/data/community-library-structure.md](docs/data/community-library-structure.md)
 - Datasheet requirements: [docs/data/datasheet-requirements.md](docs/data/datasheet-requirements.md)
 - DecapCMS implementation: [docs/technical/decapcms-implementation.md](docs/technical/decapcms-implementation.md)

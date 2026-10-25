@@ -4,8 +4,6 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import { createApiHandler, nodeEngine } from '../backend/lib/apiHandler.mjs';
-import { loadAllSources as loadExported } from '../backend/lib/exportStore.mjs';
-import previewFunction, { config as functionConfig } from '../netlify/functions/preview-api.mjs';
 
 // A tiny local "data provider" so tests never touch the network.
 const CSV = [
@@ -103,20 +101,6 @@ test('datasets that cannot be previewed get a clear 422, not a crash', async () 
   const portal = await get('/api/sources/portal/preview');
   assert.equal(portal.status, 422);
   assert.match(portal.body.details, /no download URL/);
-});
-
-test('the Netlify function serves the real SQLite export', async () => {
-  assert.deepEqual(functionConfig.path, ['/api/health', '/api/sources', '/api/sources/*']);
-  const exported = await loadExported();
-  const list = await get('/api/sources', previewFunction);
-  assert.equal(list.status, 200);
-  assert.equal(list.body.count, exported.length);
-  const health = await get('/api/health', previewFunction);
-  assert.equal(health.body.runtime, 'netlify-function');
-  assert.equal(health.body.dataSource, 'sqlite-export');
-  const milk = await get('/api/sources/usda-milk-production', previewFunction);
-  assert.equal(milk.status, 200);
-  assert.deepEqual(milk.body.coverage, [{ level: 'nation', geoid: 'US' }]);
 });
 
 test('an unreachable data provider returns 502', async () => {

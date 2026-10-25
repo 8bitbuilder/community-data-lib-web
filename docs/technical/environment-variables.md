@@ -127,7 +127,7 @@ None of these are needed on Netlify, where the build sets what it needs. The def
 |---|---|---|---|
 | `BACKEND_ROOT` | web build scripts, backend | `../backend` | Path to the canonical backend repo. The Netlify build sets this itself. |
 | `BACKEND_SOURCES_DIR` | web build scripts | `$BACKEND_ROOT/data/sources` | Overrides just the dataset YAML folder. |
-| `PUBLIC_API_BASE_URL` | Astro site (browser) | empty (same origin) | Where the site fetches `/api/*` from. Leave empty to use the dev proxy locally and the `preview-api` function on Netlify. Because of the `PUBLIC_` prefix, it is visible in the browser, so never put a secret here. |
+| `PUBLIC_API_BASE_URL` | Astro site (browser) | empty (same origin) | Where the site fetches `/api/*` from. Development only (the deployed Data Preview page reads static files). Leave empty to use the dev proxy locally. Because of the `PUBLIC_` prefix, it is visible in the browser, so never put a secret here. |
 | `BACKEND_DEV_URL` | `astro dev` proxy | `http://localhost:4323` | Where `npm run dev` forwards `/api/sources` and `/api/health`. |
 | `BACKEND_PORT` | backend API server | `4323` | Port for `npm run backend:dev`. |
 | `SOURCES_DB_PATH` | backend API server | built-in SQLite path | Use a different SQLite database. |

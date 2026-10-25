@@ -1,15 +1,15 @@
 ---
 title: "County Estimates All Data 2025"
-description: "County Estimates All Data 2025 from U.S. Census Bureau (U.S. Department of Commerce). Topics include Energy & Environment, Population Data. Data is available for direct download. SUMLEV: summary level (40 = state, 50 = county). NPOPCHG: net population change. NATURALCHG: births minus deaths. GQESTIMATES: population in group quarters (prisons, dorms, nursing homes, etc.). RB..."
+description: "County Estimates All Data 2025 from U.S. Census Bureau (U.S. Department of Commerce). Topics include Business & Economy, Population Data. Data is available for direct download. SUMLEV: summary level (40 = state, 50 = county). NPOPCHG: net population change. NATURALCHG: births minus deaths. GQESTIMATES: population in group quarters (prisons, dorms, nursing homes, etc.). RB..."
 author: "U.S. Census Bureau"
 sourceId: "census-county-estimates-all-2025"
 category: "dataset"
 syncedFromBackend: true
 tags:
-  - "Energy & Environment"
+  - "Business & Economy"
   - "Population Data"
 dataThemes:
-  - "Energy & Environment"
+  - "Business & Economy"
   - "Population Data"
 pedagogicalTags: []
 sensitive: false
@@ -17,10 +17,6 @@ studentSuitability: "unreviewed"
 granularity: "county"
 coverage:
   - { level: "nation", geoid: "US" }
-location:
-  latitude: 38.8468
-  longitude: -76.9296
-  label: "U.S. Census Bureau headquarters, Suitland, MD (approximate)"
 url: "https://www2.census.gov/programs-surveys/popest/datasets/2020-2025/counties/totals/"
 featured: false
 difficulty: "intermediate"

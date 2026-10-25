@@ -1,6 +1,7 @@
 /**
- * Local preview API server (development). Production uses the Netlify Function in
- * netlify/functions/preview-api.mjs; both share backend/lib/apiHandler.mjs.
+ * Local preview API server (development only; routes in backend/lib/apiHandler.mjs).
+ * The deployed site has no preview server: /data-preview reads the static Tier 1
+ * preview files the backend exports (copied to public/previews/ at build time).
  *
  * Locally this reads sources from SQLite (or YAML if no database exists) and uses
  * pandas when available, falling back to the Node engine.

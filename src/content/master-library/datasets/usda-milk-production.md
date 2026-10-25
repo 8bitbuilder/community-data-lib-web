@@ -1,28 +1,16 @@
 ---
 title: "U.S. Milk Production and Related Data"
-description: "U.S. Milk Production and Related Data from USDA Economic Research Service (ERS) (U.S. Department of Agriculture). Topics include Agriculture, Economy, Energy & Environment, Government Administration, Health & Social Services, and more. Data is available for direct download."
+description: "U.S. Milk Production and Related Data from USDA Economic Research Service (ERS) (U.S. Department of Agriculture). Topics include Agriculture, Business & Economy. Data is available for direct download."
 author: "USDA Economic Research Service (ERS)"
 sourceId: "usda-milk-production"
 category: "dataset"
 syncedFromBackend: true
 tags:
   - "Agriculture"
-  - "Economy"
-  - "Energy & Environment"
-  - "Government Administration"
-  - "Health & Social Services"
-  - "Housing & Buildings"
-  - "Population Data"
-  - "Restaurant and Food Service"
+  - "Business & Economy"
 dataThemes:
   - "Agriculture"
-  - "Economy"
-  - "Energy & Environment"
-  - "Government Administration"
-  - "Health & Social Services"
-  - "Housing & Buildings"
-  - "Population Data"
-  - "Restaurant and Food Service"
+  - "Business & Economy"
 pedagogicalTags:
   - "good for one way anova"
   - "good for chi square independence"
@@ -64,10 +52,6 @@ studentSuitability: "unreviewed"
 granularity: "nation"
 coverage:
   - { level: "nation", geoid: "US" }
-location:
-  latitude: 38.8882
-  longitude: -77.0303
-  label: "USDA headquarters, Washington, DC (approximate)"
 url: "https://www.ers.usda.gov/data-products/dairy-data"
 featured: false
 difficulty: "beginner"

@@ -175,7 +175,6 @@ function buildMarkdown(source) {
   const difficulty = inferDifficulty(source);
 
   const coverage = Array.isArray(source.coverage) ? source.coverage : [];
-  const location = source.location;
 
   const lines = [
     '---',
@@ -203,14 +202,6 @@ function buildMarkdown(source) {
           ...coverage.map(
             (c) => `  - { level: ${yamlQuote(c.level)}, geoid: ${yamlQuote(c.geoid ?? c.fips ?? 'US')} }`
           ),
-        ]
-      : []),
-    ...(location
-      ? [
-          'location:',
-          `  latitude: ${Number(location.latitude)}`,
-          `  longitude: ${Number(location.longitude)}`,
-          ...(location.label ? [`  label: ${yamlQuote(location.label)}`] : []),
         ]
       : []),
     ...(source.published_date ? [`publishedDate: ${source.published_date}`] : []),
@@ -279,7 +270,7 @@ async function main() {
   console.log(`  → ${outputDir}`);
 }
 
-// Run only when executed directly (the loader above is also imported by build-map-markers.mjs).
+// Run only when executed directly (loadCatalogSources() is exported for reuse).
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((err) => {
     console.error(err);
