@@ -207,18 +207,26 @@ export function checkReview({ user, community }) {
   return { ok: true };
 }
 
+/** The fields of an approved library that its public page shows (the ones `communityDb.update` writes). */
+export const PUBLIC_FIELDS = ['name', 'place_name', 'description', 'county_fips'];
+
 /**
  * Whether a write changes the public site, so the static pages must be rebuilt
  * (each rebuild is a production deploy). Pending libraries and editor lists are
- * not public, so changing them does not rebuild.
+ * not public, so changing them does not rebuild, and neither does an update that
+ * leaves every public field as it was.
  *
  * @param {'register' | 'update' | 'approve' | 'reject' | 'add-editor' | 'remove-editor'} action
+ * @param {object} community the library after the write
+ * @param {object} [previous] the library before an update
  * @returns {string | null} a short reason for the build log, or null for no rebuild
  */
-export function rebuildReason(action, community) {
+export function rebuildReason(action, community, previous) {
   if (action === 'approve') return `Approve community library ${community.slug}`;
-  if (action === 'update' && community.approved) return `Update community library ${community.slug}`;
-  return null;
+  if (action !== 'update' || !community.approved) return null;
+  const same = (field) => String(community[field] ?? '') === String(previous[field] ?? '');
+  if (previous && PUBLIC_FIELDS.every(same)) return null;
+  return `Update community library ${community.slug}`;
 }
 
 /**

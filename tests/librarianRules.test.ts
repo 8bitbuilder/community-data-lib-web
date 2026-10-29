@@ -12,6 +12,7 @@ import {
   isAllowedOrigin,
   isEditor,
   rebuildReason,
+  PUBLIC_FIELDS,
   slugify,
 } from '../src/lib/community/librarianRules.mjs';
 import { parseCommunityMarkdown } from '../src/lib/community/communityFile.mjs';
@@ -162,6 +163,12 @@ test('only writes that change public pages rebuild the site', () => {
   assert.match(rebuildReason('approve', knox)!, /Approve community library knox-county/);
   assert.match(rebuildReason('update', knox)!, /Update community library knox-county/);
   assert.equal(rebuildReason('update', { ...knox, approved: false }), null);
+  // An update that leaves every public field as it was does not rebuild; null and '' are the same.
+  assert.equal(rebuildReason('update', knox, { ...knox }), null);
+  assert.equal(rebuildReason('update', { ...knox, description: null }, { ...knox, description: '' }), null);
+  for (const field of PUBLIC_FIELDS) {
+    assert.match(rebuildReason('update', knox, { ...knox, [field]: 'before' })!, /Update community library/, field);
+  }
   for (const action of ['register', 'reject', 'add-editor', 'remove-editor'] as const) {
     assert.equal(rebuildReason(action, knox), null, action);
   }

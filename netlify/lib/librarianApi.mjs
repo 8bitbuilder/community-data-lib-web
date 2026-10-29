@@ -16,8 +16,8 @@
  *   POST   /:slug/approve            approve a pending library (admins)
  *   DELETE /:slug                    reject a pending library (admins)
  *
- * Writes check the Origin header (the login is a cookie). Approving a library or
- * editing an approved one rebuilds the site through the build hook.
+ * Writes check the Origin header (the login is a cookie). Approving a library, or
+ * changing a public field of an approved one, rebuilds the site through the build hook.
  */
 
 import { describeCounty } from '../../src/lib/community/geoVocabulary.mjs';
@@ -81,8 +81,8 @@ export function createLibrarianHandler({ verifyUser, db: openDb, rebuild, vocabu
   /** A library as the pages show it: stored fields plus state and county names. */
   const view = (community) => ({ ...community, ...(describeCounty(vocabulary, community.county_fips) ?? {}) });
 
-  async function maybeRebuild(action, community) {
-    const reason = rebuildReason(action, community);
+  async function maybeRebuild(action, community, previous) {
+    const reason = rebuildReason(action, community, previous);
     return reason ? rebuild(reason) : 'not needed';
   }
 
@@ -150,7 +150,7 @@ export function createLibrarianHandler({ verifyUser, db: openDb, rebuild, vocabu
           const updated = await db.update(slug, check.community);
           return json(200, {
             library: view({ ...updated, editors: current.editors }),
-            rebuild: await maybeRebuild('update', updated),
+            rebuild: await maybeRebuild('update', updated, current),
           });
         }
         if (method === 'DELETE') {

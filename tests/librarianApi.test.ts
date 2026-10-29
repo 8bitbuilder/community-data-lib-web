@@ -123,6 +123,15 @@ test('editors read and edit their library; an edit to an approved library rebuil
   assert.equal((await call('PUT', '/knox-county', { user: 'stranger', body: { name: 'X', county_fips: '47093' } })).status, 403);
 });
 
+test('saving an approved library without changing a public field does not rebuild', async () => {
+  const { call, rebuilds } = setup();
+  const same = { name: 'Knox County Data Library', place_name: 'Knoxville', county_fips: '47093' };
+  const res = await call('PUT', '/knox-county', { user: 'editor', body: same });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.rebuild, 'not needed');
+  assert.deepEqual(rebuilds, []);
+});
+
 test('editing a pending library does not rebuild', async () => {
   const { call, rebuilds } = setup();
   const anderson = { email: 'new@anderson.org', roles: [] };
@@ -133,8 +142,8 @@ test('editing a pending library does not rebuild', async () => {
   assert.deepEqual(rebuilds, []);
 });
 
-test('editors add and remove editors, but never the last one', async () => {
-  const { call, db } = setup();
+test('editors add and remove editors, but never the last one; editor changes do not rebuild', async () => {
+  const { call, db, rebuilds } = setup();
   const added = await call('POST', '/knox-county/editors', { user: 'editor', body: { email: 'Teacher@School.edu' } });
   assert.equal(added.status, 201);
   assert.deepEqual(db.rows.get('knox-county')!.editors, ['librarian@knoxdata.org', 'helper@knoxdata.org', 'teacher@school.edu']);
@@ -146,6 +155,7 @@ test('editors add and remove editors, but never the last one', async () => {
   const last = await call('DELETE', '/knox-county/editors/librarian%40knoxdata.org', { user: 'editor' });
   assert.equal(last.status, 409);
   assert.deepEqual(db.rows.get('knox-county')!.editors, ['librarian@knoxdata.org']);
+  assert.deepEqual(rebuilds, [], 'editor lists are not public');
 });
 
 test('admins approve (rebuilding the site) or reject pending libraries; nobody else can', async () => {
@@ -162,6 +172,7 @@ test('admins approve (rebuilding the site) or reject pending libraries; nobody e
   assert.equal((await call('DELETE', '/davidson-county-data-library', { user: 'admin' })).status, 200);
   assert.equal(db.rows.has('davidson-county-data-library'), false);
   assert.equal((await call('DELETE', '/knox-county', { user: 'admin' })).status, 409, 'approved libraries are not rejected');
+  assert.deepEqual(rebuilds, ['Approve community library anderson'], 'registering and rejecting do not rebuild');
 });
 
 test('unknown libraries and routes', async () => {
