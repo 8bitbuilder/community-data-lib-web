@@ -1,5 +1,9 @@
 ---
 import LibrarianPage from '@components/librarian/LibrarianPage.astro';
+import { withBasePath } from '@lib/paths';
+
+// Team members' invite and reset links land here too (Layout forwards Identity tokens); Decap lives at /admin/.
+const adminHref = withBasePath('/admin/');
 ---
 
 <LibrarianPage
@@ -67,6 +71,10 @@ import LibrarianPage from '@components/librarian/LibrarianPage.astro';
     </div>
     <p class="form-error" role="alert"></p>
     <div class="actions"><button type="submit">Save password</button></div>
+    <p class="note" id="team-cms-note">
+      On the Community Data Libraries team? Save your password here, then log in to the content editor at
+      <a href={adminHref}>{adminHref}</a>.
+    </p>
   </form>
 </LibrarianPage>
 
