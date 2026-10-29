@@ -109,9 +109,9 @@ The Netlify Database connection string. Netlify provides it to builds and functi
 ### `COMMUNITY_BUILD_HOOK_URL`
 **Optional · Secret · Scope: Functions**
 
-A Netlify build hook (Site configuration → Build & deploy → Build hooks, branch `main`). The librarian function calls it after an approval or an edit to an approved library, so the static community pages rebuild.
+A Netlify build hook (Site configuration → Build & deploy → Build hooks, branch `main`). The librarian function calls it after an approval, or an edit that changes a public field of an approved library, so the static community pages rebuild.
 
-- **Cost:** each call is a production build and deploy (build minutes and deploy credits).
+- **Cost:** each call is a production build and deploy (15 credits on credit-based plans; see [community-store.md](community-store.md#costs)).
 - **If missing:** saves still work. The function logs `COMMUNITY_BUILD_HOOK_URL is not set; skipping the site rebuild`, and changes appear after the next deploy.
 - **Risk if leaked:** anyone can trigger builds. To rotate, delete the hook and create a new one.
 

@@ -39,7 +39,7 @@ Community librarians register and maintain their library at `/librarian/` (`/web
 - **Registering**: anyone logged in can register a library and pick its county from a searchable list. It starts pending, and the registrant is its first editor. One library per county.
 - **Approval**: users with the Identity role `admin` approve or reject pending libraries on `/librarian/`.
 - **Editing**: only a library's editors can edit it or add and remove editors (never the last one).
-- **Rebuilds**: approving a library, or editing an approved one, calls the build hook in `COMMUNITY_BUILD_HOOK_URL`, so the static pages rebuild.
+- **Rebuilds**: approving a library, or changing a public field of an approved one, calls the build hook in `COMMUNITY_BUILD_HOOK_URL`, so the static pages rebuild. Each call is a production deploy; see the cost notes in [community-store.md](docs/technical/community-store.md#costs).
 - **Contact form**: each library page has a *Contact the librarian* form. The `library-contact` function emails the editors through Resend without showing their addresses.
 
 Code: `netlify/functions/librarian-api.mjs` and `library-contact.mjs`, with helpers in `netlify/lib/`. The rules are in `src/lib/community/librarianRules.mjs` and are covered by `npm test`. One-time seed from the Markdown files: `npm run db:seed`.

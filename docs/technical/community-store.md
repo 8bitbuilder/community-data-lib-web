@@ -99,10 +99,12 @@ under `/api/librarian/libraries`:
 - **Database access:** SQL is in `netlify/lib/communityDb.mjs` (pg-style pool from
   `getDatabase().pool`; transactions for registration; a database guard against removing the
   last editor).
-- **Rebuilds:** after an **approval** or an **edit to an approved library**, the function calls
-  the build hook in `COMMUNITY_BUILD_HOOK_URL`, so the static pages rebuild.
-  - Each call is a production build and deploy.
-  - Pending registrations and editor changes don't touch public pages, so they don't rebuild.
+- **Rebuilds:** after an **approval**, or an **edit that changes a public field** (name, place
+  name, description, county) of an approved library, the function calls the build hook in
+  `COMMUNITY_BUILD_HOOK_URL`, so the static pages rebuild.
+  - Each call is a production build and deploy (see [Costs](#costs)).
+  - Pending registrations, editor changes, rejections and saves that change nothing public
+    don't touch public pages, so they don't rebuild.
   - Without the variable, the write succeeds and the rebuild is skipped with a warning.
 - **Contact form:** the `library-contact` function forwards a visitor's message to an approved
   library's editors (Resend), without showing their emails.
@@ -142,6 +144,63 @@ under `/api/librarian/libraries`:
 - **Identity:** Identity does not work on localhost or with `netlify dev`. The pages say so there.
   A real login, registration, approval and rebuild can only be tested on a deploy preview or the
   production site.
+
+## Costs
+
+Netlify bills the site in credits (credit-based plans, rates from Netlify's pricing and
+Database docs, checked 2026-10-29). Recheck the rates before relying on them.
+
+| Action | Credits |
+|---|---|
+| Production deploy (a push to `main`, a build-hook call, the backend's rebuild-on-data-change) | 15 |
+| Deploy preview, branch deploy, failed deploy | 0 |
+| Database compute | 10 per compute-unit hour (CU-h) while awake |
+| Bandwidth, web and database | 20 per GB |
+| Web requests | 2 per 10,000 |
+| Function compute | 10 per GB-hour (librarian API calls are tiny) |
+| Database storage | not billed before 2026-07-01; rates not announced yet |
+
+What each librarian action costs:
+
+- **Register, add or remove an editor, reject, or save without a public change:** wakes the
+  database only. A wake lasts at least the sleep window: 5 minutes at 1 CU is about 0.83
+  credits, shared by everything else that happens in those 5 minutes.
+- **Approve, or change a public field of an approved library:** the same, plus one production
+  deploy (15 credits). That build reads the database too, inside the same wake or a new one.
+
+### Settings that must stay set
+
+- **Sleep on inactivity: on, after 5 minutes** (Database > the database's stats area). Always
+  on is about 720 CU-h, or roughly 7,200 credits a month, which alone is more than Pro
+  includes. Waking takes well under a second.
+- **Max compute units: 1**, the minimum.
+- **Auto recharge** (Team Owner only, off by default): with it off, a credit-based plan
+  pauses every site on the team when credits run out. The Open Source plan says its sites stay
+  active.
+
+### Monthly estimate
+
+For 5 new libraries and 40 edits to approved libraries a month. The push and backend-rebuild
+counts are assumptions; replace them with real numbers from Deploys.
+
+| Item | Credits |
+|---|---|
+| 5 approvals + 40 public edits: at most 45 hook deploys | up to 675 |
+| Pushes to `main` (assume 20) | 300 |
+| Backend rebuild-on-data-change (assume 8) | 120 |
+| Database wakes from writes, sign-ins and builds (about 100 to 200) | 85 to 170 |
+| Bandwidth and requests | small; no change from today |
+| **Total** | **about 1,200** |
+
+That is more than Free (300, a hard limit) and Personal (1,000) include, and fits in Pro
+(3,000) or the Open Source plan (10,000).
+
+### Several edits in a row
+
+A build-hook call while a build is running doesn't start a second build at once. Netlify
+queues it, and when the running build finishes it skips older queued builds and builds only the
+newest commit. A burst of edits during one build therefore costs at most two deploys (about 30
+credits), so the function doesn't debounce the hook.
 
 ## Netlify settings
 

@@ -16,7 +16,7 @@ These are settings that code can't change. Do them in this order.
    - Copy the URL into the environment variable `COMMUNITY_BUILD_HOOK_URL`, scoped to
      **Functions**.
    - Each call is a production build and deploy. The portal only calls it for approvals and for
-     edits to approved libraries.
+     edits that change a public field of an approved library.
 5. **Contact form email** (if not set already): `RESEND_API_KEY` and `CONTACT_FROM_EMAIL`, scoped to
    Functions. See [environment-variables.md](environment-variables.md).
 
@@ -29,6 +29,8 @@ These are settings that code can't change. Do them in this order.
    - Migrations apply automatically on every deploy, just before it is published.
    - Deploy previews get their own database branch, copied from production when the preview is
      created.
+   - **Keep the cost settings:** sleep on inactivity on (after 5 minutes) and max compute units
+     at 1. See [community-store.md](community-store.md#costs).
 7. **First deploy.**
    - That deploy's build can't see the new tables yet: migrations run after the build. It builds
      the community pages from `src/content/communities/*.md` and logs a warning. This is
