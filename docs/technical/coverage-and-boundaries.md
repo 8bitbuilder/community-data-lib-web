@@ -73,6 +73,8 @@ is the site's list of valid FIPS codes.
   | Check | What it does | Where it runs |
   |---|---|---|
   | `npm run check:geo` (`scripts/check-geo-vocabulary.mjs`) | Fails if a catalog entry's coverage or a community file's `county_fips` is not in the vocabulary | `prebuild`, after `sync:catalog` |
+  | Communities loader | Fails the build for a library with an unknown county | `src/lib/community/communityStore.mjs` |
+  | Librarian function | Refuses a county outside the vocabulary | Netlify Functions |
   | `test_coverage_vocabulary.py` | Checks YAML coverage against the copy in `data/reference/geo-vocabulary.json` | backend pytest |
   | `county-names.json` | Names counties for the Data Preview county picker | Built to `/geo/county-names.json` |
 

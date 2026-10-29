@@ -1,6 +1,6 @@
 # Web Architecture
 
-`web/` is a static Astro site (`output: 'static'`) that renders the CDL dataset catalog for different audiences, plus a county coverage map, static data previews, and a content-editing CMS. This document covers the site's structure, routing, content model, its relationship to the backend, and CI/CD. For the data-pipeline side, see [`backend/docs/PIPELINE.md`](../../../backend/docs/PIPELINE.md); for how the two projects fit together, see the repo-root [`ARCHITECTURE.md`](../../../ARCHITECTURE.md).
+`web/` is a static Astro site (`output: 'static'`) that renders the CDL dataset catalog for different audiences, plus a county coverage map, static data previews, and a librarian portal for community libraries. This document covers the site's structure, routing, content model, its relationship to the backend, and CI/CD. For the data-pipeline side, see [`backend/docs/PIPELINE.md`](../../../backend/docs/PIPELINE.md); for how the two projects fit together, see the repo-root [`ARCHITECTURE.md`](../../../ARCHITECTURE.md).
 
 ## Tech stack
 
@@ -10,9 +10,11 @@
 | UI integration | `@astrojs/react`, React 19 (used selectively; most pages are plain Astro) |
 | Styling | Tailwind CSS v4 via PostCSS (Flowbite was evaluated and explicitly removed — see `docs/technical/flowbite-evaluation.md`) |
 | Language | TypeScript, `astro/tsconfigs/strict`, path aliases `@components/*`, `@layouts/*`, `@content/*`, `@lib/*`, `@data/*` |
-| Content layer | Astro Content Collections — one collection, `master-library`, loaded via `glob()` from `src/content/master-library/**/*.md` |
+| Content layer | Astro Content Collections: `master-library` (`glob()` over `src/content/master-library/**/*.md`) and `communities` (Netlify Database, falling back to `src/content/communities/*.md`; see [community-store.md](community-store.md)) |
 | Local backend (dev) | Plain Node `http` server mirrored at `web/backend/`, run with `node --experimental-sqlite` |
 | Map | Leaflet 1.9.4 (from unpkg) and `topojson-client` with one Census cartographic boundary TopoJSON file; `mapshaper` (dev) builds it |
+| Database | Netlify Database (Postgres) via `@netlify/database`, for community library records only (migrations in `netlify/database/migrations/`) |
+| Auth | Netlify Identity via `@netlify/identity`, loaded only on `/librarian/` pages; visitors never log in |
 | Data previews | Static Tier 1 files from the backend (`public/previews/`, copied at build) |
 | CMS | Decap CMS, static admin at `public/admin/` |
 | Hosting | Netlify (`netlify.toml`, functions, forms) and GitHub Pages (`.github/workflows/astro.yml`) |
@@ -34,6 +36,7 @@
 | `prebuild` | `sync:backend-yaml && check:backend-yaml && sync:catalog && check:geo && sync:previews` (auto-runs before `build`) |
 | `build` | `astro build` |
 | `geo:boundaries` | Builds the TopoJSON boundary file and the county vocabulary from the Census files (manual; not in `prebuild`; `--from`, `--backend`) |
+| `db:seed` | One-time seed of Netlify Database from `src/content/communities/*.md` |
 | `lint` | `eslint . --ext .ts,.tsx,.js,.jsx,.astro` |
 | `check` | `lint && test && build` — full local gate |
 
@@ -43,20 +46,22 @@
 web/
 ├── backend/            local MIRROR of ../backend (do not edit directly — see ARCHITECTURE.md)
 ├── docs/               this documentation
-├── netlify/functions/  Netlify Forms webhook (submission-notify.js)
-├── public/admin/       Decap CMS static admin app
+├── netlify/database/migrations/  Netlify Database tables (communities, community_editors)
+├── netlify/functions/  librarian API, contact form, metadata editor, Forms webhook (helpers in netlify/lib/)
+├── public/admin/       Decap CMS static admin app (team editing; see decapcms-implementation.md)
 ├── public/geo/boundaries/  Census TopoJSON boundaries for /maps (generated, committed)
 ├── public/previews/    Tier 1 preview files copied from the backend at build time (gitignored)
 ├── scripts/            sync/validation scripts (Node ESM, run directly)
 └── src/
     ├── components/     Navigation.astro, etc.
     ├── content/         master-library/ — the one content collection (hand-authored + generated)
-    ├── content.config.ts  Zod schema for master-library
+    ├── content.config.ts  Zod schemas; the communities loader (database or files)
     ├── data/geo-vocabulary.json  every state and county GEOID (Census 2025), from geo:boundaries
     ├── layouts/          Layout.astro (site shell), CommunityLayout.astro (per-community branding)
     ├── lib/
     │   ├── api/backend.ts        typed client for the live backend proxy (preview/chart/datasheet)
-    │   ├── community/geoVocabulary.mjs  state and county lookups over the vocabulary (pure, tested)
+    │   ├── community/             librarian rules, community store, geo vocabulary lookups (pure, tested)
+    │   ├── librarian/             /librarian/ page helpers; client.ts is the only @netlify/identity import
     │   ├── data/coverageMap.ts    pure coverage logic for /maps (FIPS expansion, counts, labels)
     │   ├── data/staticPreview.ts  Data Preview logic over the static files (pure, tested)
     │   ├── data/libraryAccess.ts  audience-access logic (teacher/student/community + sensitive-keyword filter)
@@ -78,6 +83,8 @@ Content/catalog pages:
 - `/data-preview` — dataset preview from static Tier 1 files (ApexCharts); `?community=<slug>` opens that county's rows. See [previews.md](previews.md)
 - `/submit` — resource submission form (Netlify Forms)
 - `/maps` — county coverage map: counties shaded by how many datasets cover them, or one dataset's coverage
+- `/communities/<slug>/` and `/communities/<slug>/catalog/` — community library landing page and filtered catalog, one per approved library
+- `/librarian/`, `/librarian/login/`, `/librarian/register/`, `/librarian/<slug>/edit/` — librarian portal (one static edit page serves every library through a `netlify.toml` rewrite)
 - `/example-community-library/{index,catalog,data-resources,map}` — a reference community-library implementation (Knox County, TN) using `CommunityLayout`
 
 Static (build-time-rendered) API routes, `src/pages/api/*.ts`:
@@ -87,7 +94,7 @@ Static (build-time-rendered) API routes, `src/pages/api/*.ts`:
 - `/api/community.json` — `community-submissions.json`
 - `/geo/county-names.json` — county and state names by FIPS code, for the Data Preview county picker
 
-These are pre-rendered static files (because `output: 'static'`). The old preview API (`/api/sources`, `/api/health`) exists only in local development, through the Vite dev proxy to `npm run backend:dev`; the deployed `/data-preview` reads static files.
+These are pre-rendered static files (because `output: 'static'`). The only runtime endpoints are Netlify Functions for librarian reads and writes (`/api/librarian/*`), the contact form (`/api/library-contact`) and the metadata editor. The old preview API (`/api/sources`) exists only in local development, through the Vite dev proxy to `npm run backend:dev`.
 
 ## Content model
 
@@ -109,6 +116,10 @@ Dataset metadata (backend YAML) is edited separately through the magic-link meta
 ## Data previews
 
 Tier 1 static preview files (exported by the backend, copied at build) are described in [previews.md](previews.md).
+
+## Community libraries
+
+Records in Netlify Database, the build's fallback to Markdown files, the librarian portal and its functions are described in [community-store.md](community-store.md). The Netlify settings are in [netlify-setup-checklist.md](netlify-setup-checklist.md).
 
 ## CI/CD
 
