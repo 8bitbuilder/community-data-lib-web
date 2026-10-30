@@ -35,6 +35,19 @@ Create a build hook in Netlify (Site configuration → Build & deploy → Build 
 URL as the `NETLIFY_BUILD_HOOK` secret in the backend repo. The backend's
 `netlify-rebuild.yml` workflow calls it when `data/**` changes on `main`.
 
+## Excel fields
+
+When the download URL ends in `.xlsx` or `.xls`, the form shows two more fields, saved under
+`download` in the source YAML:
+
+| Field | YAML key | Meaning |
+|---|---|---|
+| Excel sheet (name or number) | `download.sheet` | Which sheet the preview and notebook read. A name, or a 0-based position (`0` = first sheet). An all-digit entry is saved as a position, so for a sheet named like a number (`2024`) enter its position instead. |
+| Header row (row number in Excel) | `download.header_row` | The 1-based row holding the column names (a whole number of 1 or more). |
+
+Leave either blank to detect it automatically; clearing a field removes the key from the YAML.
+Visitors can still choose another sheet or header row on the preview page.
+
 ## Tags
 
 Allowed tags come from `backend/data/tag_vocabulary.yml`. Tag groups an editor changes are listed

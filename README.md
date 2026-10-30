@@ -22,9 +22,21 @@ npm run dev           # Astro site on http://localhost:4321/web
 
 In development, the Astro dev server proxies `/api/sources` and `/api/health` to the preview API, so you usually do not need `PUBLIC_API_BASE_URL` in `.env`.
 
-**In production (Netlify)** the same `/api/*` routes are served by a Netlify Function, `netlify/functions/preview-api.mjs`; no separate server runs. The function and `backend/server.mjs` share `backend/lib/apiHandler.mjs`. The function reads sources from the SQLite export (`backend/data/exports/catalog.json`) and uses the Node preview engine (no pandas). Excel (`.xlsx`) datasets and sources without a direct download link return "can't be previewed yet" instead of an error page.
+**In production (Netlify)** the same `/api/*` routes are served by a Netlify Function, `netlify/functions/preview-api.mjs`; no separate server runs. The function and `backend/server.mjs` share `backend/lib/apiHandler.mjs`. The function reads sources from the SQLite export (`backend/data/exports/catalog.json`) and uses the Node preview engine (no pandas). Excel datasets (`.xlsx` and legacy `.xls`, also inside a `.zip`) are previewed too: the page picks the sheet and header row automatically and lets visitors choose another sheet or header row. Sources without a direct download link return "can't be previewed yet" instead of an error page.
 
-Base URL (direct): `http://localhost:4323`
+Base URL (direct): `http://localhost:4323`. Endpoints are listed in [backend/README.md](backend/README.md).
+
+## Clean this data (notebook for teachers)
+
+The Data Preview page (`/web/data-preview`) has a **Clean this data** notebook under the preview. It runs Python (pandas) right in the browser with [Pyodide](https://pyodide.org), so there is nothing to install and nothing is sent to a server.
+
+- **Open notebook** loads the dataset into a table called `df`. The first cell is the load step; for Excel files it uses the sheet and header row shown in the preview.
+- **+ Cleaning step** adds common steps without typing code (drop columns or rows, drop or fill missing values, rename a column, change a column's type, keep only matching rows, remove duplicates). Each step becomes a short, commented Python cell that students can read and edit.
+- **Use my own file** loads a CSV, TSV, TXT, XLSX or XLS file from your computer instead.
+- **Export** downloads the cleaned table (CSV or Excel) or the whole notebook as a `.ipynb` file that opens in Jupyter or Google Colab and re-downloads the original data itself.
+- Cells are saved in your browser, so they come back when you return to the same dataset. **Reset** starts over; **Stop** restarts Python if a cell runs too long.
+
+The first open downloads Python into the browser, so it can take a little while. Files larger than `PREVIEW_FILE_MAX_BYTES` (4 MB by default) are not opened automatically; download them and use **Use my own file**.
 
 ## Geographic Markers
 
