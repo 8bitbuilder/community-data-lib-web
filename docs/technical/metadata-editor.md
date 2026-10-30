@@ -12,8 +12,7 @@ is saved.
 Design: `backend/docs/superpowers/specs/2026-10-14-metadata-editor-auth-design.md`.
 
 The Netlify build clones `community-data-libraries/backend@main` and syncs its data, so merged
-edits appear on the next build. This also keeps the Data Preview API
-(`netlify/functions/preview-api.mjs`, served from the synced backend export) current.
+edits appear on the next build, including the Data Preview page's static preview files.
 
 ## Netlify environment variables
 
@@ -42,11 +41,11 @@ When the download URL ends in `.xlsx` or `.xls`, the form shows two more fields,
 
 | Field | YAML key | Meaning |
 |---|---|---|
-| Excel sheet (name or number) | `download.sheet` | Which sheet the preview and notebook read. A name, or a 0-based position (`0` = first sheet). An all-digit entry is saved as a position, so for a sheet named like a number (`2024`) enter its position instead. |
+| Excel sheet (name or number) | `download.sheet` | Which sheet the notebook opens for an uploaded workbook (static previews read the first sheet). A name, or a 0-based position (`0` = first sheet). An all-digit entry is saved as a position, so for a sheet named like a number (`2024`) enter its position instead. |
 | Header row (row number in Excel) | `download.header_row` | The 1-based row holding the column names (a whole number of 1 or more). |
 
 Leave either blank to detect it automatically; clearing a field removes the key from the YAML.
-Visitors can still choose another sheet or header row on the preview page.
+Visitors can still choose another sheet or header row in the notebook after uploading the file.
 
 ## Tags
 

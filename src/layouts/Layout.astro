@@ -15,6 +15,7 @@ const {
 
 const siteTitle =
   title === 'Community Data Libraries' ? title : `${title} | Community Data Libraries`;
+const librarianPortalHref = withBasePath('/librarian/');
 ---
 
 <!doctype html>
@@ -36,13 +37,17 @@ const siteTitle =
     <!-- Fraunces: expressive serif for display — Outfit: clean geometric sans for body — JetBrains Mono -->
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,400;1,9..144,700&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <title>{siteTitle}</title>
-    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-    <script is:inline>
+    <!-- is:inline keeps this a classic script; Astro would otherwise bundle it as a
+         cross-origin module import, which identity.netlify.com's CORS headers block. -->
+    <script is:inline src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+    <script is:inline define:vars={{ librarianPortalHref }}>
+      // Sign-up confirmation and invite links land on the home page; after logging in
+      // there, send librarians to their portal. (Team members open /admin/ directly.)
       if (window.netlifyIdentity) {
         window.netlifyIdentity.on('init', (user) => {
-          if (!user) {
+          if (!user && !document.location.pathname.startsWith(librarianPortalHref)) {
             window.netlifyIdentity.on('login', () => {
-              document.location.href = '/admin/';
+              document.location.href = librarianPortalHref;
             });
           }
         });

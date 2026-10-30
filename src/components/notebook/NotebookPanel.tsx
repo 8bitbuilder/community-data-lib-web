@@ -1,6 +1,6 @@
 // The notebook itself, loaded lazily by Notebook.tsx when "Open notebook" is clicked.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { BackendSource, ExcelLayout } from '@lib/api/backend';
+import type { ExcelLayout } from '@lib/api/backend';
 import { clearSaved, loadSavedCode, markStaleFrom, newCell, restoreCells, saveCode } from './notebookStore';
 import {
   detectEncoding,
@@ -10,7 +10,7 @@ import {
   uploadKind,
   type NotebookFile,
 } from './notebookFiles';
-import { readLayout, uploadLayout } from './notebookExcel';
+import { readLayout, uploadLayout, type NotebookSource } from './notebookExcel';
 import { safeFileName } from './pyodideProtocol';
 import { usePyodide, type DfInfo } from './usePyodide';
 import { useNotebookRunner } from './useNotebookRunner';
@@ -47,7 +47,7 @@ function CleaningStepSlot({ dfInfo, insertCellAndRun, disabled }: CleaningSlotPr
  * The notebook never fetches datasets itself: visitors download the file from the
  * original provider (under the provider's terms of use) and upload it here.
  */
-function GetTheData({ source }: { source: BackendSource }) {
+function GetTheData({ source }: { source: NotebookSource }) {
   const provider = source.provider?.name || 'the data provider';
   const href = source.download?.url || source.provider?.url;
   return (
@@ -79,7 +79,7 @@ function GetTheData({ source }: { source: BackendSource }) {
 
 const RESTARTED ='Python restarted. Run the cells again to rebuild df.';
 
-export default function NotebookPanel({ sourceId, source }: { sourceId: string; source: BackendSource }) {
+export default function NotebookPanel({ sourceId, source }: { sourceId: string; source: NotebookSource }) {
   const py = usePyodide();
   const { start, writeFile, run, restart, exportDf } = py;
 

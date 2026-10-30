@@ -37,7 +37,7 @@ const resources = (await getCollection('master-library'))
 function detailHref(entry: CollectionEntry<'master-library'>): string {
   if (entry.data.sourceId) {
     return withBasePath(
-      `/data-preview?source=${encodeURIComponent(entry.data.sourceId)}&audience=community`
+      `/data-preview?source=${encodeURIComponent(entry.data.sourceId)}&audience=community&community=${encodeURIComponent(data.slug)}`
     );
   }
   return entry.data.url ?? withBasePath('/complete-catalog');

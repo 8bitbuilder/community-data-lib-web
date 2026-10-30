@@ -74,13 +74,12 @@ export function slugify(value: string): string {
 /**
  * Keys a catalog entry can carry in its `tags` to belong to a community.
  *
- * Interim rule: the canonical backend does not yet record where a dataset's
- * coverage is, so matching uses explicit tags only:
+ * Only used for entries without canonical coverage (hand-written guides and
+ * tools); backend datasets match by their coverage FIPS codes instead, see
+ * matchesCommunity(). The keys are:
  *   - the community slug            e.g. `knox-county`
  *   - the county FIPS as `fips-<n>` e.g. `fips-47093`
  *   - the slugified county name     e.g. `knox-county`
- * When canonical dataset coverage (county/state FIPS) is added to the
- * pipeline, extend matchesCommunity() here; call sites do not change.
  */
 export function communityGeoKeys(community: CommunityGeo): string[] {
   const keys = new Set<string>();

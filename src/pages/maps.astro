@@ -1,369 +1,690 @@
 ---
+import { getCollection } from 'astro:content';
 import Layout from '@layouts/Layout.astro';
-import { loadGeoMarkers } from '@lib/data/geo';
-import type { GeoMarkerFeature } from '@lib/types/geo';
+import vocabulary from '@data/geo-vocabulary.json';
+import { catalogEntryHref, withBasePath } from '@lib/paths';
+import {
+  buildBoundaryIndex,
+  coverageLabel,
+  isNational,
+  unknownCoverageFips,
+  unmappedDatasets,
+} from '@lib/data/coverageMap';
 
-const collection = loadGeoMarkers();
-const features = collection.features as GeoMarkerFeature[];
-const usFeatures = features.filter((f) => f.properties?.region === 'US');
+// Census cartographic boundary file written by `npm run geo:boundaries`
+// (scripts/build-geo-boundaries.mjs). Geometry is for display only; coverage
+// comes from each dataset's FIPS codes, checked against the vocabulary written
+// from the same county file.
+const BOUNDARY_FILE = 'us-2025-20m.topo.json';
+
+const index = buildBoundaryIndex(
+  vocabulary.states.map((s) => ({ geoid: s.geoid, name: s.name, state: s.usps })),
+  vocabulary.counties
+);
+
+const entries = await getCollection('master-library');
+const datasets = entries
+  .map((entry) => ({
+    id: entry.data.sourceId ?? entry.id,
+    title: entry.data.title,
+    coverage: entry.data.coverage,
+    href: catalogEntryHref(entry.data),
+    label: coverageLabel(entry.data.coverage, index),
+    national: isNational(entry.data.coverage),
+  }))
+  .sort((a, b) => a.title.localeCompare(b.title));
+
+// Also checked in prebuild (scripts/check-geo-vocabulary.mjs); kept here so the page never renders bad codes.
+const unknown = unknownCoverageFips(datasets, index);
+if (unknown.length > 0) {
+  throw new Error(
+    `/maps: dataset coverage uses FIPS codes that are not in the Census boundary files (public/geo/boundaries):\n` +
+      unknown.map((u) => `  - ${u.datasetId}: ${u.level} ${u.geoid}`).join('\n') +
+      `\nFix the coverage in the backend YAML (data/sources/<id>.yml), re-import and re-export, or bump the boundary vintage.`
+  );
+}
+
+const unmapped = unmappedDatasets(datasets);
+const mapped = datasets.filter((d) => d.coverage.length > 0);
+const states = [...index.states.values()].sort((a, b) => a.name.localeCompare(b.name));
+
+const mapData = {
+  datasets: mapped,
+  boundaries: withBasePath(`/geo/boundaries/${BOUNDARY_FILE}`),
+};
 ---
 
-<Layout title="Community Map" description="Geographic markers for community data libraries">
+<Layout title="Coverage Map" description="Which U.S. states and counties each dataset in the catalog covers">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" slot="head" />
-  <section>
-    <h1>Community Map</h1>
-    <p>Click anywhere on the map to drop a pin and see the nearest datasets for that community.</p>
+  <section class="coverage-page">
+    <h1>Coverage Map</h1>
+    <p class="lede">
+      See which places each dataset in the catalog describes. A national dataset covers every county; a statewide
+      dataset covers every county in its state.
+    </p>
+
+    <form class="map-controls" id="map-controls">
+      <fieldset class="mode-switch">
+        <legend>Show</legend>
+        <label><input type="radio" name="mode" value="count" checked /> Datasets per county</label>
+        <label><input type="radio" name="mode" value="dataset" /> One dataset's coverage</label>
+      </fieldset>
+      <label class="dataset-picker" id="dataset-picker" hidden>
+        <span>Dataset</span>
+        <select id="dataset-select">
+          {mapped.map((d) => <option value={d.id}>{d.title} ({d.label})</option>)}
+        </select>
+      </label>
+    </form>
 
     <div class="map-shell">
-      <div class="map-panel" id="map-panel" aria-live="polite">
-        <p class="panel-eyebrow">Community preview</p>
-        <h2 id="panel-title">Drop a pin on the map</h2>
-        <p id="panel-copy">We’ll surface the closest datasets in the CDL catalog for that location.</p>
-        <div id="nearby-list" class="nearby-list">
-          <p class="empty-copy">No pin selected yet.</p>
-        </div>
+      <div class="map-column">
+        <div id="map" role="region" aria-label="Map of U.S. counties shaded by dataset coverage"></div>
+        <div class="legend" id="legend" aria-live="polite"></div>
+        <p class="map-note" id="map-note" aria-live="polite"></p>
       </div>
 
-      <div id="map" role="region" aria-label="Community map"></div>
+      <aside class="map-panel" aria-labelledby="panel-title">
+        <p class="panel-eyebrow">County</p>
+        <h2 id="panel-title">Pick a county</h2>
+        <p id="panel-copy">Click a county on the map, or choose one here, to list the datasets that cover it.</p>
+        <div class="county-finder">
+          <label>
+            <span>State</span>
+            <select id="state-select">
+              <option value="">Choose a state</option>
+              {states.map((s) => <option value={s.geoid}>{s.name}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>County</span>
+            <select id="county-select" disabled>
+              <option value="">Choose a state first</option>
+            </select>
+          </label>
+        </div>
+        <ul id="panel-list" class="panel-list" aria-live="polite"></ul>
+      </aside>
     </div>
 
-    <!-- Embed GeoJSON data for client-side usage -->
-    <script type="application/json" id="geojson-data" set:html={JSON.stringify(collection)}></script>
+    {
+      unmapped.length > 0 && (
+        <section class="not-mapped" aria-labelledby="not-mapped-title">
+          <h2 id="not-mapped-title">Not mapped</h2>
+          <p>These datasets don't record which places they cover yet, so they are left off the map.</p>
+          <ul>
+            {unmapped.map((d) => (
+              <li>
+                <a href={d.href}>{d.title}</a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
 
-    <script is:inline>
-      function showMapError(message) {
-        var mapEl = document.getElementById('map');
-        if (mapEl) {
-          mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#c2410c;font-family:sans-serif;padding:1rem;text-align:center;">' + message + '</div>';
-        }
-      }
-
-      // Dynamically inject Leaflet CSS + JS then call initMap via onload,
-      // ensuring both the stylesheet and library are available before we
-      // measure the container or create any Leaflet objects.
-      (function loadLeaflet() {
-        var link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-        document.head.appendChild(link);
-
-        var s = document.createElement('script');
-        s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-        s.onload = initMap;
-        s.onerror = function() {
-          showMapError('Unable to load map library. Please check your network connection.');
-        };
-        document.head.appendChild(s);
-      })();
-
-      function initMap() {
-        // Define US bounds
-        const usBounds = L.latLngBounds([24.396308, -124.848974], [49.384358, -66.885444]);
-
-        const map = L.map('map', { 
-          scrollWheelZoom: false,
-          maxBounds: usBounds,
-          maxBoundsViscosity: 1.0,
-          minZoom: 3
-        });
-        
-        // Base layer
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
-
-        // Parse embedded geojson
-        const el = document.getElementById('geojson-data');
-        if (!el || !el.textContent) {
-          showMapError('Unable to load map marker data.');
-          return;
-        }
-        let data;
-        try {
-          data = JSON.parse(el.textContent);
-        } catch (e) {
-          showMapError('Failed to parse map marker data.');
-          return;
-        }
-
-        // Prepare data structures
-        const markersBounds = L.latLngBounds([]);
-        const registry = []; // { feature, marker, lat, lon, title, description, url, tags }
-        let userPin = null;
-
-        // Color mapping by category — warm palette
-        const colors = {
-          dataset: '#C2410C',   // terracotta (primary)
-          site: '#166534',      // forest green (secondary)
-          organization: '#B45309', // amber (accent)
-          event: '#9A3412',     // dark terracotta
-          other: '#A8927A'      // warm grey
-        };
-
-        for (const feature of data.features || []) {
-          if (!feature || feature.type !== 'Feature') continue;
-          
-          // Filter to US only
-          if (feature.properties?.region !== 'US') continue;
-
-          const coords = feature.geometry && feature.geometry.coordinates;
-          if (!Array.isArray(coords) || coords.length < 2) continue;
-          const [lon, lat] = coords;
-          const cat = feature.properties?.category || 'other';
-
-          const marker = L.circleMarker([lat, lon], {
-            radius: 6,
-            color: colors[cat] || colors.other,
-            weight: 2,
-            fillColor: colors[cat] || colors.other,
-            fillOpacity: 0.8
-          }).addTo(map);
-
-          const name = feature.properties?.name || 'Unknown';
-          const url = feature.properties?.sourceUrl;
-          const place = feature.properties?.locationLabel;
-          const popupHtml = `<strong>${name}</strong><br/>Category: ${cat}` +
-            (place ? `<br/><small>${place}</small>` : '') +
-            (url ? `<br/><a href="${url}" target="_blank" rel="noopener">Source</a>` : '');
-          marker.bindPopup(popupHtml);
-
-          markersBounds.extend([lat, lon]);
-          registry.push({
-            feature,
-            marker,
-            lat,
-            lon,
-            title: name,
-            description: String(feature.properties?.description ?? ''),
-            url,
-            tags: Array.isArray(feature.properties?.tags) ? feature.properties.tags : [],
-          });
-        }
-
-        // Give the browser one tick after window.load to finalise any
-        // remaining paint work, then tell Leaflet the true container size.
-        setTimeout(() => {
-          map.invalidateSize({ animate: false });
-          if (markersBounds.isValid()) {
-            map.fitBounds(markersBounds.pad(0.25));
-          } else {
-            map.setView([39.8283, -98.5795], 4);
+    <details class="coverage-table">
+      <summary>All mapped datasets and their coverage ({mapped.length})</summary>
+      <table>
+        <thead>
+          <tr><th scope="col">Dataset</th><th scope="col">Coverage</th></tr>
+        </thead>
+        <tbody>
+          {
+            mapped.map((d) => (
+              <tr>
+                <td><a href={d.href}>{d.title}</a></td>
+                <td>{d.label}</td>
+              </tr>
+            ))
           }
-        }, 50);
+        </tbody>
+      </table>
+    </details>
 
-        function haversineDistanceKm(leftLat, leftLon, rightLat, rightLon) {
-          const radiusKm = 6371;
-          const toRadians = (value) => (value * Math.PI) / 180;
-          const deltaLat = toRadians(rightLat - leftLat);
-          const deltaLon = toRadians(rightLon - leftLon);
-          const a =
-            Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-            Math.cos(toRadians(leftLat)) * Math.cos(toRadians(rightLat)) *
-            Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
-          return 2 * radiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        }
-
-        function escapeHtml(value) {
-          return String(value)
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;')
-            .replaceAll("'", '&#39;');
-        }
-
-        function renderNearbyResources(lat, lon) {
-          const panelTitle = document.getElementById('panel-title');
-          const panelCopy = document.getElementById('panel-copy');
-          const nearbyList = document.getElementById('nearby-list');
-
-          const nearby = registry
-            .map((item) => ({
-              ...item,
-              distance: haversineDistanceKm(lat, lon, item.lat, item.lon),
-            }))
-            .sort((left, right) => left.distance - right.distance)
-            .slice(0, 8);
-
-          if (panelTitle) panelTitle.textContent = 'Nearby datasets';
-          if (panelCopy) panelCopy.textContent = 'These are the closest CDL resources to your pin. Click a title to open its preview.';
-          if (!nearbyList) return;
-
-          nearbyList.innerHTML = nearby.length > 0
-            ? nearby.map((item) => {
-                const tagText = item.tags.slice(0, 3).join(', ');
-                const titleMarkup = item.url
-                  ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title)}</a>`
-                  : escapeHtml(item.title);
-                return `<article class="nearby-item"><h3>${titleMarkup}</h3><p>${escapeHtml(item.description || 'No description provided.')}</p><p class="meta">${item.distance.toFixed(1)} km away${tagText ? ` · ${escapeHtml(tagText)}` : ''}</p></article>`;
-              }).join('')
-            : '<p class="empty-copy">No nearby resources found for this pin.</p>';
-        }
-
-        function placePin(lat, lon) {
-          if (userPin) userPin.remove();
-          userPin = L.marker([lat, lon]).addTo(map);
-          renderNearbyResources(lat, lon);
-        }
-
-        map.on('click', (event) => {
-          placePin(event.latlng.lat, event.latlng.lng);
-        });
-
-        if (markersBounds.isValid()) {
-          map.fitBounds(markersBounds.pad(0.25));
-        } else {
-          map.setView([39.8283, -98.5795], 4);
-        }
-      }
-
-      // initMap is called via the Leaflet script's onload — no extra trigger needed.
-    </script>
-
-    <style>
-      section > h1 {
-        margin-bottom: var(--space-2);
-      }
-
-      section > p:first-of-type {
-        color: var(--color-text-muted);
-        font-size: var(--font-size-sm);
-        margin-bottom: 0;
-      }
-
-      /* The panel sits beside the map (below it on narrow screens) rather than
-         over it: as an overlay it hid the Northeast, and maxBounds kept the map
-         from being dragged out from under it. */
-      .map-shell {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-4);
-        margin: 0 0 var(--space-4);
-        isolation: isolate;
-      }
-
-      @media (min-width: 900px) {
-        .map-shell {
-          grid-template-columns: minmax(0, 1fr) 340px;
-        }
-      }
-
-      #map {
-        grid-row: 1;
-        grid-column: 1;
-        height: 560px;
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-md);
-        /* Override Leaflet's white background */
-        background: var(--color-surface) !important;
-        position: relative;
-        z-index: 0;
-        overflow: hidden;
-      }
-
-      .map-panel {
-        max-height: 560px;
-        overflow: auto;
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-lg);
-        background: var(--color-surface);
-        box-shadow: var(--shadow-md);
-        padding: var(--space-4);
-      }
-
-      @media (min-width: 900px) {
-        .map-panel {
-          grid-row: 1;
-          grid-column: 2;
-        }
-      }
-
-      .panel-eyebrow {
-        margin: 0 0 var(--space-2);
-        font-size: var(--font-size-xs);
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--color-secondary);
-      }
-
-      .map-panel h2 {
-        margin: 0 0 var(--space-2);
-        font-size: var(--font-size-lg);
-      }
-
-      .map-panel p {
-        margin: 0 0 var(--space-3);
-        color: var(--color-text-muted);
-        font-size: var(--font-size-sm);
-      }
-
-      .nearby-list {
-        display: grid;
-        gap: var(--space-3);
-      }
-
-      .nearby-item {
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-md);
-        background: var(--color-surface);
-        padding: var(--space-3);
-      }
-
-      .nearby-item h3 {
-        margin: 0 0 var(--space-1);
-        font-size: var(--font-size-sm);
-      }
-
-      .nearby-item a {
-        color: var(--color-text);
-      }
-
-      .nearby-item p {
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: var(--font-size-xs);
-        line-height: var(--line-height-relaxed);
-      }
-
-      .nearby-item .meta {
-        margin-top: var(--space-2);
-        color: var(--color-text-dim);
-      }
-
-      .empty-copy {
-        margin: 0;
-        color: var(--color-text-dim);
-        font-size: var(--font-size-sm);
-      }
-
-      /* Dark-ify Leaflet popup */
-      :global(.leaflet-popup-content-wrapper) {
-        background: var(--color-surface-raised) !important;
-        color: var(--color-text) !important;
-        border: 1px solid var(--color-border) !important;
-        box-shadow: var(--shadow-md) !important;
-        border-radius: var(--radius-md) !important;
-      }
-
-      :global(.leaflet-popup-tip) {
-        background: var(--color-surface-raised) !important;
-      }
-
-      :global(.leaflet-popup-content a) {
-        color: var(--color-primary) !important;
-      }
-
-      .marker-count {
-        font-family: var(--font-mono);
-        font-size: var(--font-size-xs);
-        color: var(--color-text-dim);
-        margin-top: var(--space-2);
-      }
-    </style>
-
-    <p class="marker-count">{usFeatures.length} location{usFeatures.length !== 1 ? 's' : ''} plotted on the map.</p>
+    <p class="source-note">
+      Boundaries: U.S. Census Bureau cartographic boundary files, 2025, 1:20,000,000. Puerto Rico and the island areas
+      are not shown.
+    </p>
   </section>
+
+  <script type="application/json" id="map-data" set:html={JSON.stringify(mapData)} />
+
+  <script>
+    import { feature, mesh } from 'topojson-client';
+    import {
+      buildBoundaryIndex,
+      classForCount,
+      countClasses,
+      countsByCounty,
+      datasetsForCounty,
+      expandCoverage,
+      type BoundaryArea,
+      type CountClass,
+      type CoverageDataset,
+    } from '@lib/data/coverageMap';
+
+    interface MapDataset extends CoverageDataset {
+      href: string;
+      label: string;
+      national: boolean;
+    }
+    interface BoundaryFeature {
+      type: 'Feature';
+      id: string;
+      properties: { name: string; state: string };
+      geometry: unknown;
+    }
+    interface BoundaryCollection {
+      type: 'FeatureCollection';
+      features: BoundaryFeature[];
+    }
+    interface BoundaryTopology {
+      type: 'Topology';
+      objects: { states: unknown; counties: unknown };
+    }
+
+    // One-hue ordinal ramp (validated: monotone lightness, light end >= 2:1 on white).
+    const RAMP = ['#79c0b6', '#4fa89c', '#2a8c80', '#126e63', '#0a4a43'];
+    const HIGHLIGHT = '#0E7265';
+    const OUTLINE = '#334155';
+    // Selected county outline: reads on both the light and dark ramp steps and on bare tiles.
+    const SELECTED = '#D97706';
+    const LOWER_48: [[number, number], [number, number]] = [[24.4, -124.8], [49.4, -66.9]];
+    // Wide enough for Alaska (Aleutians shifted west of -180) and Hawaii.
+    const MAX_BOUNDS: [[number, number], [number, number]] = [[15, -192], [73, -60]];
+
+    const data = JSON.parse(document.getElementById('map-data')?.textContent ?? '{}') as {
+      datasets: MapDataset[];
+      boundaries: string;
+    };
+
+    const mapEl = document.getElementById('map') as HTMLElement;
+    const legendEl = document.getElementById('legend') as HTMLElement;
+    const noteEl = document.getElementById('map-note') as HTMLElement;
+    const pickerEl = document.getElementById('dataset-picker') as HTMLElement;
+    const datasetSelect = document.getElementById('dataset-select') as HTMLSelectElement;
+    const stateSelect = document.getElementById('state-select') as HTMLSelectElement;
+    const countySelect = document.getElementById('county-select') as HTMLSelectElement;
+    const panelTitle = document.getElementById('panel-title') as HTMLElement;
+    const panelCopy = document.getElementById('panel-copy') as HTMLElement;
+    const panelList = document.getElementById('panel-list') as HTMLElement;
+
+    function showMapError(message: string) {
+      mapEl.replaceChildren(Object.assign(document.createElement('p'), { className: 'map-error', textContent: message }));
+    }
+
+    function loadLeaflet(): Promise<void> {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Unable to load the map library. Please check your network connection.'));
+        document.head.appendChild(script);
+      });
+    }
+
+    async function fetchBoundaries(url: string): Promise<BoundaryTopology> {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Unable to load the map boundaries (HTTP ${response.status}).`);
+      return response.json();
+    }
+
+    const toAreas = (collection: BoundaryCollection): BoundaryArea[] =>
+      collection.features.map(({ id, properties: p }) => ({ geoid: id, name: p.name, state: p.state }));
+
+    const plural = (n: number, word: string, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
+
+    function swatch(color: string | null, text: string): HTMLElement {
+      const item = document.createElement('span');
+      item.className = 'legend-item';
+      const box = document.createElement('span');
+      box.className = color ? 'legend-swatch' : 'legend-swatch legend-swatch-empty';
+      if (color) box.style.background = color;
+      item.append(box, document.createTextNode(text));
+      return item;
+    }
+
+    async function init() {
+      const [, topology] = await Promise.all([loadLeaflet(), fetchBoundaries(data.boundaries)]);
+      const statesGeo = feature(topology, topology.objects.states) as BoundaryCollection;
+      const countiesGeo = feature(topology, topology.objects.counties) as BoundaryCollection;
+
+      const index = buildBoundaryIndex(toAreas(statesGeo), toAreas(countiesGeo));
+      const counts = countsByCounty(data.datasets, index);
+      const classes: CountClass[] = countClasses(counts.values(), RAMP.length);
+      const nationalCount = data.datasets.filter((d) => d.national).length;
+
+      let mode: 'count' | 'dataset' = 'count';
+      let highlighted: Set<string> = new Set();
+      let selectedGeoid: string | null = null;
+
+      const map = L.map(mapEl, {
+        scrollWheelZoom: false,
+        maxBounds: MAX_BOUNDS,
+        maxBoundsViscosity: 1.0,
+        minZoom: 2,
+        zoomSnap: 0.5,
+        preferCanvas: true,
+      });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(map);
+      const renderer = L.canvas({ padding: 0.5 });
+
+      function fillFor(geoid: string): string | null {
+        if (mode === 'dataset') return highlighted.has(geoid) ? HIGHLIGHT : null;
+        const cls = classForCount(counts.get(geoid) ?? 0, classes);
+        return cls ? RAMP[cls.step] : null;
+      }
+
+      function countyStyle(feature: BoundaryFeature) {
+        const fill = fillFor(feature.id);
+        const selected = feature.id === selectedGeoid;
+        return {
+          color: selected ? SELECTED : '#FFFFFF',
+          weight: selected ? 3 : 0.4,
+          fillColor: fill ?? '#FFFFFF',
+          fillOpacity: fill ? 0.75 : 0,
+        };
+      }
+
+      const layersByGeoid: Map<string, L.Path> = new Map();
+      const counties = L.geoJSON(countiesGeo, {
+        renderer,
+        style: countyStyle,
+        onEachFeature: (feature: BoundaryFeature, layer: L.Path) => {
+          layersByGeoid.set(feature.id, layer);
+          const { name, state } = feature.properties;
+          layer.bindTooltip(() => {
+            const base = `${name}, ${state}: ${plural(counts.get(feature.id) ?? 0, 'dataset')}`;
+            if (mode !== 'dataset') return base;
+            return `${base} · ${highlighted.has(feature.id) ? 'covered' : 'not covered'} by the selected dataset`;
+          }, {
+            sticky: true,
+            className: 'county-tooltip',
+          });
+          layer.on('mouseover', () => {
+            if (feature.id !== selectedGeoid) layer.setStyle({ weight: 2, color: OUTLINE });
+          });
+          layer.on('mouseout', () => counties.resetStyle(layer));
+          layer.on('click', () => selectCounty(feature.id, false));
+        },
+      }).addTo(map);
+
+      // State lines as one mesh: each shared border is drawn once.
+      L.geoJSON(mesh(topology, topology.objects.states), {
+        renderer,
+        style: { color: OUTLINE, weight: 1, fill: false },
+        interactive: false,
+      }).addTo(map);
+
+      function restyle() {
+        counties.setStyle(countyStyle);
+      }
+
+      function renderLegend() {
+        legendEl.replaceChildren();
+        noteEl.textContent = '';
+        if (mode === 'dataset') {
+          const dataset = data.datasets.find((d) => d.id === datasetSelect.value);
+          if (!dataset) return;
+          legendEl.append(swatch(HIGHLIGHT, `Covered by ${dataset.title}`), swatch(null, 'Not covered'));
+          noteEl.textContent = dataset.national
+            ? 'This is a national dataset: it covers the whole United States, every county in all 50 states and DC.'
+            : `${dataset.label}: ${plural(highlighted.size, 'county', 'counties')}.`;
+          return;
+        }
+        const title = document.createElement('span');
+        title.className = 'legend-title';
+        title.textContent = 'Datasets covering each county';
+        legendEl.append(title);
+        for (const cls of classes) {
+          const text = cls.min === cls.max ? plural(cls.min, 'dataset') : `${cls.min}–${cls.max} datasets`;
+          legendEl.append(swatch(RAMP[cls.step], text));
+        }
+        if ([...counts.values()].some((n) => n === 0)) legendEl.append(swatch(null, '0 datasets'));
+        noteEl.textContent =
+          classes.length === 1
+            ? `Every county is covered by the same ${plural(classes[0].min, 'dataset')}${nationalCount ? `, ${nationalCount} of them national` : ''}. Counties will stand out here as local or statewide datasets are added.`
+            : `National datasets count once in every county (${plural(nationalCount, 'national dataset')}), so darker counties have more statewide or local data.`;
+      }
+
+      function setMode(next: 'count' | 'dataset') {
+        mode = next;
+        pickerEl.hidden = mode !== 'dataset';
+        highlighted =
+          mode === 'dataset'
+            ? expandCoverage(data.datasets.find((d) => d.id === datasetSelect.value)?.coverage ?? [], index)
+            : new Set();
+        restyle();
+        renderLegend();
+      }
+
+      function fillCountySelect(stateFips: string) {
+        const options = (index.countiesByState.get(stateFips) ?? [])
+          .map((geoid) => index.counties.get(geoid))
+          .filter((c): c is BoundaryArea => Boolean(c))
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((c) => new Option(c.name, c.geoid));
+        countySelect.replaceChildren(new Option(stateFips ? 'Choose a county' : 'Choose a state first', ''), ...options);
+        countySelect.disabled = !stateFips;
+      }
+
+      function renderPanel(geoid: string) {
+        const county = index.counties.get(geoid);
+        if (!county) return;
+        const covering = datasetsForCounty(geoid, data.datasets, index);
+        panelTitle.textContent = `${county.name}, ${county.state}`;
+        panelCopy.textContent =
+          covering.length > 0
+            ? `${plural(covering.length, 'dataset')} in the catalog cover${covering.length === 1 ? 's' : ''} this county.`
+            : 'No dataset in the catalog covers this county yet.';
+        panelList.replaceChildren(
+          ...covering.map((d) => {
+            const item = document.createElement('li');
+            const link = Object.assign(document.createElement('a'), { href: d.href, textContent: d.title });
+            const label = Object.assign(document.createElement('span'), { className: 'coverage-tag', textContent: d.label });
+            item.append(link, label);
+            return item;
+          })
+        );
+      }
+
+      function selectCounty(geoid: string, zoom: boolean) {
+        selectedGeoid = geoid;
+        restyle();
+        renderPanel(geoid);
+        const stateFips = geoid.slice(0, 2);
+        if (stateSelect.value !== stateFips) {
+          stateSelect.value = stateFips;
+          fillCountySelect(stateFips);
+        }
+        countySelect.value = geoid;
+        const layer = layersByGeoid.get(geoid) as L.Polygon | undefined;
+        if (zoom && layer) map.fitBounds(layer.getBounds(), { maxZoom: 8, padding: [24, 24] });
+      }
+
+      document.getElementById('map-controls')?.addEventListener('change', (event) => {
+        const target = event.target as HTMLInputElement | HTMLSelectElement;
+        if (target.name === 'mode') setMode(target.value as 'count' | 'dataset');
+        if (target === datasetSelect) setMode('dataset');
+      });
+      stateSelect.addEventListener('change', () => fillCountySelect(stateSelect.value));
+      countySelect.addEventListener('change', () => {
+        if (countySelect.value) selectCounty(countySelect.value, true);
+      });
+
+      renderLegend();
+      // Let the grid settle before Leaflet measures the container.
+      setTimeout(() => {
+        map.invalidateSize({ animate: false });
+        map.fitBounds(LOWER_48);
+      }, 50);
+    }
+
+    init().catch((error: Error) => showMapError(error.message));
+  </script>
+
+  <style>
+    .coverage-page > h1 {
+      margin-bottom: var(--space-2);
+    }
+
+    .lede {
+      color: var(--color-text-muted);
+      font-size: var(--font-size-sm);
+      margin: 0 0 var(--space-4);
+      max-width: 70ch;
+    }
+
+    .map-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: var(--space-3) var(--space-6);
+      margin: 0 0 var(--space-4);
+    }
+
+    .mode-switch {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2) var(--space-4);
+      border: 0;
+      margin: 0;
+      padding: 0;
+      font-size: var(--font-size-sm);
+    }
+
+    .mode-switch legend,
+    .dataset-picker span,
+    .county-finder span {
+      display: block;
+      margin-bottom: var(--space-1);
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-secondary);
+    }
+
+    .mode-switch label {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      cursor: pointer;
+    }
+
+    .dataset-picker {
+      flex: 1 1 280px;
+      max-width: 520px;
+    }
+
+    .dataset-picker select,
+    .county-finder select {
+      width: 100%;
+      padding: var(--space-2);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+      color: var(--color-text);
+      font-size: var(--font-size-sm);
+    }
+
+    /* The panel sits beside the map on wide screens and below it on narrow ones. */
+    .map-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-4);
+      margin: 0 0 var(--space-4);
+      isolation: isolate;
+    }
+
+    @media (min-width: 900px) {
+      .map-shell {
+        grid-template-columns: minmax(0, 1fr) 340px;
+      }
+    }
+
+    .map-column {
+      min-width: 0;
+    }
+
+    /* Beside the map the panel scrolls on its own; below it, it grows with the page. */
+    @media (min-width: 900px) {
+      .map-panel {
+        max-height: 640px;
+        overflow: auto;
+      }
+    }
+
+    #map {
+      height: 560px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      background: var(--color-surface) !important;
+      position: relative;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    @media (max-width: 600px) {
+      #map {
+        height: 420px;
+      }
+    }
+
+    :global(.map-error) {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      margin: 0;
+      padding: var(--space-4);
+      text-align: center;
+      color: #c2410c;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-2) var(--space-4);
+      margin-top: var(--space-3);
+      font-size: var(--font-size-sm);
+      color: var(--color-text);
+    }
+
+    :global(.legend-title) {
+      font-weight: 600;
+    }
+
+    :global(.legend-item) {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    :global(.legend-swatch) {
+      width: 18px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1px solid var(--color-border-highlight);
+    }
+
+    :global(.legend-swatch-empty) {
+      background: var(--color-surface);
+    }
+
+    .map-note {
+      margin: var(--space-2) 0 0;
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+    }
+
+    .map-panel {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface);
+      box-shadow: var(--shadow-md);
+      padding: var(--space-4);
+    }
+
+    .panel-eyebrow {
+      margin: 0 0 var(--space-2);
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-secondary);
+    }
+
+    .map-panel h2 {
+      margin: 0 0 var(--space-2);
+      font-size: var(--font-size-lg);
+    }
+
+    .map-panel > p {
+      margin: 0 0 var(--space-3);
+      color: var(--color-text-muted);
+      font-size: var(--font-size-sm);
+    }
+
+    .county-finder {
+      display: grid;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+
+    .panel-list {
+      display: grid;
+      gap: var(--space-2);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .panel-list :global(li) {
+      display: grid;
+      gap: var(--space-1);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+      font-size: var(--font-size-sm);
+    }
+
+    .panel-list :global(a) {
+      color: var(--color-text);
+      font-weight: 600;
+    }
+
+    .panel-list :global(.coverage-tag) {
+      color: var(--color-text-muted);
+      font-size: var(--font-size-xs);
+    }
+
+    .not-mapped,
+    .coverage-table {
+      margin: 0 0 var(--space-4);
+      font-size: var(--font-size-sm);
+    }
+
+    .not-mapped h2 {
+      font-size: var(--font-size-base);
+      margin: 0 0 var(--space-2);
+    }
+
+    .coverage-table summary {
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .coverage-table table {
+      width: 100%;
+      margin-top: var(--space-3);
+      border-collapse: collapse;
+    }
+
+    .coverage-table th,
+    .coverage-table td {
+      text-align: left;
+      padding: var(--space-2);
+      border-bottom: 1px solid var(--color-border);
+      vertical-align: top;
+    }
+
+    .source-note {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-dim);
+    }
+
+    :global(.county-tooltip) {
+      background: var(--color-surface) !important;
+      color: var(--color-text) !important;
+      border: 1px solid var(--color-border) !important;
+      box-shadow: var(--shadow-md) !important;
+      font-size: var(--font-size-sm);
+    }
+  </style>
 </Layout>

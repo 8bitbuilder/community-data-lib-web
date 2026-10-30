@@ -1,9 +1,8 @@
 // "Clean this data" section on the Data Preview page. This file stays light: the
 // notebook itself (CodeMirror, Pyodide worker, SheetJS) is a separate chunk that
 // is only downloaded when the visitor clicks "Open notebook".
-import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
-import { fetchSource, type BackendSource } from '@lib/api/backend';
-import { previewUnavailableReason } from '@lib/data/previewSupport';
+import { Component, lazy, Suspense, useState, type ReactNode } from 'react';
+import type { NotebookSource } from './notebookExcel';
 import './notebook.css';
 
 const NotebookPanel = lazy(() => import('./NotebookPanel'));
@@ -30,28 +29,14 @@ function sourceIdFromUrl(): string {
   return new URLSearchParams(window.location.search).get('source')?.trim() ?? '';
 }
 
-export default function Notebook() {
+export default function Notebook({ sources }: { sources: Record<string, NotebookSource> }) {
   const [sourceId] = useState(sourceIdFromUrl);
-  const [source, setSource] = useState<BackendSource | null>(null);
   const [open, setOpen] = useState(false);
+  const source = sources[sourceId];
 
-  useEffect(() => {
-    if (!sourceId) return;
-    let cancelled = false;
-    fetchSource(sourceId)
-      .then((s) => {
-        if (!cancelled) setSource(s);
-      })
-      .catch(() => {
-        // The page shows its own error for an unknown or unreachable source.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [sourceId]);
-
-  // Hidden until the source is known, and for info-only sources.
-  if (!sourceId || !source || previewUnavailableReason(source)) return null;
+  // Hidden for unknown sources and ones with no file to download. A file the
+  // preview can't read can still be uploaded and cleaned here.
+  if (!source?.download?.url?.trim()) return null;
 
   return (
     <section className="cdl-notebook panel-card" aria-labelledby="cdl-notebook-title">

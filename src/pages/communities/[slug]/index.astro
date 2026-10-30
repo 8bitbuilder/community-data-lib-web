@@ -71,6 +71,38 @@ const roleDescriptions = {
         Your choice only adjusts which datasets and tags are shown. No sign-in is needed.
       </p>
     </section>
+
+    <section class="contact" aria-labelledby="contact-heading">
+      <div class="contact-intro">
+        <h2 id="contact-heading">Contact the librarian</h2>
+        <p>
+          Questions about local data, or ideas for this library? Send {libraryTitle}'s librarian a
+          message and they'll reply by email.
+        </p>
+      </div>
+      <form class="contact-form" id="contact-form" data-slug={data.slug} novalidate>
+        <div class="hp" aria-hidden="true">
+          <label>Leave this empty <input name="website" type="text" tabindex="-1" autocomplete="off" /></label>
+        </div>
+        <div class="contact-row">
+          <label>
+            <span>Your name</span>
+            <input name="name" type="text" maxlength="100" required autocomplete="name" />
+          </label>
+          <label>
+            <span>Your email</span>
+            <input name="email" type="email" maxlength="254" required autocomplete="email" />
+          </label>
+        </div>
+        <label>
+          <span>Message</span>
+          <textarea name="message" rows="5" minlength="10" maxlength="3000" required></textarea>
+        </label>
+        <p class="contact-note">Your email is shared only with this library's librarian so they can reply.</p>
+        <p class="contact-status" id="contact-status" role="status"></p>
+        <button type="submit" id="contact-submit">Send message</button>
+      </form>
+    </section>
   </section>
 
   <script>
@@ -79,6 +111,47 @@ const roleDescriptions = {
 
     // The link already carries ?audience=; saving here also covers the case
     // where the visitor later returns to the catalog through the nav.
+    // Contact form: posts to the library-contact function, which forwards the message
+    // to the librarians without ever exposing their emails to the page.
+    const contactForm = document.getElementById('contact-form') as HTMLFormElement | null;
+    if (contactForm) {
+      const startedAt = Date.now();
+      const status = document.getElementById('contact-status')!;
+      const submit = document.getElementById('contact-submit') as HTMLButtonElement;
+      contactForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!contactForm.reportValidity()) return;
+        const data = new FormData(contactForm);
+        submit.disabled = true;
+        status.textContent = 'Sending…';
+        status.dataset.state = '';
+        try {
+          const response = await fetch('/api/library-contact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              slug: contactForm.dataset.slug,
+              name: data.get('name'),
+              email: data.get('email'),
+              message: data.get('message'),
+              website: data.get('website'),
+              started_at: startedAt,
+            }),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(payload.error ?? 'Your message could not be sent.');
+          contactForm.reset();
+          status.textContent = 'Thanks! Your message was sent to the librarian.';
+          status.dataset.state = 'ok';
+        } catch (err) {
+          status.textContent = err instanceof Error ? err.message : 'Your message could not be sent.';
+          status.dataset.state = 'error';
+        } finally {
+          submit.disabled = false;
+        }
+      });
+    }
+
     document.querySelectorAll<HTMLAnchorElement>('.role-card[data-audience]').forEach((card) => {
       card.addEventListener('click', () => {
         const role = normalizeAudience(card.dataset.audience);
@@ -93,6 +166,107 @@ const roleDescriptions = {
   </script>
 
   <style>
+    .contact {
+      display: grid;
+      gap: var(--space-6);
+      padding: var(--space-6);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      background: var(--color-surface);
+      box-shadow: var(--shadow-sm);
+      max-width: 820px;
+    }
+
+    .contact-intro {
+      display: grid;
+      gap: var(--space-2);
+    }
+
+    .contact h2,
+    .contact p {
+      margin: 0;
+    }
+
+    .contact-intro p,
+    .contact-note {
+      color: var(--color-text-muted);
+    }
+
+    .contact-note {
+      font-size: var(--font-size-xs);
+    }
+
+    .contact-form {
+      display: grid;
+      gap: var(--space-4);
+    }
+
+    .contact-row {
+      display: grid;
+      gap: var(--space-4);
+    }
+
+    @media (min-width: 640px) {
+      .contact-row {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .contact-form label {
+      display: grid;
+      gap: var(--space-1);
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+    }
+
+    .contact-form input,
+    .contact-form textarea {
+      width: 100%;
+      min-width: 0;
+      padding: var(--space-3) var(--space-4);
+      background: var(--color-surface-raised);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      color: var(--color-text);
+      font-family: var(--font-sans);
+      font-size: var(--font-size-sm);
+      font-weight: 400;
+    }
+
+    .contact-form button {
+      justify-self: start;
+    }
+
+    .contact-form button:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    .contact-status {
+      font-size: var(--font-size-sm);
+    }
+
+    .contact-status:empty {
+      display: none;
+    }
+
+    .contact-status[data-state='ok'] {
+      color: var(--color-primary);
+    }
+
+    .contact-status[data-state='error'] {
+      color: #b42318;
+    }
+
+    /* Honeypot: hidden from people, still in the form for bots. */
+    .hp {
+      position: absolute;
+      left: -10000px;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+    }
+
     .landing {
       display: grid;
       gap: var(--space-12);

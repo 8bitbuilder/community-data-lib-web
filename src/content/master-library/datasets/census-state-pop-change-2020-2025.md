@@ -1,21 +1,15 @@
 ---
 title: "National State Population Change 2020-2025"
-description: "National State Population Change 2020-2025 from U.S. Census Bureau (U.S. Department of Commerce). Topics include Economy, Energy & Environment, Government Administration, Housing & Buildings, Population Data. Data is available for direct download."
+description: "National State Population Change 2020-2025 from U.S. Census Bureau (U.S. Department of Commerce). Topics include Business & Economy, Population Data. Data is available for direct download."
 author: "U.S. Census Bureau"
 sourceId: "census-state-pop-change-2020-2025"
 category: "dataset"
 syncedFromBackend: true
 tags:
-  - "Economy"
-  - "Energy & Environment"
-  - "Government Administration"
-  - "Housing & Buildings"
+  - "Business & Economy"
   - "Population Data"
 dataThemes:
-  - "Economy"
-  - "Energy & Environment"
-  - "Government Administration"
-  - "Housing & Buildings"
+  - "Business & Economy"
   - "Population Data"
 pedagogicalTags:
   - "positive correlation"
@@ -67,10 +61,6 @@ studentSuitability: "unreviewed"
 granularity: "state"
 coverage:
   - { level: "nation", geoid: "US" }
-location:
-  latitude: 38.8468
-  longitude: -76.9296
-  label: "U.S. Census Bureau headquarters, Suitland, MD (approximate)"
 url: "https://www2.census.gov/programs-surveys/popest/datasets/2020-2025/state/totals/"
 featured: false
 difficulty: "beginner"
