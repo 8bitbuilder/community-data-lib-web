@@ -12,22 +12,12 @@ export const EXPORT_MIME: Record<ExportKind, string> = {
 
 type ExportLoadSource = Exclude<LoadSource, { kind: 'file' }>;
 
-/** Where the exported notebook reads the original data from. */
-export function exportSourceFor(
-  file: {
-    origin: 'catalog' | 'upload';
-    filename: string;
-    archive: 'zip' | null;
-    archiveEntry?: string | null;
-  },
-  downloadUrl: string | undefined,
-): ExportLoadSource {
-  if (file.origin === 'upload' || !downloadUrl) return { kind: 'upload', filename: file.filename };
-  if (file.archive === 'zip') {
-    // The full path inside the zip; `filename` is only the basename used in Python's filesystem.
-    return { kind: 'zip', url: downloadUrl, innerName: file.archiveEntry || file.filename };
-  }
-  return { kind: 'url', url: downloadUrl };
+/**
+ * Where the exported notebook reads the data from: the same file the visitor
+ * uploaded, placed next to the notebook. It never downloads the dataset itself.
+ */
+export function exportSourceFor(file: { filename: string }): ExportLoadSource {
+  return { kind: 'upload', filename: file.filename };
 }
 
 /** The notebook's cells: the in-browser load cell is swapped for one that loads from the original source. */

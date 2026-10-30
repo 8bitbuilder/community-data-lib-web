@@ -266,50 +266,6 @@ export async function fetchFilterOptions(
   return data.options;
 }
 
-export interface SourceFileResult {
-  bytes: Uint8Array;
-  filename: string;
-  format: 'csv' | 'tsv' | 'xlsx' | 'xls';
-  archive: 'zip' | null;
-  /** Zipped sources: the file's full path inside the zip (e.g. "data/sub/file.csv"). */
-  archiveEntry: string | null;
-}
-
-/** Downloads the source's raw file through the API (used by the notebook). */
-export async function fetchSourceFile(id: string): Promise<SourceFileResult> {
-  const path = `/api/sources/${encodeURIComponent(id)}/file`;
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE}${path}`, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'TimeoutError') {
-      throw new Error(`Request timed out after ${API_TIMEOUT_MS / 1000}s while downloading the file.`);
-    }
-    throw error;
-  }
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
-    const message = typeof body.error === 'string' ? body.error : `API error ${response.status}`;
-    throw new ApiError(message, response.status, body);
-  }
-  const decodeHeader = (raw: string) => {
-    try {
-      return decodeURIComponent(raw);
-    } catch {
-      return raw;
-    }
-  };
-  const archive = response.headers.get('X-CDL-Archive') === 'zip' ? 'zip' : null;
-  const entry = response.headers.get('X-CDL-Archive-Entry');
-  return {
-    bytes: new Uint8Array(await response.arrayBuffer()),
-    filename: decodeHeader(response.headers.get('X-CDL-Filename') ?? ''),
-    format: (response.headers.get('X-CDL-Format') ?? 'csv') as SourceFileResult['format'],
-    archive,
-    archiveEntry: archive && entry ? decodeHeader(entry) : null,
-  };
-}
-
 export function normalizeDescriptionTags(tags: BackendSource['description_tags']): string[] {
   if (!tags) return [];
   if (Array.isArray(tags)) return tags;

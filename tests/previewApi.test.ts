@@ -24,12 +24,6 @@ const ZIP = (() => {
   zip.addFile('title-rows.xlsx', fixture('title-rows.xlsx'));
   return zip.toBuffer();
 })();
-const NESTED_ZIP = (() => {
-  const zip = new AdmZip();
-  zip.addFile('data/sub/file.csv', Buffer.from(CSV));
-  zip.addFile('readme.txt', Buffer.from('not data'));
-  return zip.toBuffer();
-})();
 
 let server: http.Server;
 let base = '';
@@ -42,12 +36,6 @@ before(async () => {
     } else if (req.url === '/bundle.zip') {
       res.writeHead(200, { 'Content-Type': 'application/zip' });
       res.end(ZIP);
-    } else if (req.url === '/nested.zip') {
-      res.writeHead(200, { 'Content-Type': 'application/zip' });
-      res.end(NESTED_ZIP);
-    } else if (req.url?.startsWith('/named/')) {
-      res.writeHead(200, { 'Content-Type': 'text/csv' });
-      res.end(CSV);
     } else if (req.url?.startsWith('/fx/')) {
       try {
         const body = fixture(req.url.slice(4));
@@ -86,17 +74,6 @@ function sources() {
     { id: 'zipped', title: 'Zipped', download: { url: `${base}/bundle.zip` } },
     { id: 'notes-first', title: 'Notes', download: { url: `${base}/fx/notes-first.xlsx` } },
     { id: 'numeric-sheets', title: 'Years', download: { url: `${base}/fx/numeric-sheets.xlsx` } },
-    { id: 'nested-zip', title: 'Nested zip', download: { url: `${base}/nested.zip` } },
-    {
-      id: 'en-dash',
-      title: 'En dash',
-      download: { url: `${base}/named/${encodeURIComponent('pop–2020.csv')}` },
-    },
-    {
-      id: 'cjk',
-      title: 'CJK',
-      download: { url: `${base}/named/${encodeURIComponent('人口统计.csv')}` },
-    },
     { id: 'portal', title: 'Portal only', provider: { url: 'https://example.gov' } },
   ];
 }
@@ -119,7 +96,7 @@ test('health and source listing', async () => {
   assert.equal(health.status, 200);
   assert.equal(health.body.previewEngine, 'node');
   const list = await get('/api/sources');
-  assert.equal(list.body.count, 11);
+  assert.equal(list.body.count, 8);
   assert.equal((await get('/api/sources/counties')).body.title, 'Counties');
   assert.equal(list.headers.get('access-control-allow-origin'), '*');
 });
@@ -183,73 +160,9 @@ test('an unreachable data provider returns 502', async () => {
   assert.equal(res.status, 502);
 });
 
-async function getRaw(path: string, handle = makeHandler()) {
-  const response = await handle(new Request(`http://site.test${path}`));
-  return { status: response.status, headers: response.headers, bytes: Buffer.from(await response.arrayBuffer()) };
-}
-
-test('file route returns raw CSV bytes with filename headers', async () => {
-  const res = await getRaw('/api/sources/counties/file');
-  assert.equal(res.status, 200);
-  assert.equal(res.bytes.toString(), CSV);
-  assert.equal(res.headers.get('x-cdl-filename'), 'counties.csv');
-  assert.equal(res.headers.get('x-cdl-format'), 'csv');
-  assert.equal(res.headers.get('x-cdl-archive'), null);
-  assert.match(res.headers.get('content-type')!, /text\/csv/);
-  assert.match(res.headers.get('content-disposition')!, /attachment; filename="counties.csv"/);
-  assert.match(res.headers.get('access-control-expose-headers')!, /X-CDL-Filename/);
-});
-
-test('file route unzips and reports the inner file', async () => {
-  const res = await getRaw('/api/sources/zipped/file');
-  assert.equal(res.status, 200);
-  assert.equal(res.headers.get('x-cdl-archive'), 'zip');
-  assert.equal(res.headers.get('x-cdl-filename'), 'title-rows.xlsx');
-  assert.equal(res.headers.get('x-cdl-format'), 'xlsx');
-  assert.ok(res.bytes.equals(fixture('title-rows.xlsx')));
-});
-
-test('file route reports the full entry name of a file in a folder inside the zip', async () => {
-  const res = await getRaw('/api/sources/nested-zip/file');
-  assert.equal(res.status, 200);
-  assert.equal(res.headers.get('x-cdl-archive'), 'zip');
-  assert.equal(res.headers.get('x-cdl-filename'), 'file.csv');
-  assert.equal(decodeURIComponent(res.headers.get('x-cdl-archive-entry')!), 'data/sub/file.csv');
-  assert.match(res.headers.get('access-control-expose-headers')!, /X-CDL-Archive-Entry/);
-  assert.equal(res.bytes.toString(), CSV);
-  const plain = await getRaw('/api/sources/counties/file');
-  assert.equal(plain.headers.get('x-cdl-archive-entry'), null);
-});
-
-test('file route serves names outside Latin-1 (en dash, CJK) without a 500', async () => {
-  const dash = await getRaw('/api/sources/en-dash/file');
-  assert.equal(dash.status, 200);
-  assert.equal(decodeURIComponent(dash.headers.get('x-cdl-filename')!), 'pop–2020.csv');
-  assert.equal(
-    dash.headers.get('content-disposition'),
-    `attachment; filename="pop_2020.csv"; filename*=UTF-8''pop%E2%80%932020.csv`,
-  );
-  const cjk = await getRaw('/api/sources/cjk/file');
-  assert.equal(cjk.status, 200);
-  assert.equal(decodeURIComponent(cjk.headers.get('x-cdl-filename')!), '人口统计.csv');
-  const disp = cjk.headers.get('content-disposition')!;
-  assert.match(disp, /^attachment; filename="____\.csv"; filename\*=UTF-8''/);
-  assert.equal(decodeURIComponent(disp.split("UTF-8''")[1]), '人口统计.csv');
-  assert.equal(cjk.bytes.toString(), CSV);
-});
-
-test('file route returns 413 above PREVIEW_FILE_MAX_BYTES', async () => {
-  const prev = process.env.PREVIEW_FILE_MAX_BYTES;
-  process.env.PREVIEW_FILE_MAX_BYTES = '10';
-  try {
-    const res = await get('/api/sources/counties/file');
-    assert.equal(res.status, 413);
-    assert.equal(typeof res.body.size, 'number');
-    assert.equal(res.body.downloadUrl, `${base}/counties.csv`);
-  } finally {
-    if (prev === undefined) delete process.env.PREVIEW_FILE_MAX_BYTES;
-    else process.env.PREVIEW_FILE_MAX_BYTES = prev;
-  }
+test('the site never serves raw dataset files (visitors download from the provider)', async () => {
+  const res = await get('/api/sources/counties/file');
+  assert.equal(res.status, 404);
 });
 
 test('Excel preview returns rows and layout', async () => {

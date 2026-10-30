@@ -3,14 +3,19 @@ import { UPLOAD_ACCEPT, uploadKind } from './notebookFiles';
 
 export const UNSUPPORTED_FILE = "That file type isn't supported. Use a CSV, TSV, TXT or Excel (.xlsx, .xls) file.";
 
-/** "Use my own file": a file picker plus a drop area. */
+/**
+ * A file picker plus a drop area. Before a file is loaded it's always open (it's the
+ * only way to get data in); afterwards a "Use a different file" button toggles it.
+ */
 export default function UploadZone({
   expanded,
+  hasFile,
   onToggle,
   onFile,
   error,
 }: {
   expanded: boolean;
+  hasFile: boolean;
   onToggle: () => void;
   onFile: (file: File) => void;
   error?: string;
@@ -35,9 +40,11 @@ export default function UploadZone({
 
   return (
     <div className="nb-upload">
-      <button type="button" className="nb-btn" aria-expanded={expanded} onClick={onToggle}>
-        Use my own file
-      </button>
+      {hasFile && (
+        <button type="button" className="nb-btn" aria-expanded={expanded} onClick={onToggle}>
+          Use a different file
+        </button>
+      )}
       {expanded && (
         <div
           className={`nb-dropzone${dragging ? ' nb-dropzone--over' : ''}`}
@@ -48,7 +55,7 @@ export default function UploadZone({
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
         >
-          <label htmlFor={inputId}>Choose a CSV, TSV or Excel file, or drop it here.</label>
+          <label htmlFor={inputId}>Choose the CSV, TSV or Excel file you downloaded, or drop it here.</label>
           <input
             id={inputId}
             type="file"

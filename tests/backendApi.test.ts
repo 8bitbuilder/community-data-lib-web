@@ -6,7 +6,6 @@ import {
   fetchPreview,
   fetchChart,
   fetchFilterOptions,
-  fetchSourceFile,
   parseSheetParam,
 } from '../src/lib/api/backend.ts';
 
@@ -93,44 +92,4 @@ test('fetchChart and fetchFilterOptions pass the layout params', async () => {
   assert.equal(q.get('type'), 'state');
   assert.equal(q.get('sheet'), '3');
   assert.equal(q.get('header_row'), '4');
-});
-
-test('fetchSourceFile decodes filename and reads format and archive headers', async () => {
-  const seen = stub(
-    new Response(new Uint8Array([1, 2, 3]), {
-      status: 200,
-      headers: {
-        'X-CDL-Filename': '%C3%A9t%C3%A9.csv',
-        'X-CDL-Format': 'csv',
-        'X-CDL-Archive': 'zip',
-        'X-CDL-Archive-Entry': 'data%2Fsub%2F%C3%A9t%C3%A9.csv',
-      },
-    }),
-  );
-  const file = await fetchSourceFile('a b');
-  assert.equal(file.archiveEntry, 'data/sub/été.csv');
-  assert.ok(seen.urls[0].endsWith('/api/sources/a%20b/file'));
-  assert.equal(file.filename, 'été.csv');
-  assert.equal(file.format, 'csv');
-  assert.equal(file.archive, 'zip');
-  assert.deepEqual([...file.bytes], [1, 2, 3]);
-});
-
-test('fetchSourceFile reports archive null when the header is absent', async () => {
-  stub(new Response('x', { headers: { 'X-CDL-Filename': 'a.xlsx', 'X-CDL-Format': 'xlsx' } }));
-  const file = await fetchSourceFile('s');
-  assert.equal(file.archive, null);
-  assert.equal(file.archiveEntry, null);
-  assert.equal(file.format, 'xlsx');
-});
-
-test('fetchSourceFile turns 413 into an ApiError with size and downloadUrl', async () => {
-  stub(json({ error: 'File too large', size: 99, downloadUrl: 'http://x/f' }, 413));
-  await assert.rejects(fetchSourceFile('s'), (err: unknown) => {
-    assert.ok(err instanceof ApiError);
-    assert.equal(err.status, 413);
-    assert.equal(err.body.size, 99);
-    assert.equal(err.body.downloadUrl, 'http://x/f');
-    return true;
-  });
 });

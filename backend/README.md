@@ -39,7 +39,6 @@ npm run backend:dev          # http://localhost:4323
 | `GET /api/sources/:id/preview` | Table rows. Query: `limit`, `offset`, `state`, `county`, `columns`, plus the Excel params below. Excel responses include a `layout` object (`sheets`, `sheet`, `headerRow`, `dataRowCount`, `trimmedRows`, `origin`). |
 | `GET /api/sources/:id/chart` | Chart series. Query: `variable`, `xVariable`, `plotType` (`bar`, `line`, `scatter`), `state`, `county`, `limit`, plus the Excel params. |
 | `GET /api/sources/:id/filters` | Filter options. Query: `type` (`state` or `county`), `state` (for counties), plus the Excel params. |
-| `GET /api/sources/:id/file` | The raw data file (unzipped if the download is a `.zip`), for the in-browser notebook. Headers: `X-CDL-Filename` and, for zips, `X-CDL-Archive: zip` and `X-CDL-Archive-Entry` (the path inside the zip), all URI-encoded where needed; `X-CDL-Format` (`csv`, `tsv`, `xlsx`, `xls`). Files over `PREVIEW_FILE_MAX_BYTES` (default 4,000,000) return 413 with `size` and `downloadUrl`. |
 
 Excel params (preview, chart, filters):
 

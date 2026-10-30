@@ -13,11 +13,9 @@
  *   GET /api/sources/:id/preview?state&county&limit&offset&columns&sheet&header_row
  *   GET /api/sources/:id/chart?variable&xVariable&plotType&state&county&limit&sheet&header_row
  *   GET /api/sources/:id/filters?type&state&sheet&header_row
- *   GET /api/sources/:id/file   raw (unzipped) source bytes; X-CDL-Filename (URI-encoded)/Format/Archive headers
  */
 
 import { buildChart, buildPreview, listFilterOptions } from './dataPreview.mjs';
-import { getSourceFile } from './csvCache.mjs';
 import { LayoutError } from '../../src/lib/data/excelLayout.mjs';
 import { buildDatasheet } from './datasheet.mjs';
 
@@ -43,13 +41,6 @@ function json(status, payload) {
   });
 }
 
-const MIME = {
-  csv: 'text/csv',
-  tsv: 'text/tab-separated-values',
-  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  xls: 'application/vnd.ms-excel',
-};
-
 /** `sheet` and `header_row` query params -> table options (digits in sheet = 0-based index). */
 function tableParams(q) {
   const out = {};
@@ -63,19 +54,6 @@ function tableParams(q) {
     out.headerRow = Number(row);
   }
   return out;
-}
-
-/**
- * Header values must be ByteStrings, so non-ASCII names go in `filename*` (RFC 6266)
- * with an ASCII-only `filename` fallback for old clients.
- */
-export function contentDisposition(name) {
-  const ascii = name.replace(/[^\x20-\x7e]|["\\]/g, '_');
-  const encoded = encodeURIComponent(name).replace(
-    /['()*]/g,
-    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
-  );
-  return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
 }
 
 function isExcelSource(source, table) {
@@ -156,30 +134,6 @@ export function createApiHandler({
 
       if (parsed.action === 'datasheet') {
         return json(200, { id: parsed.id, datasheet: buildDatasheet(source) });
-      }
-
-      if (parsed.action === 'file') {
-        const file = await getSourceFile(source);
-        const limit = Number(process.env.PREVIEW_FILE_MAX_BYTES ?? 4_000_000);
-        if (file.bytes.length > limit) {
-          return json(413, {
-            error: 'File too large to open automatically',
-            size: file.bytes.length,
-            downloadUrl: source.download?.url,
-          });
-        }
-        const headers = {
-          ...CORS_HEADERS,
-          'Content-Type': MIME[file.format] ?? 'application/octet-stream',
-          'Content-Disposition': contentDisposition(file.filename),
-          'X-CDL-Filename': encodeURIComponent(file.filename),
-          'X-CDL-Format': file.format,
-          'Access-Control-Expose-Headers':
-            'X-CDL-Filename, X-CDL-Format, X-CDL-Archive, X-CDL-Archive-Entry',
-        };
-        if (file.archive) headers['X-CDL-Archive'] = file.archive;
-        if (file.archiveEntry) headers['X-CDL-Archive-Entry'] = encodeURIComponent(file.archiveEntry);
-        return new Response(file.bytes, { status: 200, headers });
       }
 
       if (parsed.action === 'preview') {

@@ -11,50 +11,8 @@ import {
 
 const URL_ = 'https://example.org/data.csv';
 
-test('exportSourceFor: zip archive uses the zip form with the inner file name', () => {
-  assert.deepEqual(exportSourceFor({ origin: 'catalog', filename: 'a.csv', archive: 'zip' }, URL_), {
-    kind: 'zip',
-    url: URL_,
-    innerName: 'a.csv',
-  });
-});
-
-test('exportSourceFor: a file in a folder inside the zip keeps its full entry name', () => {
-  const src = exportSourceFor(
-    { origin: 'catalog', filename: 'file.csv', archive: 'zip', archiveEntry: 'data/sub/file.csv' },
-    URL_,
-  );
-  assert.deepEqual(src, { kind: 'zip', url: URL_, innerName: 'data/sub/file.csv' });
-  const cells = notebookCellsFor(['load', 'df = df.dropna()'], src, { format: 'csv', encoding: 'utf-8' });
-  assert.match(cells[0], /"data\/sub\/file\.csv"/);
-  assert.doesNotMatch(cells[0], /open\("file\.csv"\)/);
-});
-
-test('exportSourceFor: uploads use the upload form even when a URL exists', () => {
-  assert.deepEqual(exportSourceFor({ origin: 'upload', filename: 'mine.csv', archive: null }, URL_), {
-    kind: 'upload',
-    filename: 'mine.csv',
-  });
-});
-
-test('exportSourceFor: plain catalog file uses the url form', () => {
-  assert.deepEqual(exportSourceFor({ origin: 'catalog', filename: 'a.csv', archive: null }, URL_), {
-    kind: 'url',
-    url: URL_,
-  });
-});
-
-test('exportSourceFor: no download URL falls back to upload form', () => {
-  for (const u of [undefined, '']) {
-    assert.deepEqual(exportSourceFor({ origin: 'catalog', filename: 'a.csv', archive: null }, u), {
-      kind: 'upload',
-      filename: 'a.csv',
-    });
-    assert.deepEqual(exportSourceFor({ origin: 'catalog', filename: 'a.zip.csv', archive: 'zip' }, u), {
-      kind: 'upload',
-      filename: 'a.zip.csv',
-    });
-  }
+test('exportSourceFor: always the uploaded file, never a download URL', () => {
+  assert.deepEqual(exportSourceFor({ filename: 'mine.csv' }), { kind: 'upload', filename: 'mine.csv' });
 });
 
 test('notebookCellsFor replaces cell 0 and keeps the rest', () => {

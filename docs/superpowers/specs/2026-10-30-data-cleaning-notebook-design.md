@@ -336,3 +336,13 @@ script stays as-is apart from the hooks it needs.
   since government tables often use years as column names. `layout.detected` is replaced
   by `layout.origin: { sheet, headerRow }` (`'visitor' | 'curator' | 'auto'`) so the page
   can say where each choice came from.
+
+## Change (2026-10-30, after launch): upload only
+
+To avoid redistributing datasets, the notebook no longer loads data automatically. Visitors
+download the file from the original provider (link shown in the notebook) and upload it.
+The `/api/sources/:id/file` pass-through route and `PREVIEW_FILE_MAX_BYTES` are removed;
+the site never serves raw dataset files. Uploaded Excel workbooks reuse the preview's
+sheet/header row (if the workbook has that sheet), then the curator defaults, then
+auto-detection. Exported notebooks load the uploaded file from next to the notebook. The
+"preview layout changed" prompt is gone (the notebook's file is always the visitor's copy).

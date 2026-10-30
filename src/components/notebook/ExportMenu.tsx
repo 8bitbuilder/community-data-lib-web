@@ -1,13 +1,11 @@
 // "Export ▾" menu: cleaned data as CSV / Excel, or the notebook as a runnable .ipynb.
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import type { BackendSource } from '@lib/api/backend';
 import type { CellState } from './notebookStore';
 import { errorMessage, readSpecFor, type NotebookFile } from './notebookFiles';
 import { EXPORT_MIME, exportFilename, exportSourceFor, notebookJson, type ExportKind } from './exportPlan';
 
 interface Props {
   sourceId: string;
-  source: BackendSource;
   file: NotebookFile | null;
   cells: CellState[];
   exportDf: (format: 'csv' | 'xlsx') => Promise<Uint8Array>;
@@ -33,7 +31,7 @@ function download(data: BlobPart, type: string, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
-export default function ExportMenu({ sourceId, source, file, cells, exportDf, disabled, disabledReason }: Props) {
+export default function ExportMenu({ sourceId, file, cells, exportDf, disabled, disabledReason }: Props) {
   const uid = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -78,7 +76,7 @@ export default function ExportMenu({ sourceId, source, file, cells, exportDf, di
     setBusy(true);
     try {
       if (kind === 'ipynb') {
-        const src = exportSourceFor(file, source.download?.url);
+        const src = exportSourceFor(file);
         download(notebookJson(cells.map((c) => c.code), src, readSpecFor(file)), EXPORT_MIME.ipynb, name);
       } else {
         const bytes = await exportDf(kind);

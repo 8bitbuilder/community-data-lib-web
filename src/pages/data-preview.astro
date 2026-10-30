@@ -313,8 +313,8 @@ const catalogHref = withBasePath('/complete-catalog');
       lastGoodLayout = layout;
       lastGoodNote = text;
 
+      // The notebook reads this to open an uploaded copy of this workbook the same way.
       (window as unknown as { __cdlExcelLayout?: unknown }).__cdlExcelLayout = layout;
-      window.dispatchEvent(new CustomEvent('cdl:excel-layout', { detail: layout }));
     }
 
     // A shared link may name a sheet or header row that no longer exists. Drop the

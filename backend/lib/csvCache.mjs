@@ -117,8 +117,8 @@ export function isExcelFormat(format) {
   return format === "xlsx" || format === "xls";
 }
 
-/** Download (and unzip) the source's file once; cached per source id. */
-export async function getSourceFile(source) {
+/** Download (and unzip) the source's file once; cached per source id. Server-side only, for the preview. */
+async function getSourceFile(source) {
   const cached = fileCache.get(source.id);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached.file;
 
@@ -127,17 +127,12 @@ export async function getSourceFile(source) {
 
   let bytes = await downloadBytes(downloadUrl);
   let filename = lastSegment(downloadUrl);
-  let archive = null;
-  // Zipped sources: the full entry name inside the zip (e.g. "data/sub/file.csv").
-  let archiveEntry = null;
   if (isZip(bytes) && !isXlsx(bytes)) {
     const extracted = pickFileFromZip(bytes);
     bytes = extracted.data;
-    archiveEntry = extracted.filename;
-    filename = extracted.filename.split("/").pop();
-    archive = "zip";
+    filename = extracted.filename;
   }
-  const file = { bytes, filename, format: formatOf(bytes, filename), archive, archiveEntry };
+  const file = { bytes, format: formatOf(bytes, filename) };
   fileCache.set(source.id, { file, fetchedAt: Date.now() });
   return file;
 }

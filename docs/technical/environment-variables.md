@@ -133,7 +133,6 @@ None of these are needed on Netlify, where the build sets what it needs. The def
 | `SOURCES_DB_PATH` | backend API server | built-in SQLite path | Use a different SQLite database. |
 | `PREVIEW_ENGINE` | backend API server | pandas if available | Set to `node` to skip the Python/pandas preview engine. |
 | `PANDAS_TIMEOUT_MS` | backend API server | `120000` | Time limit for a pandas data preview. |
-| `PREVIEW_FILE_MAX_BYTES` | backend API server and `preview-api` function | `4000000` | Largest file `/api/sources/:id/file` sends to the in-browser notebook. Bigger files return 413 and the notebook asks the visitor to download the file and upload it. |
 
 ### Testing the editor locally
 
