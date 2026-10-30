@@ -62,3 +62,10 @@ test('sheet and header_row send only when changed', () => {
   const had = { ...original, download: { url: 'u', sheet: 'Data', header_row: 4 } };
   assert.deepEqual(diffFields(had, { ...had, download: { url: 'u', sheet: '', header_row: '4' } }), { download: { sheet: null } });
 });
+
+test('null sheet/header_row (as sent by readForm) is treated as blank', () => {
+  const edited = { ...original, download: { url: original.download.url, sheet: null, header_row: null } };
+  assert.deepEqual(diffFields(original, edited), {});
+  const had = { ...original, download: { url: 'u', sheet: 'Data', header_row: 4 } };
+  assert.deepEqual(diffFields(had, { ...had, download: { url: 'u', sheet: null, header_row: null } }), { download: { sheet: null, header_row: null } });
+});

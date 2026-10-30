@@ -159,6 +159,7 @@ export function toTopLevelUpdates(current, normalized, vocabulary) {
       // A cleared sheet/header_row means "auto-detect": drop the key instead of writing null.
       merged = Object.fromEntries(Object.entries(merged).filter(([k, v]) => !(['sheet', 'header_row'].includes(k) && v === null)));
     }
+    if (field === 'download' && Object.keys(merged).length === 0 && !isPlainObject(current.download)) continue;
     if (canonical(merged) !== canonical(current[field])) updates[field] = merged;
   }
   const tagFields = Object.keys(updates).filter((f) => f === 'description_tags' || Object.hasOwn(vocabulary.statistical_tags, f));

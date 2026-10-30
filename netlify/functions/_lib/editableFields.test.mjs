@@ -140,3 +140,8 @@ test('clearing sheet deletes the key rather than writing null', () => {
   assert.equal(Object.hasOwn(updates.download, 'sheet'), false);
   assert.deepEqual(toTopLevelUpdates(current, validateChanges({ download: { sheet: null } }, vocab), vocab), {});
 });
+
+test('clearing sheet on a dataset with no download block emits no update', () => {
+  const { download, ...noDownload } = current;
+  assert.deepEqual(toTopLevelUpdates(noDownload, validateChanges({ download: { sheet: null, header_row: null } }, vocab), vocab), {});
+});

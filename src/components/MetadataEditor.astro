@@ -126,8 +126,9 @@
     const edited: any = {};
     for (const [name] of TEXT) edited[name] = value(name);
     edited.provider = { name: value('provider.name'), agency: value('provider.agency'), url: value('provider.url') };
-    const sheet = value('download.sheet').trim();
-    const headerRow = value('download.header_row').trim();
+    const isExcel = /\.xlsx?$/i.test(value('download.url').trim().split(/[?#]/)[0]);
+    const sheet = isExcel ? value('download.sheet').trim() : '';
+    const headerRow = isExcel ? value('download.header_row').trim() : '';
     edited.download = { url: value('download.url'), sheet: sheet === '' ? null : sheet, header_row: headerRow === '' ? null : Number(headerRow) };
     edited.sensitive = (form.elements.namedItem('sensitive') as HTMLInputElement).checked;
     edited.requires_account = (form.elements.namedItem('requires_account') as HTMLInputElement).checked;
