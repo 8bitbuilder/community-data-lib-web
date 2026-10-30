@@ -23,43 +23,14 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
         Open-Source · Community-Focused · Free Forever
       </div>
 
-      <h1 class="hero-title">
-        Data <em class="word-about">about</em> your community,<br/>
-        <em class="word-for">for</em> your community.
-      </h1>
+      <h1 class="hero-title">Community Data Libraries</h1>
 
       <p class="hero-body">
-        A curated catalog of datasets and resources —
-        filtered to focus on your geographic community with just a few clicks.
+        Community Data Libraries is an open-source resource to explore and locate
+        datasets for a specific region or community near you.
       </p>
-
-      <div class="hero-actions">
-        <a href={withBasePath('/complete-catalog')} class="btn-primary">
-          Explore the Full Dataset Catalog
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </a>
-        <a href={withBasePath('/maps')} class="btn-ghost">
-          Preview the Data Available for Your Community
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </a>
-      </div>
-
-      <!-- <div class="hero-roles" aria-label="Browse by role">
-        <span class="roles-label">Browse as</span>
-        <a href={withBasePath('/teacher')} class="role-pill">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
-          Teacher
-        </a>
-        <a href={withBasePath('/student')} class="role-pill">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          Student
-        </a>
-        <a href={withBasePath('/community-member')} class="role-pill">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          Community
-        </a>
-      </div> -->
     </div>
+
 
     <!-- Hero visual — abstract data grid -->
     <div class="hero-visual" aria-hidden="true">
@@ -134,31 +105,73 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
   <!-- ═══════════════════════════════════════════
        HOW IT WORKS  — editorial 3-column
   ═══════════════════════════════════════════ -->
-  <section class="how-section" aria-label="How it works">
-    <header class="section-header">
-      <p class="section-eyebrow">How it works</p>
-      <h2 class="section-title">Built for classrooms and communities.</h2>
-    </header>
+  <section class="directory-section" aria-labelledby="directory-heading">
+  <header class="section-header">
+    <p class="section-eyebrow">Explore the platform</p>
+    <h2 class="section-title" id="directory-heading">
+      Find the right place to start.
+    </h2>
+  </header>
 
-    <p class="how-section">
-        Community data libraries allows you quickly build a robust data library for your community with a few simple clicks. Simply follow the setup steps to <a href={withBasePath('/data-preview')}>create a library</a>. No technical expertise is needed. Your community library will be created, continuously updated, and available automatically.
-    </p>
+  <div class="directory-grid">
+    <article class="directory-card">
+      <h3 class="directory-title">
+        <a href={withBasePath('/complete-catalog')}>Complete Catalog</a>
+      </h3>
+      <p>
+        New to the platform? Start with the Complete Catalog. This is the master
+        collection of all datasets available across the platform, giving you
+        access to the full range of information that has been added to the
+        system.
+      </p>
+    </article>
 
-    <div class="how-grid">
-      <div class="how-step">
-        <h3>Curated catalog</h3>
-        <p>Editors review and tag every resource — geographic coverage, dataset topic, and statistical properties for classroom use.</p>
-      </div>
-      <div class="how-step">
-        <h3>Local geographic filtering</h3>
-        <p>We handle the complexity of geographies. You will specify the geography of your community when creating your library, and we will automatically create your local dataset catalog.</p>
-      </div>
-      <div class="how-step">
-        <h3>Community accessibility</h3>
-        <p>Everyone can suggest new data resources. Suggestions are reviewed and rolled out in regular library updates so community libraries stay up-to-date.</p>
-      </div>
-    </div>
-  </section>
+    <article class="directory-card">
+      <h3 class="directory-title">
+        <a href={withBasePath('/create-community-library')}>Community Library</a>
+      </h3>
+      <p>
+        Need data for a specific area? Create your own Community Library to
+        generate a curated collection of datasets tailored to a selected
+        community or region. Built from the Complete Catalog, it automatically
+        includes only datasets with information relevant to that area, making it
+        easier to discover local data and insights without searching through
+        the entire collection. You can view an example community library
+        <a href={withBasePath('/communities/knox-county/')}>here</a>.
+      </p>
+    </article>
+
+    <article class="directory-card">
+      <h3 class="directory-title">
+        <a href={withBasePath('/data-resources')}>Data Resources</a>
+      </h3>
+      <p>
+        The Data Resources section contains open-source educational and
+        community engagement materials developed by our team. These resources
+        are intended to support the use of the Community Data Library (CDL) in
+        a variety of settings, including classrooms and community workshops.
+        Planned resources include lesson plans, guided activities, and other
+        tools designed to help users explore, analyze, and discuss community
+        data.
+      </p>
+    </article>
+
+    <article class="directory-card">
+      <h3 class="directory-title">
+        <a href={withBasePath('/maps')}>Interactive Map</a>
+      </h3>
+      <p>
+        The Interactive Map provides an overview of the data available for
+        communities across the region before a user creates a Community Data
+        Library. Just place a pin on the map at the location of interest and
+        the system will then identify the surrounding community and display a
+        filtered catalog containing datasets relevant to that area. By
+        exploring the map, you can quickly determine what information is
+        currently available for a particular location.
+      </p>
+    </article>
+  </div>
+</section>
 
   <!-- ═══════════════════════════════════════════
        FEATURE CARDS — 3-up
@@ -220,7 +233,7 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
       <a href={withBasePath('/submit')} class="btn-primary btn-large">Submit a Resource →</a>
       <a href="https://github.com/community-data-libraries/web" target="_blank" rel="noopener noreferrer" class="cta-github">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/></svg>
-        View on GitHub
+        View us on GitHub
       </a>
     </div>
   </section>
@@ -905,4 +918,82 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     color: var(--color-text);
     text-decoration: none;
   }
+
+  .directory-section {
+  margin-bottom: var(--space-16);
+}
+
+.directory-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .directory-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.directory-card {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-6);
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.directory-card p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+}
+
+.directory-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.directory-title a {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--color-text);
+  text-decoration: none;
+  transition: color 0.18s ease;
+}
+
+.directory-title a::after {
+  content: "→";
+  color: var(--color-primary);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.directory-title a:hover,
+.directory-title a:focus-visible {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.directory-title a:hover::after,
+.directory-title a:focus-visible::after {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.directory-title a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
 </style>
