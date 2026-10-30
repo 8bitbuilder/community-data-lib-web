@@ -33,5 +33,5 @@ export function notebookJson(codes: string[], source: ExportLoadSource, read: Re
 
 export function exportFilename(kind: ExportKind, sourceId: string): string {
   const base = sourceId.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'dataset';
-  return kind === 'ipynb' ? `${base}-cleaning.ipynb` : `${base}-cleaned.${kind}`;
+  return kind === 'ipynb' ? `${base}-notebook.ipynb` : `${base}-cleaned.${kind}`;
 }

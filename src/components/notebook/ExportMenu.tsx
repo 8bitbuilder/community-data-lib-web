@@ -12,6 +12,8 @@ interface Props {
   cells: CellState[];
   exportDf: (format: 'csv' | 'xlsx') => Promise<Uint8Array>;
   disabled: boolean;
+  /** Tooltip explaining why the menu is disabled. */
+  disabledReason?: string;
 }
 
 const ITEMS: { kind: ExportKind; label: string }[] = [
@@ -28,10 +30,10 @@ function download(data: BlobPart, type: string, filename: string) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
-export default function ExportMenu({ sourceId, source, file, cells, exportDf, disabled }: Props) {
+export default function ExportMenu({ sourceId, source, file, cells, exportDf, disabled, disabledReason }: Props) {
   const uid = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -71,22 +73,23 @@ export default function ExportMenu({ sourceId, source, file, cells, exportDf, di
   async function choose(kind: ExportKind) {
     setOpen(false);
     setError('');
-    buttonRef.current?.focus();
     if (!file) return;
     const name = exportFilename(kind, sourceId);
-    if (kind === 'ipynb') {
-      const src = exportSourceFor(file, source.download?.url);
-      download(notebookJson(cells.map((c) => c.code), src, readSpecFor(file)), EXPORT_MIME.ipynb, name);
-      return;
-    }
     setBusy(true);
     try {
-      const bytes = await exportDf(kind);
-      download(new Uint8Array(bytes), EXPORT_MIME[kind], name);
+      if (kind === 'ipynb') {
+        const src = exportSourceFor(file, source.download?.url);
+        download(notebookJson(cells.map((c) => c.code), src, readSpecFor(file)), EXPORT_MIME.ipynb, name);
+      } else {
+        const bytes = await exportDf(kind);
+        download(new Uint8Array(bytes), EXPORT_MIME[kind], name);
+      }
     } catch (e) {
-      setError(`Couldn't export the data: ${errorMessage(e)}`);
+      setError(`Couldn't export: ${errorMessage(e)}`);
     } finally {
       setBusy(false);
+      // The button was disabled while exporting, so focus fell to the page; give it back.
+      requestAnimationFrame(() => buttonRef.current?.focus());
     }
   }
 
@@ -99,9 +102,13 @@ export default function ExportMenu({ sourceId, source, file, cells, exportDf, di
         aria-expanded={open}
         aria-controls={open ? `${uid}-list` : undefined}
         disabled={disabled || busy}
-        onClick={() => setOpen((o) => !o)}
+        title={disabled ? disabledReason : undefined}
+        onClick={() => {
+          setError('');
+          setOpen((o) => !o);
+        }}
       >
-        Export ▾
+        {busy ? 'Exporting…' : 'Export ▾'}
       </button>
       {open && (
         <ul className="nb-action-list nb-action-list--end" id={`${uid}-list`}>

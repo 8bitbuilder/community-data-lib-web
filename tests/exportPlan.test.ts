@@ -78,7 +78,8 @@ test('notebookJson is code-only nbformat with no outputs', () => {
 test('exportFilename and MIME types', () => {
   assert.equal(exportFilename('csv', 'census-state-pop'), 'census-state-pop-cleaned.csv');
   assert.equal(exportFilename('xlsx', 'census-state-pop'), 'census-state-pop-cleaned.xlsx');
-  assert.equal(exportFilename('ipynb', 'census-state-pop'), 'census-state-pop-cleaning.ipynb');
+  assert.equal(exportFilename('ipynb', 'census-state-pop'), 'census-state-pop-notebook.ipynb');
+  assert.equal(exportFilename('ipynb', 'we/ird id'), 'we-ird-id-notebook.ipynb');
   assert.equal(exportFilename('csv', 'we/ird id'), 'we-ird-id-cleaned.csv');
   assert.equal(EXPORT_MIME.csv, 'text/csv');
   assert.equal(EXPORT_MIME.xlsx, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

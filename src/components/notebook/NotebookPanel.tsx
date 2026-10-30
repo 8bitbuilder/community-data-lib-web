@@ -315,6 +315,7 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
     py.state === 'loading' ? py.status : py.state === 'error' ? `Python couldn't start: ${py.status}` : '';
   const statusText = [pyStatus, phase].filter(Boolean).join(' ');
   const hasCells = cells.length > 0;
+  const anyRunning = cells.some((c) => c.status === 'running');
   const uploadLayout = file?.origin === 'upload' ? file.layout : undefined;
 
   return (
@@ -409,7 +410,8 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
           file={file}
           cells={cells}
           exportDf={exportDf}
-          disabled={!hasCells}
+          disabled={!hasCells || runningAll || anyRunning}
+          disabledReason={hasCells ? 'Wait for the running cell to finish' : 'Load the data first'}
         />
         <button type="button" className="nb-btn" onClick={() => void stop()}>
           Stop
