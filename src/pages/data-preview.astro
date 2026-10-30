@@ -329,13 +329,29 @@ const catalogHref = withBasePath('/complete-catalog');
       }
     }
 
+    // While a layout change loads, lock every control that could start a competing
+    // refresh. layoutSeq only changes here, so the final exit can always re-enable.
+    let layoutSeq = 0;
+    let layoutInFlight = false;
     function setExcelControlsDisabled(disabled: boolean) {
-      if (excelSheetSelect) excelSheetSelect.disabled = disabled;
-      if (excelHeaderRowSelect) excelHeaderRowSelect.disabled = disabled;
+      for (const el of [
+        excelSheetSelect,
+        excelHeaderRowSelect,
+        stateFilter,
+        countyFilter,
+        variableFilter,
+        xVariableFilter,
+        plotTypeFilter,
+      ]) {
+        if (el) el.disabled = disabled;
+      }
     }
 
     function onExcelLayoutChange(changed: 'sheet' | 'headerRow') {
       const previous = { sheet: excelOverride.sheet, headerRow: excelOverride.headerRow };
+      const previousFilters = { state: stateFilter?.value ?? '', county: countyFilter?.value ?? '' };
+      const layoutToken = ++layoutSeq;
+      layoutInFlight = true;
       if (changed === 'sheet') {
         excelOverride.sheet = excelSheetSelect.value || undefined;
         excelOverride.headerRow = undefined; // new sheet: re-detect the header
@@ -364,7 +380,7 @@ const catalogHref = withBasePath('/complete-catalog');
             excelHeaderRowSelect.value = String(lastGoodLayout.headerRow);
           }
           try {
-            await reloadColumnsAndRefresh(token);
+            await reloadColumnsAndRefresh(token, previousFilters);
           } catch (restoreError) {
             console.warn('Could not restore the previous layout:', restoreError);
           }
@@ -373,7 +389,10 @@ const catalogHref = withBasePath('/complete-catalog');
           if (note) note.textContent = `${lastGoodNote} Couldn't load that choice: ${message}`;
         })
         .finally(() => {
-          if (token === requestSeq) setExcelControlsDisabled(false);
+          if (layoutToken === layoutSeq) {
+            layoutInFlight = false;
+            setExcelControlsDisabled(false);
+          }
         });
     }
 
@@ -391,7 +410,10 @@ const catalogHref = withBasePath('/complete-catalog');
 
     // A different sheet or header row can mean different columns, so re-derive the
     // variable and X dropdowns from a fresh sample before redrawing.
-    async function reloadColumnsAndRefresh(token: number) {
+    async function reloadColumnsAndRefresh(
+      token: number,
+      restore?: { state: string; county: string },
+    ) {
       if (currentSource) {
         setSectionLoading(true, true);
         const sample = await withStaleFallback(() =>
@@ -410,7 +432,11 @@ const catalogHref = withBasePath('/complete-catalog');
         populateVariableControls(currentSource);
         if (stateFilterWrap && !stateFilterWrap.hasAttribute('hidden')) {
           try {
-            await loadStateOptions('');
+            await loadStateOptions(restore?.state ?? '');
+            if (restore?.state && countyFilter) {
+              await loadCountyOptions(restore.state);
+              countyFilter.value = restore.county;
+            }
           } catch (filterError) {
             console.warn('Filter options unavailable:', filterError);
           }
@@ -779,6 +805,9 @@ const catalogHref = withBasePath('/complete-catalog');
     }
 
     async function refreshPreviewAndChart(tokenArg?: number | Event) {
+      // A layout change is reloading everything; a competing filter refresh would
+      // only invalidate it.
+      if (typeof tokenArg !== 'number' && layoutInFlight) return;
       const token = typeof tokenArg === 'number' ? tokenArg : ++requestSeq;
       const state = stateFilter?.value || undefined;
       const county = countyFilter?.value || undefined;
