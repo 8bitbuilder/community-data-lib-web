@@ -1,5 +1,5 @@
 function resolveApiBase(): string {
-  const configured = import.meta.env.PUBLIC_API_BASE_URL?.trim();
+  const configured = import.meta.env?.PUBLIC_API_BASE_URL?.trim();
   if (configured) return configured.replace(/\/$/, '');
   // Same origin: in dev, Astro proxies /api/* to backend/server.mjs (see astro.config.mjs);
   // on Netlify, /api/* is served by netlify/functions/preview-api.mjs.
@@ -155,7 +155,7 @@ async function apiFetch<T>(path: string): Promise<T> {
       const contentType = response.headers.get('content-type') ?? '';
       if (contentType.includes('text/html')) {
         throw new Error(
-          import.meta.env.DEV
+          import.meta.env?.DEV
             ? `API error ${response.status}: preview API not reachable. Run \`npm run backend:dev\` (port 4323) in the web repo, then reload.`
             : `API error ${response.status}: the preview service is unavailable. Please try again later.`,
         );
@@ -304,7 +304,7 @@ export function normalizeDescriptionTags(tags: BackendSource['description_tags']
     .map(([tag]) => tag);
 }
 
-export { getPedagogicalTags } from './tags';
+export { getPedagogicalTags } from './tags.ts';
 
 export function buildCatalogDescription(source: BackendSource): string {
   const provider = source.provider?.name ?? 'a government data provider';

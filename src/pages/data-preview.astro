@@ -233,6 +233,28 @@ const catalogHref = withBasePath('/complete-catalog');
       headerRow: Number.isInteger(initialHeaderRow) && initialHeaderRow >= 1 ? initialHeaderRow : undefined,
     };
     let excelStaleNotice = false;
+    // Latest request wins: older responses are dropped so the UI never disagrees
+    // with excelOverride and the URL.
+    let requestSeq = 0;
+    let lastGoodLayout = null;
+    let lastGoodNote = '';
+
+    function setSelectOptions(
+      select: HTMLSelectElement | null,
+      items: { value: string; label: string }[],
+      selected?: string,
+    ) {
+      if (!select) return;
+      select.replaceChildren(
+        ...items.map((item) => {
+          const opt = document.createElement('option');
+          opt.value = item.value;
+          opt.textContent = item.label;
+          return opt;
+        }),
+      );
+      if (selected !== undefined) select.value = selected;
+    }
 
     const ORIGIN_WORDS = {
       auto: 'auto-detected',
@@ -264,11 +286,11 @@ const catalogHref = withBasePath('/complete-catalog');
       );
       excelSheetSelect.value = layout.sheet;
       const maxRow = Math.max(20, layout.headerRow);
-      excelHeaderRowSelect.innerHTML = Array.from(
-        { length: maxRow },
-        (_, i) => `<option value="${i + 1}">${i + 1}</option>`,
-      ).join('');
-      excelHeaderRowSelect.value = String(layout.headerRow);
+      setSelectOptions(
+        excelHeaderRowSelect,
+        Array.from({ length: maxRow }, (_, i) => ({ value: String(i + 1), label: String(i + 1) })),
+        String(layout.headerRow),
+      );
 
       const origin = ORIGIN_WORDS[layout.origin?.headerRow] ?? ORIGIN_WORDS.auto;
       let text = `Read from sheet "${layout.sheet}", header on row ${layout.headerRow} (${origin}).`;
@@ -279,6 +301,8 @@ const catalogHref = withBasePath('/complete-catalog');
         text += " That sheet or header row isn't in this file anymore, so we went back to the default.";
       }
       note.textContent = text;
+      lastGoodLayout = layout;
+      lastGoodNote = text;
 
       (window as unknown as { __cdlExcelLayout?: unknown }).__cdlExcelLayout = layout;
       window.dispatchEvent(new CustomEvent('cdl:excel-layout', { detail: layout }));
@@ -305,7 +329,13 @@ const catalogHref = withBasePath('/complete-catalog');
       }
     }
 
+    function setExcelControlsDisabled(disabled: boolean) {
+      if (excelSheetSelect) excelSheetSelect.disabled = disabled;
+      if (excelHeaderRowSelect) excelHeaderRowSelect.disabled = disabled;
+    }
+
     function onExcelLayoutChange(changed: 'sheet' | 'headerRow') {
+      const previous = { sheet: excelOverride.sheet, headerRow: excelOverride.headerRow };
       if (changed === 'sheet') {
         excelOverride.sheet = excelSheetSelect.value || undefined;
         excelOverride.headerRow = undefined; // new sheet: re-detect the header
@@ -319,19 +349,55 @@ const catalogHref = withBasePath('/complete-catalog');
         countyFilter.innerHTML = '<option value="">All counties</option>';
         countyFilter.value = '';
       }
-      reloadColumnsAndRefresh().catch((err) =>
-        showError(err instanceof Error ? err.message : String(err)),
+      const token = ++requestSeq;
+      setExcelControlsDisabled(true);
+      reloadColumnsAndRefresh(token)
+        .catch(async (err) => {
+          if (token !== requestSeq) return;
+          // Keep the page usable: go back to the last layout that worked.
+          const message = err instanceof Error ? err.message : String(err);
+          excelOverride.sheet = previous.sheet;
+          excelOverride.headerRow = previous.headerRow;
+          syncExcelUrl();
+          if (lastGoodLayout) {
+            excelSheetSelect.value = lastGoodLayout.sheet;
+            excelHeaderRowSelect.value = String(lastGoodLayout.headerRow);
+          }
+          try {
+            await reloadColumnsAndRefresh(token);
+          } catch (restoreError) {
+            console.warn('Could not restore the previous layout:', restoreError);
+          }
+          if (token !== requestSeq) return;
+          const note = document.getElementById('excel-layout-note');
+          if (note) note.textContent = `${lastGoodNote} Couldn't load that choice: ${message}`;
+        })
+        .finally(() => {
+          if (token === requestSeq) setExcelControlsDisabled(false);
+        });
+    }
+
+    async function loadStateOptions(selected: string) {
+      if (!stateFilter) return;
+      const stateOptions = await withStaleFallback(() =>
+        fetchFilterOptions(sourceId, 'state', undefined, excelLayoutParams()),
+      );
+      setSelectOptions(
+        stateFilter,
+        [{ value: '', label: 'All states' }, ...stateOptions.map((o) => ({ value: o.value, label: o.label }))],
+        selected,
       );
     }
 
     // A different sheet or header row can mean different columns, so re-derive the
     // variable and X dropdowns from a fresh sample before redrawing.
-    async function reloadColumnsAndRefresh() {
+    async function reloadColumnsAndRefresh(token: number) {
       if (currentSource) {
         setSectionLoading(true, true);
         const sample = await withStaleFallback(() =>
           fetchPreview(sourceId, { limit: 200, ...excelLayoutParams() }),
         );
+        if (token !== requestSeq) return;
         currentSource.variables = sample.columns;
         currentSource.variable_report = sample.columns.map((name, colIdx) => {
           const cells = sample.rows
@@ -342,8 +408,16 @@ const catalogHref = withBasePath('/complete-catalog');
         });
         focalVariable = pickFocalVariable(currentSource);
         populateVariableControls(currentSource);
+        if (stateFilterWrap && !stateFilterWrap.hasAttribute('hidden')) {
+          try {
+            await loadStateOptions('');
+          } catch (filterError) {
+            console.warn('Filter options unavailable:', filterError);
+          }
+          if (token !== requestSeq) return;
+        }
       }
-      await refreshPreviewAndChart();
+      await refreshPreviewAndChart(token);
     }
 
     excelSheetSelect?.addEventListener('change', () => onExcelLayoutChange('sheet'));
@@ -661,12 +735,11 @@ const catalogHref = withBasePath('/complete-catalog');
 
         const uniqueVars = [...new Set(numericVars.filter(Boolean))];
         const options = uniqueVars.length > 0 ? uniqueVars : [focalVariable].filter(Boolean);
-        variableFilter.innerHTML = options
-          .map(
-            (v) =>
-              `<option value="${v}" ${v === focalVariable ? 'selected' : ''}>${v.replace(/_/g, ' ')}</option>`,
-          )
-          .join('');
+        setSelectOptions(
+          variableFilter,
+          options.map((v) => ({ value: v, label: v.replace(/_/g, ' ') })),
+          options.includes(focalVariable) ? focalVariable : undefined,
+        );
       }
 
       if (xVariableFilter) {
@@ -705,7 +778,8 @@ const catalogHref = withBasePath('/complete-catalog');
       }
     }
 
-    async function refreshPreviewAndChart() {
+    async function refreshPreviewAndChart(tokenArg?: number | Event) {
+      const token = typeof tokenArg === 'number' ? tokenArg : ++requestSeq;
       const state = stateFilter?.value || undefined;
       const county = countyFilter?.value || undefined;
       const variable = variableFilter?.value || focalVariable;
@@ -734,12 +808,13 @@ const catalogHref = withBasePath('/complete-catalog');
           ]),
         );
 
+        if (token !== requestSeq) return;
         if (preview.layout) renderExcelLayout(preview.layout);
         renderTable(preview);
         renderChart(chart, plotType);
         renderChartNote(chart, plotType);
       } finally {
-        setSectionLoading(false, false);
+        if (token === requestSeq) setSectionLoading(false, false);
       }
     }
 
@@ -854,17 +929,7 @@ const catalogHref = withBasePath('/complete-catalog');
       try {
         if (geoTags.includes('state') && stateFilter && stateFilterWrap) {
           stateFilterWrap.removeAttribute('hidden');
-          const stateOptions = await withStaleFallback(() =>
-            fetchFilterOptions(sourceId, 'state', undefined, excelLayoutParams()),
-          );
-          stateFilter.innerHTML =
-            '<option value="">All states</option>' +
-            stateOptions
-              .map(
-                (o) =>
-                  `<option value="${o.value}" ${o.value === initialStateFilter ? 'selected' : ''}>${o.label}</option>`,
-              )
-              .join('');
+          await loadStateOptions(initialStateFilter);
         } else if (stateFilterWrap) {
           stateFilterWrap.setAttribute('hidden', '');
         }
@@ -909,12 +974,11 @@ const catalogHref = withBasePath('/complete-catalog');
       const selected = pool.some((o) => o.value === preferredValue)
         ? preferredValue
         : (pool[0]?.value ?? '');
-      xVariableFilter.innerHTML = pool
-        .map(
-          (o) =>
-            `<option value="${o.value}" ${o.value === selected ? 'selected' : ''}>${o.value.replace(/_/g, ' ')}</option>`,
-        )
-        .join('');
+      setSelectOptions(
+        xVariableFilter,
+        pool.map((o) => ({ value: o.value, label: o.value.replace(/_/g, ' ') })),
+        selected,
+      );
     }
 
     const urlParams = new URLSearchParams(window.location.search);
