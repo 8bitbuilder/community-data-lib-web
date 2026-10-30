@@ -1,4 +1,5 @@
 ---
+import EditorSignIn from '@components/EditorSignIn.astro';
 import { withBasePath } from '@lib/paths';
 
 const currentPath = Astro.url.pathname;
@@ -93,6 +94,7 @@ function isDataResourcesActive(path: string): boolean {
 
     <!-- CTA + hamburger -->
     <div class="nav-actions">
+      <button type="button" class="nav-editor" data-editor-auth hidden>Editor sign in</button>
       <a href={createCommunityHref} class="nav-cta">Create A Community Library</a>
       <button
         class="mobile-menu-button"
@@ -136,8 +138,10 @@ function isDataResourcesActive(path: string): boolean {
       </li>
       <li><a href={homeHref} class={`mobile-link ${isActive(homeHref, currentPath) ? 'active' : ''}`}>Home</a></li>
       <li><a href={createCommunityHref} class="mobile-link mobile-link-cta">Create Your Community's Library →</a></li>
+      <li><button type="button" class="mobile-link mobile-editor" data-editor-auth hidden>Editor sign in</button></li>
     </ul>
   </div>
+  <EditorSignIn />
 </nav>
 
 <script>
@@ -186,7 +190,7 @@ function isDataResourcesActive(path: string): boolean {
   }
 
   .nav-container {
-    max-width: 1200px;
+    max-width: 1280px;
     margin: 0 auto;
     padding: 0 var(--space-6);
     display: flex;
@@ -241,7 +245,7 @@ function isDataResourcesActive(path: string): boolean {
     padding: 0;
   }
 
-  @media (min-width: 768px) {
+  @media (min-width: 1280px) {
     .nav-links { display: flex; }
   }
 
@@ -364,6 +368,25 @@ function isDataResourcesActive(path: string): boolean {
     flex-shrink: 0;
   }
 
+  .nav-editor {
+    display: none;
+    padding: var(--space-2) var(--space-3);
+    background: none;
+    color: var(--color-secondary);
+    border: 1.5px solid var(--color-secondary);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+
+  .nav-editor:hover {
+    background: var(--color-secondary);
+    color: #F8FAFC;
+  }
+
   .nav-cta {
     display: none;
     padding: var(--space-2) var(--space-4);
@@ -389,6 +412,7 @@ function isDataResourcesActive(path: string): boolean {
 
   @media (min-width: 640px) {
     .nav-cta { display: inline-flex; align-items: center; }
+    .nav-editor:not([hidden]) { display: inline-flex; align-items: center; }
   }
 
   /* ── Hamburger ────────────────────────────────── */
@@ -439,7 +463,7 @@ function isDataResourcesActive(path: string): boolean {
     background: var(--color-primary);
   }
 
-  @media (min-width: 768px) {
+  @media (min-width: 1280px) {
     .mobile-menu-button { display: none; }
   }
 
@@ -457,7 +481,7 @@ function isDataResourcesActive(path: string): boolean {
     display: block;
   }
 
-  @media (min-width: 768px) {
+  @media (min-width: 1280px) {
     .mobile-drawer { display: none !important; }
   }
 
@@ -533,6 +557,16 @@ function isDataResourcesActive(path: string): boolean {
     font-weight: 600;
     background: var(--color-primary-glow);
   }
+
+  .mobile-editor {
+    width: 100%;
+    background: none;
+    border: 0;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .mobile-editor[hidden] { display: none; }
 
   .mobile-link-cta {
     color: var(--color-primary);

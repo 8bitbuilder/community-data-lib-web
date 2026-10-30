@@ -1,13 +1,20 @@
 # Metadata editor (magic-link sign-in)
 
-Approved editors can sign in on `/web/data-preview` and submit dataset-metadata edits.
+Approved editors sign in from the "Editor sign in" button in the main navbar, then submit dataset-metadata
+edits from `/web/data-preview`.
 Each edit opens a pull request on `community-data-libraries/backend`; merging it rebuilds the
 Netlify site. Works on the Netlify deployment only.
 
-Sign-in links open a confirm page, and the "Sign in" button completes sign-in (this protects
-single-use links from email scanners). The sign-in control shows on `/web/data-preview` even when
-no dataset is selected. If GitHub is unavailable, the editor shows a "try again" message and nothing
-is saved.
+The button opens a pop-up that asks for an email. Sign-in links open a confirm page, and the
+"Sign in" button completes sign-in (this protects single-use links from email scanners). The button
+stays hidden where the login service isn't running or can't start: GitHub Pages, `astro dev`, and
+Netlify sites missing a required variable. It also isn't on pages using `CommunityLayout`, which has
+its own navbar. If GitHub is unavailable, the editor shows a "try again" message and nothing is saved.
+
+The pop-up reports why a sign-in request failed: the email isn't on the approved list (403), too
+many attempts (429), or the email couldn't be sent (502). This is a deliberate change from the
+original design, which gave the same response in every case. Anyone can now test whether an address is
+approved, limited by 3 requests per email per 15 minutes and 20 per IP per hour.
 
 Design: `backend/docs/superpowers/specs/2026-10-14-metadata-editor-auth-design.md`.
 
@@ -68,8 +75,9 @@ variables above in `.env`, `SITE_ORIGIN=http://localhost:8888`, and `GITHUB_REPO
 
 ## Troubleshooting
 
-- No email arrives: check `RESEND_API_KEY`, `MAIL_FROM`, Resend domain verification, and the function logs
-  (`auth-request-link: email failed`).
+- "We couldn't send the email": check `RESEND_API_KEY`, `MAIL_FROM`, Resend domain verification, and the function
+  logs (`auth-request-link: email failed`).
+- The pop-up says to check your email but nothing arrives: Resend accepted it, so check spam and the Resend dashboard.
 - "GitHub is unavailable" on every edit: check that `GITHUB_TOKEN` has the right scope and has not expired, and that
   `GITHUB_REPO` is correct.
 - "Bad origin" or sign-in disabled: `SITE_ORIGIN` must exactly match the site's origin. Deploy previews have a
