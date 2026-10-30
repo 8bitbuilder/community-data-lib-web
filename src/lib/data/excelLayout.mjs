@@ -17,7 +17,9 @@ export class LayoutError extends Error {
 }
 
 const HEADER_SCAN_ROWS = 20;
-const NOTE_RE = /^(note|source|footnote|\*|\(x\)|\d+[.)])/i;
+// A lone cell starting like a footnote ends the data region. Whole words only, so
+// "Notebook sales" or "1.5 acres" stay data; "Sources of income" is a section label.
+const NOTE_RE = /^((notes?|sources?|footnotes?)\b(?!\s+of\b)|\*|\(x\)|\d+[.)]\s)/i;
 
 const isBlankRow = (row) => row.every((c) => c === '');
 const nonEmptyCount = (row) => row.reduce((n, c) => n + (c === '' ? 0 : 1), 0);

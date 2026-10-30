@@ -103,6 +103,28 @@ test('findDataEnd stops at footnotes and double blank rows', () => {
   assert.equal(findDataEnd(g3, 0), 2);
 });
 
+test('findDataEnd: footnote words must be whole words; real notes still end the data', () => {
+  const grid = (last: string) => [['Item', 'Value'], ['a', '1'], [last, ''], ['b', '2']];
+  for (const data of ['1.5 acres', 'Sources of income', 'Notebook computers', 'Notation', '2020', '12)abc']) {
+    assert.equal(findDataEnd(grid(data), 0), 4, data);
+  }
+  for (const note of [
+    'Note: values are rounded',
+    'Notes',
+    'NOTE - preliminary',
+    'Source: U.S. Census Bureau',
+    'Sources: BLS, BEA',
+    'Footnote 3',
+    'Footnotes:',
+    '* Estimate',
+    '(X) Not applicable',
+    '1. Estimates are subject to revision.',
+    '2) Revised',
+  ]) {
+    assert.equal(findDataEnd(grid(note), 0), 2, note);
+  }
+});
+
 test('sheet ranges not starting at A1 keep Excel row/column numbering', () => {
   const { headers, rows, layout } = readExcelTable(fx('offset-range.xlsx'));
   assert.equal(layout.headerRow, 3);
