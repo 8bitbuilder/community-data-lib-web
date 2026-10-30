@@ -13,6 +13,8 @@ export interface CellProps {
   /** The load cell (index 0) can't be moved or deleted. */
   isLoad: boolean;
   autoFocus?: boolean;
+  /** True while Run all is in progress: single runs are refused. */
+  runDisabled?: boolean;
   onChange: (code: string) => void;
   onRun: () => void;
   onMoveUp: () => void;
@@ -101,6 +103,7 @@ export default function Cell(props: CellProps) {
             type="button"
             className="nb-btn nb-btn--primary"
             onClick={props.onRun}
+            disabled={props.runDisabled}
             aria-label={`Run cell ${n}`}
             title="Run (Shift+Enter)"
           >

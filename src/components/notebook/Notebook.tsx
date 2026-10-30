@@ -1,12 +1,30 @@
 // "Clean this data" section on the Data Preview page. This file stays light: the
 // notebook itself (CodeMirror, Pyodide worker, SheetJS) is a separate chunk that
 // is only downloaded when the visitor clicks "Open notebook".
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { fetchSource, type BackendSource } from '@lib/api/backend';
 import { previewUnavailableReason } from '@lib/data/previewSupport';
 import './notebook.css';
 
 const NotebookPanel = lazy(() => import('./NotebookPanel'));
+
+/** Catches a failed chunk download or a render error in the notebook. */
+class NotebookErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    if (this.state.failed) {
+      return (
+        <p className="nb-error-text" role="alert">
+          Couldn&apos;t load the notebook. Reload the page.
+        </p>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function sourceIdFromUrl(): string {
   return new URLSearchParams(window.location.search).get('source')?.trim() ?? '';
@@ -41,9 +59,11 @@ export default function Notebook() {
         Clean this data
       </h2>
       {open ? (
-        <Suspense fallback={<p className="nb-status">Loading notebook…</p>}>
-          <NotebookPanel sourceId={sourceId} source={source} />
-        </Suspense>
+        <NotebookErrorBoundary>
+          <Suspense fallback={<p className="nb-status">Loading notebook…</p>}>
+            <NotebookPanel sourceId={sourceId} source={source} />
+          </Suspense>
+        </NotebookErrorBoundary>
       ) : (
         <div className="nb-intro">
           <p>Write and run Python (pandas) right here. The first time takes a few seconds to load.</p>

@@ -68,13 +68,15 @@ export function TableView({
 export default function DataView({ info }: { info: DfInfo | null | undefined }) {
   if (info === undefined) return null;
   return (
-    <div className="nb-dataview" aria-live="polite">
+    <div className="nb-dataview">
       <h3 className="nb-subtitle">Your data (df)</h3>
       {info === null ? (
-        <p className="nb-muted">df isn&apos;t a table right now.</p>
+        <p className="nb-muted" aria-live="polite">
+          df isn&apos;t a table right now.
+        </p>
       ) : (
         <>
-          <p className="nb-shape">
+          <p className="nb-shape" aria-live="polite">
             {info.rows.toLocaleString()} rows × {info.cols.toLocaleString()} columns
           </p>
           <TableView

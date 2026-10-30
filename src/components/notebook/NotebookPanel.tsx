@@ -1,39 +1,30 @@
 // The notebook itself, loaded lazily by Notebook.tsx when "Open notebook" is clicked.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, fetchSourceFile, type BackendSource, type ExcelLayout } from '@lib/api/backend';
-import { loadCell, type FileFormat, type ReadSpec } from './codegen';
+import { clearSaved, loadSavedCode, markStaleFrom, newCell, restoreCells, saveCode, type CellState } from './notebookStore';
 import {
-  clearSaved,
-  loadSavedCode,
-  markStaleFrom,
-  newCell,
-  restoreCells,
-  saveCode,
-  type CellState,
-} from './notebookStore';
+  detectEncoding,
+  errorMessage,
+  isExcel,
+  loadCodeFor,
+  textFormat,
+  uploadKind,
+  type NotebookFile,
+} from './notebookFiles';
+import { catalogLayout, readLayout } from './notebookExcel';
 import { safeFileName } from './pyodideProtocol';
 import { usePyodide, type DfInfo } from './usePyodide';
+import { useNotebookRunner } from './useNotebookRunner';
 import Cell from './Cell';
 import DataView from './DataView';
-import UploadZone from './UploadZone';
+import UploadZone, { UNSUPPORTED_FILE } from './UploadZone';
 
-/** The file currently loaded into Python's filesystem. */
-export interface NotebookFile {
-  origin: 'catalog' | 'upload';
-  filename: string;
-  bytes: Uint8Array;
-  format: FileFormat;
-  /** Catalog files only: the server unzipped this file from a zip download. */
-  archive: 'zip' | null;
-  encoding?: 'utf-8' | 'latin-1';
-  /** Excel only: the sheet / header row / data region the load cell reads. */
-  layout?: ExcelLayout;
-}
+export type { NotebookFile } from './notebookFiles';
 
 /** What the Task 10 "+ Cleaning step ▾" menu needs from the notebook. */
 export interface CleaningSlotProps {
   dfInfo: DfInfo | null | undefined;
-  /** Inserts a cell after the focused cell (or at the end) and runs it. */
+  /** Inserts a cell after the focused cell (or at the end) and runs it. Ignored during Run all. */
   insertCellAndRun: (code: string) => void;
   disabled: boolean;
 }
@@ -71,95 +62,15 @@ const TOO_LARGE =
 const RESTARTED = 'Python restarted. Run the cells again to rebuild df.';
 const LAYOUT_CHANGED = "The preview's sheet or header row changed. Reload data and re-run all steps?";
 
-function isExcel(format: FileFormat): boolean {
-  return format === 'xlsx' || format === 'xls';
-}
-
-function detectEncoding(bytes: Uint8Array): 'utf-8' | 'latin-1' {
-  try {
-    new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-    return 'utf-8';
-  } catch {
-    return 'latin-1';
-  }
-}
-
-function readSpecFor(file: NotebookFile): ReadSpec {
-  if (isExcel(file.format) && file.layout) {
-    const l = file.layout;
-    return {
-      format: file.format,
-      sheet: l.sheet,
-      headerRow: l.headerRow,
-      dataRowCount: l.dataRowCount,
-      trimmedRows: l.trimmedRows,
-    };
-  }
-  return { format: file.format, encoding: file.encoding };
-}
-
-function loadCodeFor(file: NotebookFile): string {
-  return loadCell({ kind: 'file', filename: file.filename }, readSpecFor(file));
-}
-
-function errorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
-type ExcelModule = typeof import('@lib/data/excelLayout.mjs');
-let excelModule: Promise<ExcelModule> | null = null;
-function loadExcelModule(): Promise<ExcelModule> {
-  excelModule ??= import('@lib/data/excelLayout.mjs');
-  return excelModule;
-}
-
-async function readLayout(
-  bytes: Uint8Array,
-  options: Parameters<ExcelModule['readExcelTable']>[1],
-): Promise<ExcelLayout> {
-  const { readExcelTable } = await loadExcelModule();
-  return readExcelTable(bytes, options).layout as ExcelLayout;
-}
-
-function pageExcelLayout(): ExcelLayout | undefined {
-  return (window as unknown as { __cdlExcelLayout?: ExcelLayout }).__cdlExcelLayout;
-}
-
-/** The catalog file's Excel layout: the preview's, or worked out here if the preview hasn't loaded. */
-async function catalogLayout(bytes: Uint8Array, source: BackendSource): Promise<ExcelLayout> {
-  const fromPage = pageExcelLayout();
-  if (fromPage) return fromPage;
-  const params = new URLSearchParams(window.location.search);
-  const headerRow = Number.parseInt(params.get('header_row') ?? '', 10);
-  return readLayout(bytes, {
-    visitor: {
-      sheet: params.get('sheet') || undefined,
-      headerRow: Number.isInteger(headerRow) && headerRow > 0 ? headerRow : undefined,
-    },
-    curator: { sheet: source.download?.sheet, headerRow: source.download?.header_row },
-  });
-}
-
-function textFormat(name: string, bytes: Uint8Array): 'csv' | 'tsv' {
-  const lower = name.toLowerCase();
-  if (lower.endsWith('.tsv')) return 'tsv';
-  if (lower.endsWith('.txt')) {
-    const firstLine = new TextDecoder('latin1').decode(bytes.subarray(0, 4096)).split(/\r?\n/)[0] ?? '';
-    if (firstLine.includes('\t') && !firstLine.includes(',')) return 'tsv';
-  }
-  return 'csv';
-}
-
 export default function NotebookPanel({ sourceId, source }: { sourceId: string; source: BackendSource }) {
   const py = usePyodide();
   const { start, writeFile, run, restart, exportDf } = py;
 
-  const [cells, setCellsState] = useState<CellState[]>([]);
-  const cellsRef = useRef<CellState[]>([]);
-  const setCells = useCallback((fn: (cells: CellState[]) => CellState[]) => {
-    cellsRef.current = fn(cellsRef.current);
-    setCellsState(cellsRef.current);
-  }, []);
+  const [notice, setNotice] = useState('');
+  const clearNotice = useCallback(() => setNotice(''), []);
+  const runner = useNotebookRunner(run, clearNotice);
+  const { cells, cellsRef, setCells, dfInfo, setDfInfo, runningAll, generation, cancel, runCellById, runCell, runAll } =
+    runner;
 
   const [file, setFileState] = useState<NotebookFile | null>(null);
   const fileRef = useRef<NotebookFile | null>(null);
@@ -168,71 +79,19 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
     setFileState(f);
   }, []);
 
-  const [dfInfo, setDfInfo] = useState<DfInfo | null | undefined>(undefined);
   const [phase, setPhase] = useState('');
   const [loadError, setLoadError] = useState('');
-  const [notice, setNotice] = useState('');
   const [runAllHint, setRunAllHint] = useState(false);
-  const [runningAll, setRunningAll] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [pendingLayout, setPendingLayout] = useState<ExcelLayout | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
 
-  // Bumped by Stop/Reset so results from before it are ignored.
-  const generation = useRef(0);
-
-  const runCellById = useCallback(
-    async (id: string): Promise<boolean> => {
-      const gen = generation.current;
-      const index = cellsRef.current.findIndex((c) => c.id === id);
-      if (index < 0) return false;
-      const code = cellsRef.current[index].code;
-      setNotice('');
-      setCells((cs) => markStaleFrom(cs, index).map((c) => (c.id === id ? { ...c, status: 'running' } : c)));
-      try {
-        const result = await run(code);
-        if (gen !== generation.current) return false;
-        const ok = !result.output.error;
-        setCells((cs) =>
-          cs.map((c) => (c.id === id ? { ...c, status: ok ? 'ok' : 'error', output: result.output } : c)),
-        );
-        setDfInfo(result.dfInfo);
-        return ok;
-      } catch (e) {
-        if (gen !== generation.current) return false;
-        const message = errorMessage(e);
-        setCells((cs) =>
-          cs.map((c) =>
-            c.id === id
-              ? { ...c, status: 'error', output: { stdout: '', error: { name: 'Error', message, traceback: message } } }
-              : c,
-          ),
-        );
-        return false;
-      }
-    },
-    [run, setCells],
-  );
-
-  const runAll = useCallback(async () => {
-    const gen = generation.current;
-    setRunAllHint(false);
-    setRunningAll(true);
-    try {
-      for (const id of cellsRef.current.map((c) => c.id)) {
-        if (gen !== generation.current) break;
-        if (!(await runCellById(id))) break;
-      }
-    } finally {
-      if (gen === generation.current) setRunningAll(false);
-    }
-  }, [runCellById]);
-
   /** Puts a file into Python and makes the load cell read it, then runs the load cell. */
   const loadFile = useCallback(
     async (f: NotebookFile) => {
+      cancel(); // stops a Run all in progress; its later cells must not run against the new df
       setFile(f);
       setPendingLayout(null);
       const code = loadCodeFor(f);
@@ -248,14 +107,17 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
       try {
         await writeFile(f.filename, f.bytes);
       } catch (e) {
-        if (gen === generation.current) setLoadError(`Couldn't load the dataset: ${errorMessage(e)}`);
+        if (gen === generation.current) {
+          setLoadError(`Couldn't load the dataset: ${errorMessage(e)}`);
+          setUploadOpen(true);
+        }
         return;
       }
       if (gen !== generation.current) return;
       const first = cellsRef.current[0];
       if (first) await runCellById(first.id);
     },
-    [runCellById, setCells, setFile, sourceId, writeFile],
+    [cancel, cellsRef, generation, runCellById, setCells, setFile, sourceId, writeFile],
   );
 
   // On open: start Python and fetch the catalog file in parallel.
@@ -278,7 +140,8 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
         if (isExcel(f.format)) f.layout = await catalogLayout(res.bytes, source);
         else f.encoding = detectEncoding(res.bytes);
         setPhase('');
-        await loadFile(f);
+        // The visitor may have uploaded their own file while this was downloading.
+        if (!fileRef.current) await loadFile(f);
       } catch (e) {
         setPhase('');
         setLoadError(
@@ -296,19 +159,16 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
       const f = fileRef.current;
       if (!layout || !f || f.origin !== 'catalog' || !isExcel(f.format)) return;
       const code = loadCodeFor({ ...f, layout });
-      if (code === cellsRef.current[0]?.code) {
-        setPendingLayout(null);
-        return;
-      }
-      setPendingLayout(layout);
+      setPendingLayout(code === cellsRef.current[0]?.code ? null : layout);
     };
     window.addEventListener('cdl:excel-layout', onLayout);
     return () => window.removeEventListener('cdl:excel-layout', onLayout);
-  }, []);
+  }, [cellsRef]);
 
   function reloadWithLayout() {
     const f = fileRef.current;
     if (!f || !pendingLayout) return;
+    cancel(); // so the Run all below is the only one running
     const next = { ...f, layout: pendingLayout };
     setFile(next);
     setPendingLayout(null);
@@ -328,7 +188,7 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
       dirty.current = false;
     }, 500);
     return () => window.clearTimeout(t);
-  }, [codeKey, sourceId]);
+  }, [cellsRef, codeKey, sourceId]);
   useEffect(() => {
     const flush = () => {
       if (dirty.current && cellsRef.current.length) saveCode(sourceId, cellsRef.current);
@@ -338,7 +198,7 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
       window.removeEventListener('pagehide', flush);
       flush();
     };
-  }, [sourceId]);
+  }, [cellsRef, sourceId]);
 
   function changeCode(id: string, code: string) {
     const index = cellsRef.current.findIndex((c) => c.id === id);
@@ -367,23 +227,17 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
     setFocusId(cell.id);
   }
 
-  const insertCellAndRun = useCallback(
-    (code: string) => {
-      const cell = newCell(code);
-      setCells((cs) => {
-        const at = cs.findIndex((c) => c.id === activeId);
-        const index = at < 0 ? cs.length : at + 1;
-        return [...cs.slice(0, index), cell, ...cs.slice(index)];
-      });
-      void runCellById(cell.id);
-    },
-    [activeId, runCellById, setCells],
-  );
+  const insertAfter = runner.insertCellAndRun;
+  const insertCellAndRun = useCallback((code: string) => insertAfter(code, activeId), [activeId, insertAfter]);
 
   async function stop() {
-    generation.current += 1;
-    setRunningAll(false);
-    await restart();
+    cancel();
+    try {
+      await restart();
+    } catch (e) {
+      setLoadError(`Python couldn't restart: ${errorMessage(e)}`);
+      return;
+    }
     setCells((cs) => cs.map((c) => ({ ...c, status: 'stale' })));
     setDfInfo(undefined);
     setNotice(RESTARTED);
@@ -395,8 +249,7 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
 
   function reset() {
     if (!window.confirm('Delete all your cells and start again from the load cell?')) return;
-    generation.current += 1;
-    setRunningAll(false);
+    cancel();
     setRunAllHint(false);
     setNotice('');
     clearSaved(sourceId);
@@ -417,26 +270,24 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
       setUploadError("That file name can't be used. Rename the file and try again.");
       return;
     }
-    const bytes = new Uint8Array(await upload.arrayBuffer());
-    const lower = filename.toLowerCase();
+    const kind = uploadKind(filename);
+    if (!kind) {
+      setUploadError(UNSUPPORTED_FILE);
+      return;
+    }
     let f: NotebookFile;
-    if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) {
-      try {
+    try {
+      const bytes = new Uint8Array(await upload.arrayBuffer());
+      if (kind === 'excel') {
         const layout = await readLayout(bytes, {});
         f = { origin: 'upload', filename, bytes, format: layout.format, archive: null, layout };
-      } catch (e) {
-        setUploadError(`Couldn't read that Excel file: ${errorMessage(e)}`);
-        return;
+      } else {
+        const format = textFormat(filename, bytes);
+        f = { origin: 'upload', filename, bytes, format, archive: null, encoding: detectEncoding(bytes) };
       }
-    } else {
-      f = {
-        origin: 'upload',
-        filename,
-        bytes,
-        format: textFormat(filename, bytes),
-        archive: null,
-        encoding: detectEncoding(bytes),
-      };
+    } catch (e) {
+      setUploadError(`Couldn't read that file: ${errorMessage(e)}`);
+      return;
     }
     setLoadError('');
     setUploadOpen(false);
@@ -454,6 +305,7 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
       setUploadError(`Couldn't read that sheet: ${errorMessage(e)}`);
       return;
     }
+    cancel(); // stops a Run all in progress before the load cell changes
     setUploadError('');
     const next = { ...f, layout };
     setFile(next);
@@ -539,7 +391,10 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
         <button
           type="button"
           className="nb-btn nb-btn--primary"
-          onClick={() => void runAll()}
+          onClick={() => {
+            setRunAllHint(false);
+            void runAll();
+          }}
           disabled={!hasCells || runningAll}
         >
           Run all
@@ -547,7 +402,11 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
         <button type="button" className="nb-btn" onClick={addCodeCell} disabled={!hasCells}>
           + Code cell
         </button>
-        <CleaningStepSlot dfInfo={dfInfo} insertCellAndRun={insertCellAndRun} disabled={!hasCells} />
+        <CleaningStepSlot
+          dfInfo={dfInfo}
+          insertCellAndRun={insertCellAndRun}
+          disabled={!hasCells || runningAll}
+        />
         <ExportSlot
           sourceId={sourceId}
           source={source}
@@ -578,8 +437,9 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
             count={cells.length}
             isLoad={i === 0}
             autoFocus={cell.id === focusId}
+            runDisabled={runningAll}
             onChange={(code) => changeCode(cell.id, code)}
-            onRun={() => void runCellById(cell.id)}
+            onRun={() => runCell(cell.id)}
             onMoveUp={() => moveCell(i, -1)}
             onMoveDown={() => moveCell(i, 1)}
             onDelete={() => deleteCell(i)}
