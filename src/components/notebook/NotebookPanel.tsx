@@ -15,6 +15,7 @@ import { catalogLayout, readLayout } from './notebookExcel';
 import { safeFileName } from './pyodideProtocol';
 import { usePyodide, type DfInfo } from './usePyodide';
 import { useNotebookRunner } from './useNotebookRunner';
+import ActionMenu from './ActionMenu';
 import Cell from './Cell';
 import DataView from './DataView';
 import UploadZone, { UNSUPPORTED_FILE } from './UploadZone';
@@ -39,12 +40,14 @@ export interface ExportSlotProps {
   disabled: boolean;
 }
 
-// Placeholder for Task 10, which replaces this with the guided-actions menu.
-function CleaningStepSlot(_props: CleaningSlotProps) {
+function CleaningStepSlot({ dfInfo, insertCellAndRun, disabled }: CleaningSlotProps) {
   return (
-    <button type="button" className="nb-btn" disabled title="Coming soon">
-      + Cleaning step ▾
-    </button>
+    <ActionMenu
+      columns={dfInfo?.columns ?? []}
+      rows={dfInfo?.rows ?? 0}
+      disabled={disabled || !dfInfo}
+      onInsert={insertCellAndRun}
+    />
   );
 }
 
