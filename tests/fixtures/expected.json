@@ -1,0 +1,58 @@
+{
+  "clean.xlsx": {
+    "sheet": "Sheet1",
+    "headerRow": 1,
+    "dataRowCount": 3,
+    "headers": [
+      "Name",
+      "Count",
+      "Share"
+    ],
+    "rowCount": 3
+  },
+  "title-rows.xlsx": {
+    "sheet": "Estimates",
+    "headerRow": 4,
+    "dataRowCount": 5,
+    "headers": [
+      "Area",
+      "2020",
+      "2021"
+    ],
+    "rowCount": 5
+  },
+  "notes-first.xlsx": {
+    "sheet": "Data",
+    "headerRow": 1,
+    "dataRowCount": 3,
+    "headers": [
+      "County",
+      "Pop",
+      "Area"
+    ],
+    "rowCount": 3
+  },
+  "blank-dup-headers.xlsx": {
+    "sheet": "Sheet1",
+    "headerRow": 1,
+    "dataRowCount": 2,
+    "headers": [
+      "State",
+      "Unnamed: 1",
+      "Pop",
+      "Pop.1"
+    ],
+    "rowCount": 2
+  },
+  "legacy.xls": {
+    "sheet": "Sheet1",
+    "headerRow": 1,
+    "dataRowCount": 3,
+    "headers": [
+      "Name",
+      "Count",
+      "Share"
+    ],
+    "rowCount": 3
+  }
+}
