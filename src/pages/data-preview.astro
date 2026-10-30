@@ -153,6 +153,19 @@ const catalogHref = withBasePath('/complete-catalog');
       </div>
 
       <div class="table-panel panel-card">
+        <div class="excel-layout-bar" id="excel-layout-bar" hidden>
+          <div class="excel-layout-controls">
+            <label class="filter-control">
+              <span>Sheet</span>
+              <select id="excel-sheet"></select>
+            </label>
+            <label class="filter-control">
+              <span>Header row</span>
+              <select id="excel-header-row"></select>
+            </label>
+          </div>
+          <p class="excel-layout-note" id="excel-layout-note" role="status"></p>
+        </div>
         <div class="table-header">
           <h2 class="section-title">Geographically filtered data preview</h2>
           <p class="table-meta" id="table-meta"></p>
@@ -176,6 +189,7 @@ const catalogHref = withBasePath('/complete-catalog');
       fetchChart,
       fetchFilterOptions,
       fetchSources,
+      ApiError,
       buildCatalogDescription,
       normalizeDescriptionTags,
       getPedagogicalTags,
@@ -208,6 +222,134 @@ const catalogHref = withBasePath('/complete-catalog');
     const stateFilterWrap = document.getElementById('state-filter-wrap');
     const countyFilterWrap = document.getElementById('county-filter-wrap');
 
+    const excelSheetSelect = document.getElementById('excel-sheet') as HTMLSelectElement;
+    const excelHeaderRowSelect = document.getElementById('excel-header-row') as HTMLSelectElement;
+
+    // Visitor's sheet / header-row choice for Excel sources, seeded from the URL.
+    const initialUrlParams = new URLSearchParams(window.location.search);
+    const initialHeaderRow = Number.parseInt(initialUrlParams.get('header_row') ?? '', 10);
+    const excelOverride: { sheet: string | undefined; headerRow: number | undefined } = {
+      sheet: initialUrlParams.get('sheet') || undefined,
+      headerRow: Number.isInteger(initialHeaderRow) && initialHeaderRow >= 1 ? initialHeaderRow : undefined,
+    };
+    let excelStaleNotice = false;
+
+    const ORIGIN_WORDS = {
+      auto: 'auto-detected',
+      curator: 'set by curator',
+      visitor: 'your choice',
+    };
+
+    function syncExcelUrl() {
+      const url = new URL(window.location.href);
+      if (excelOverride.sheet) url.searchParams.set('sheet', excelOverride.sheet);
+      else url.searchParams.delete('sheet');
+      if (excelOverride.headerRow) url.searchParams.set('header_row', String(excelOverride.headerRow));
+      else url.searchParams.delete('header_row');
+      history.replaceState(null, '', url);
+    }
+
+    function renderExcelLayout(layout) {
+      const bar = document.getElementById('excel-layout-bar');
+      const note = document.getElementById('excel-layout-note');
+      if (!bar || !note || !excelSheetSelect || !excelHeaderRowSelect) return;
+      bar.removeAttribute('hidden');
+      excelSheetSelect.replaceChildren(
+        ...layout.sheets.map((name) => {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          return opt;
+        }),
+      );
+      excelSheetSelect.value = layout.sheet;
+      const maxRow = Math.max(20, layout.headerRow);
+      excelHeaderRowSelect.innerHTML = Array.from(
+        { length: maxRow },
+        (_, i) => `<option value="${i + 1}">${i + 1}</option>`,
+      ).join('');
+      excelHeaderRowSelect.value = String(layout.headerRow);
+
+      const origin = ORIGIN_WORDS[layout.origin?.headerRow] ?? ORIGIN_WORDS.auto;
+      let text = `Read from sheet "${layout.sheet}", header on row ${layout.headerRow} (${origin}).`;
+      if (layout.trimmedRows > 0) {
+        text += ` ${layout.trimmedRows} note rows at the bottom were skipped.`;
+      }
+      if (excelStaleNotice) {
+        text += " That sheet or header row isn't in this file anymore, so we went back to the default.";
+      }
+      note.textContent = text;
+
+      (window as unknown as { __cdlExcelLayout?: unknown }).__cdlExcelLayout = layout;
+      window.dispatchEvent(new CustomEvent('cdl:excel-layout', { detail: layout }));
+    }
+
+    // A shared link may name a sheet or header row that no longer exists. Drop the
+    // override and retry once with the default layout.
+    async function withStaleFallback<T>(run: () => Promise<T>): Promise<T> {
+      try {
+        return await run();
+      } catch (error) {
+        const code = error instanceof ApiError ? error.body?.code : undefined;
+        const stale =
+          error instanceof ApiError &&
+          error.status === 400 &&
+          (code === 'UNKNOWN_SHEET' || code === 'HEADER_OUT_OF_RANGE') &&
+          (excelOverride.sheet || excelOverride.headerRow);
+        if (!stale) throw error;
+        excelOverride.sheet = undefined;
+        excelOverride.headerRow = undefined;
+        excelStaleNotice = true;
+        syncExcelUrl();
+        return run();
+      }
+    }
+
+    function onExcelLayoutChange(changed: 'sheet' | 'headerRow') {
+      if (changed === 'sheet') {
+        excelOverride.sheet = excelSheetSelect.value || undefined;
+        excelOverride.headerRow = undefined; // new sheet: re-detect the header
+      } else {
+        excelOverride.headerRow = Number.parseInt(excelHeaderRowSelect.value, 10) || undefined;
+      }
+      excelStaleNotice = false;
+      syncExcelUrl();
+      if (stateFilter) stateFilter.value = '';
+      if (countyFilter) {
+        countyFilter.innerHTML = '<option value="">All counties</option>';
+        countyFilter.value = '';
+      }
+      reloadColumnsAndRefresh().catch((err) =>
+        showError(err instanceof Error ? err.message : String(err)),
+      );
+    }
+
+    // A different sheet or header row can mean different columns, so re-derive the
+    // variable and X dropdowns from a fresh sample before redrawing.
+    async function reloadColumnsAndRefresh() {
+      if (currentSource) {
+        setSectionLoading(true, true);
+        const sample = await withStaleFallback(() =>
+          fetchPreview(sourceId, { limit: 200, ...excelLayoutParams() }),
+        );
+        currentSource.variables = sample.columns;
+        currentSource.variable_report = sample.columns.map((name, colIdx) => {
+          const cells = sample.rows
+            .map((row) => row[colIdx])
+            .filter((cell) => String(cell ?? '').trim() !== '');
+          const numeric = cells.length > 0 && cells.every(isNumericCell);
+          return { name, type: numeric ? 'float' : 'string' };
+        });
+        focalVariable = pickFocalVariable(currentSource);
+        populateVariableControls(currentSource);
+      }
+      await refreshPreviewAndChart();
+    }
+
+    excelSheetSelect?.addEventListener('change', () => onExcelLayoutChange('sheet'));
+    excelHeaderRowSelect?.addEventListener('change', () => onExcelLayoutChange('headerRow'));
+
+    let currentSource = null;
     let chartInstance = null;
     // Full X-variable option list (value + numeric flag), captured once per source
     // so the dropdown can be narrowed to numeric-only columns when Plot Type is Scatter.
@@ -239,7 +381,9 @@ const catalogHref = withBasePath('/complete-catalog');
     // a sample of the data itself: a column is numeric when every non-blank cell is.
     async function ensureSourceVariables(source) {
       if (getSourceVariables(source).length > 0 || source.variable_report?.length) return;
-      const sample = await fetchPreview(sourceId, { limit: 200 });
+      const sample = await withStaleFallback(() =>
+        fetchPreview(sourceId, { limit: 200, ...excelLayoutParams() }),
+      );
       source.variables = sample.columns;
       source.variable_report = sample.columns.map((name, colIdx) => {
         const cells = sample.rows
@@ -258,6 +402,10 @@ const catalogHref = withBasePath('/complete-catalog');
     function showPreviewContent() {
       loadingState?.setAttribute('hidden', '');
       previewContent?.removeAttribute('hidden');
+    }
+
+    function excelLayoutParams() {
+      return { sheet: excelOverride.sheet, headerRow: excelOverride.headerRow };
     }
 
     function setSectionLoading(chartLoading, tableLoading) {
@@ -504,11 +652,51 @@ const catalogHref = withBasePath('/complete-catalog');
       }
     }
 
+    function populateVariableControls(source) {
+      if (variableFilter) {
+        const numericVars =
+          source.variable_report
+            ?.filter((v) => v.type === 'integer' || v.type === 'float')
+            .map((v) => v.name) ?? getSourceVariables(source);
+
+        const uniqueVars = [...new Set(numericVars.filter(Boolean))];
+        const options = uniqueVars.length > 0 ? uniqueVars : [focalVariable].filter(Boolean);
+        variableFilter.innerHTML = options
+          .map(
+            (v) =>
+              `<option value="${v}" ${v === focalVariable ? 'selected' : ''}>${v.replace(/_/g, ' ')}</option>`,
+          )
+          .join('');
+      }
+
+      if (xVariableFilter) {
+        const report = source.variable_report ?? [];
+        const allCols = getSourceVariables(source);
+        const numericNames = new Set(
+          report.filter((v) => v.type === 'integer' || v.type === 'float').map((v) => v.name),
+        );
+        // Non-numeric (label/time) columns first, then numeric
+        const nonNumeric = report
+          .filter((v) => !numericNames.has(v.name))
+          .map((v) => v.name)
+          .filter((n) => allCols.includes(n));
+        const numeric = [...numericNames].filter((n) => allCols.includes(n));
+        const ordered = [...new Set([...nonNumeric, ...numeric, ...allCols])];
+        const xOptions = ordered.length > 0 ? ordered : allCols;
+        xVariableOptions = xOptions.map((v) => ({ value: v, numeric: numericNames.has(v) }));
+        // Auto-detect default X: first temporal column or first column
+        const temporalNames = ['YEAR', 'DATE', 'PERIOD', 'TIMEPERIOD_NAME'];
+        const defaultX =
+          xOptions.find((v) => temporalNames.includes(v.toUpperCase())) ?? xOptions[0] ?? '';
+        renderXVariableOptions(plotTypeFilter?.value || 'bar', defaultX);
+      }
+    }
+
     async function loadCountyOptions(currentState) {
       if (!countyFilter) return;
       countyFilter.innerHTML = '<option value="">All counties</option>';
       if (!currentState) return;
-      const options = await fetchFilterOptions(sourceId, 'county', currentState);
+      const options = await fetchFilterOptions(sourceId, 'county', currentState, excelLayoutParams());
       for (const opt of options) {
         const el = document.createElement('option');
         el.value = opt.value;
@@ -526,22 +714,27 @@ const catalogHref = withBasePath('/complete-catalog');
 
       setSectionLoading(true, true);
       try {
-        const [preview, chart] = await Promise.all([
-          fetchPreview(sourceId, {
-            state,
-            county,
-            limit: 25,
-          }),
-          fetchChart(sourceId, {
-            state,
-            county,
-            variable,
-            xVariable,
-            plotType,
-            limit: plotType === 'scatter' ? 300 : 15,
-          }),
-        ]);
+        const [preview, chart] = await withStaleFallback(() =>
+          Promise.all([
+            fetchPreview(sourceId, {
+              state,
+              county,
+              limit: 25,
+              ...excelLayoutParams(),
+            }),
+            fetchChart(sourceId, {
+              state,
+              county,
+              variable,
+              xVariable,
+              plotType,
+              limit: plotType === 'scatter' ? 300 : 15,
+              ...excelLayoutParams(),
+            }),
+          ]),
+        );
 
+        if (preview.layout) renderExcelLayout(preview.layout);
         renderTable(preview);
         renderChart(chart, plotType);
         renderChartNote(chart, plotType);
@@ -643,6 +836,7 @@ const catalogHref = withBasePath('/complete-catalog');
       if (dsWhy) dsWhy.textContent = datasheet.why;
       if (dsWhen) dsWhen.textContent = datasheet.when;
 
+      currentSource = source;
       const unavailable = previewUnavailableReason(source);
       if (unavailable) {
         showPreviewUnavailable(unavailable, source.provider?.url);
@@ -660,7 +854,9 @@ const catalogHref = withBasePath('/complete-catalog');
       try {
         if (geoTags.includes('state') && stateFilter && stateFilterWrap) {
           stateFilterWrap.removeAttribute('hidden');
-          const stateOptions = await fetchFilterOptions(sourceId, 'state');
+          const stateOptions = await withStaleFallback(() =>
+            fetchFilterOptions(sourceId, 'state', undefined, excelLayoutParams()),
+          );
           stateFilter.innerHTML =
             '<option value="">All states</option>' +
             stateOptions
@@ -683,44 +879,7 @@ const catalogHref = withBasePath('/complete-catalog');
         console.warn('Filter options unavailable:', filterError);
       }
 
-      if (variableFilter) {
-        const numericVars =
-          source.variable_report
-            ?.filter((v) => v.type === 'integer' || v.type === 'float')
-            .map((v) => v.name) ?? getSourceVariables(source);
-
-        const uniqueVars = [...new Set(numericVars.filter(Boolean))];
-        const options = uniqueVars.length > 0 ? uniqueVars : [focalVariable].filter(Boolean);
-        variableFilter.innerHTML = options
-          .map(
-            (v) =>
-              `<option value="${v}" ${v === focalVariable ? 'selected' : ''}>${v.replace(/_/g, ' ')}</option>`,
-          )
-          .join('');
-      }
-
-      let defaultX = '';
-      if (xVariableFilter) {
-        const report = source.variable_report ?? [];
-        const allCols = getSourceVariables(source);
-        const numericNames = new Set(
-          report.filter((v) => v.type === 'integer' || v.type === 'float').map((v) => v.name),
-        );
-        // Non-numeric (label/time) columns first, then numeric
-        const nonNumeric = report
-          .filter((v) => !numericNames.has(v.name))
-          .map((v) => v.name)
-          .filter((n) => allCols.includes(n));
-        const numeric = [...numericNames].filter((n) => allCols.includes(n));
-        const ordered = [...new Set([...nonNumeric, ...numeric, ...allCols])];
-        const xOptions = ordered.length > 0 ? ordered : allCols;
-        xVariableOptions = xOptions.map((v) => ({ value: v, numeric: numericNames.has(v) }));
-        // Auto-detect default X: first temporal column or first column
-        const temporalNames = ['YEAR', 'DATE', 'PERIOD', 'TIMEPERIOD_NAME'];
-        defaultX =
-          xOptions.find((v) => temporalNames.includes(v.toUpperCase())) ?? xOptions[0] ?? '';
-        renderXVariableOptions('bar', defaultX);
-      }
+      populateVariableControls(source);
 
       populateReferenceCard(source);
 
@@ -1228,6 +1387,22 @@ const catalogHref = withBasePath('/complete-catalog');
 
     .chart-note {
       margin: 0 0 var(--space-2);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+    }
+
+    .excel-layout-bar {
+      padding: var(--space-3) var(--space-4) 0;
+    }
+
+    .excel-layout-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .excel-layout-note {
+      margin: var(--space-2) 0 0;
       font-size: var(--font-size-sm);
       color: var(--color-text-muted);
     }

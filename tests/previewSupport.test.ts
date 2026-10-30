@@ -13,7 +13,7 @@ test('sources without a download URL are info only', () => {
   assert.match(previewUnavailableReason({ download: { url: '  ' } })!, /provider's website/);
 });
 
-test('Excel downloads are info only', () => {
-  assert.match(previewUnavailableReason({ download: { url: 'https://x.gov/f.XLSX' } })!, /Excel/);
-  assert.match(previewUnavailableReason({ download: { url: 'https://x.gov/f.xls#a' } })!, /Excel/);
+test('Excel downloads can be previewed', () => {
+  assert.equal(previewUnavailableReason({ download: { url: 'https://x.gov/f.XLSX' } }), null);
+  assert.equal(previewUnavailableReason({ download: { url: 'https://x.gov/f.xls#a' } }), null);
 });

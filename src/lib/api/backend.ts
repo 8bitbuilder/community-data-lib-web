@@ -66,7 +66,25 @@ export interface Datasheet {
   when: string;
 }
 
+/** Sheet name, or a 0-based index. */
+export type SheetParam = string | number;
+
+export interface ExcelLayout {
+  format: 'xlsx' | 'xls';
+  sheets: string[];
+  sheet: string;
+  headerRow: number;
+  dataRowCount: number;
+  trimmedRows: number;
+  origin: {
+    sheet: 'visitor' | 'curator' | 'auto';
+    headerRow: 'visitor' | 'curator' | 'auto';
+  };
+}
+
 export interface PreviewParams {
+  sheet?: SheetParam;
+  headerRow?: number;
   state?: string;
   county?: string;
   limit?: number;
@@ -81,6 +99,7 @@ export interface PreviewResponse {
   total: number;
   filters: { state: string | null; county: string | null };
   availableFilters: SourceFilters;
+  layout?: ExcelLayout;
 }
 
 export interface ChartSeriesPoint {
@@ -111,6 +130,22 @@ export interface FilterOption {
 
 const API_TIMEOUT_MS = 60_000;
 
+export class ApiError extends Error {
+  status: number;
+  body: Record<string, unknown>;
+  constructor(message: string, status: number, body: Record<string, unknown> = {}) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
+function setLayoutParams(search: URLSearchParams, params: { sheet?: SheetParam; headerRow?: number }) {
+  if (params.sheet != null && params.sheet !== '') search.set('sheet', String(params.sheet));
+  if (params.headerRow != null) search.set('header_row', String(params.headerRow));
+}
+
 async function apiFetch<T>(path: string): Promise<T> {
   try {
     const response = await fetch(`${API_BASE}${path}`, {
@@ -125,11 +160,15 @@ async function apiFetch<T>(path: string): Promise<T> {
             : `API error ${response.status}: the preview service is unavailable. Please try again later.`,
         );
       }
-      const body = (await response.json().catch(() => ({}))) as { details?: string; error?: string };
+      const body = (await response.json().catch(() => ({}))) as {
+        details?: string;
+        error?: string;
+        [key: string]: unknown;
+      };
       // e.g. "This dataset can't be previewed yet (XLSX files are not supported…)"
       const message =
         body.error && body.details ? `${body.error} (${body.details})` : body.details ?? body.error;
-      throw new Error(message ?? `API error ${response.status}`);
+      throw new ApiError(message ?? `API error ${response.status}`, response.status, body);
     }
     return response.json() as Promise<T>;
   } catch (error) {
@@ -164,6 +203,7 @@ export async function fetchDatasheet(id: string): Promise<Datasheet> {
 
 export async function fetchPreview(id: string, params: PreviewParams = {}): Promise<PreviewResponse> {
   const search = new URLSearchParams();
+  setLayoutParams(search, params);
   if (params.state) search.set('state', params.state);
   if (params.county) search.set('county', params.county);
   if (params.limit != null) search.set('limit', String(params.limit));
@@ -184,9 +224,12 @@ export async function fetchChart(
     state?: string;
     county?: string;
     limit?: number;
+    sheet?: SheetParam;
+    headerRow?: number;
   } = {},
 ): Promise<ChartResponse> {
   const search = new URLSearchParams();
+  setLayoutParams(search, params);
   if (params.variable) search.set('variable', params.variable);
   if (params.xVariable) search.set('xVariable', params.xVariable);
   if (params.plotType) search.set('plotType', params.plotType);
@@ -203,13 +246,54 @@ export async function fetchFilterOptions(
   id: string,
   type: 'state' | 'county',
   state?: string,
+  layout: { sheet?: SheetParam; headerRow?: number } = {},
 ): Promise<FilterOption[]> {
   const search = new URLSearchParams({ type });
+  setLayoutParams(search, layout);
   if (state) search.set('state', state);
   const data = await apiFetch<{ options: FilterOption[] }>(
     `/api/sources/${encodeURIComponent(id)}/filters?${search}`,
   );
   return data.options;
+}
+
+export interface SourceFileResult {
+  bytes: Uint8Array;
+  filename: string;
+  format: 'csv' | 'tsv' | 'xlsx' | 'xls';
+  archive: 'zip' | null;
+}
+
+/** Downloads the source's raw file through the API (used by the notebook). */
+export async function fetchSourceFile(id: string): Promise<SourceFileResult> {
+  const path = `/api/sources/${encodeURIComponent(id)}/file`;
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      throw new Error(`Request timed out after ${API_TIMEOUT_MS / 1000}s while downloading the file.`);
+    }
+    throw error;
+  }
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+    const message = typeof body.error === 'string' ? body.error : `API error ${response.status}`;
+    throw new ApiError(message, response.status, body);
+  }
+  const rawName = response.headers.get('X-CDL-Filename') ?? '';
+  let filename = rawName;
+  try {
+    filename = decodeURIComponent(rawName);
+  } catch {
+    /* keep raw */
+  }
+  return {
+    bytes: new Uint8Array(await response.arrayBuffer()),
+    filename,
+    format: (response.headers.get('X-CDL-Format') ?? 'csv') as SourceFileResult['format'],
+    archive: response.headers.get('X-CDL-Archive') === 'zip' ? 'zip' : null,
+  };
 }
 
 export function normalizeDescriptionTags(tags: BackendSource['description_tags']): string[] {
