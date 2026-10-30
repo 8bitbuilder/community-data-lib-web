@@ -24,6 +24,12 @@ const ZIP = (() => {
   zip.addFile('title-rows.xlsx', fixture('title-rows.xlsx'));
   return zip.toBuffer();
 })();
+const NESTED_ZIP = (() => {
+  const zip = new AdmZip();
+  zip.addFile('data/sub/file.csv', Buffer.from(CSV));
+  zip.addFile('readme.txt', Buffer.from('not data'));
+  return zip.toBuffer();
+})();
 
 let server: http.Server;
 let base = '';
@@ -36,6 +42,12 @@ before(async () => {
     } else if (req.url === '/bundle.zip') {
       res.writeHead(200, { 'Content-Type': 'application/zip' });
       res.end(ZIP);
+    } else if (req.url === '/nested.zip') {
+      res.writeHead(200, { 'Content-Type': 'application/zip' });
+      res.end(NESTED_ZIP);
+    } else if (req.url?.startsWith('/named/')) {
+      res.writeHead(200, { 'Content-Type': 'text/csv' });
+      res.end(CSV);
     } else if (req.url?.startsWith('/fx/')) {
       try {
         const body = fixture(req.url.slice(4));
@@ -73,6 +85,18 @@ function sources() {
     { id: 'empty', title: 'Empty', download: { url: `${base}/fx/empty.xlsx` } },
     { id: 'zipped', title: 'Zipped', download: { url: `${base}/bundle.zip` } },
     { id: 'notes-first', title: 'Notes', download: { url: `${base}/fx/notes-first.xlsx` } },
+    { id: 'numeric-sheets', title: 'Years', download: { url: `${base}/fx/numeric-sheets.xlsx` } },
+    { id: 'nested-zip', title: 'Nested zip', download: { url: `${base}/nested.zip` } },
+    {
+      id: 'en-dash',
+      title: 'En dash',
+      download: { url: `${base}/named/${encodeURIComponent('pop–2020.csv')}` },
+    },
+    {
+      id: 'cjk',
+      title: 'CJK',
+      download: { url: `${base}/named/${encodeURIComponent('人口统计.csv')}` },
+    },
     { id: 'portal', title: 'Portal only', provider: { url: 'https://example.gov' } },
   ];
 }
@@ -95,7 +119,7 @@ test('health and source listing', async () => {
   assert.equal(health.status, 200);
   assert.equal(health.body.previewEngine, 'node');
   const list = await get('/api/sources');
-  assert.equal(list.body.count, 7);
+  assert.equal(list.body.count, 11);
   assert.equal((await get('/api/sources/counties')).body.title, 'Counties');
   assert.equal(list.headers.get('access-control-allow-origin'), '*');
 });
@@ -185,6 +209,35 @@ test('file route unzips and reports the inner file', async () => {
   assert.ok(res.bytes.equals(fixture('title-rows.xlsx')));
 });
 
+test('file route reports the full entry name of a file in a folder inside the zip', async () => {
+  const res = await getRaw('/api/sources/nested-zip/file');
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('x-cdl-archive'), 'zip');
+  assert.equal(res.headers.get('x-cdl-filename'), 'file.csv');
+  assert.equal(decodeURIComponent(res.headers.get('x-cdl-archive-entry')!), 'data/sub/file.csv');
+  assert.match(res.headers.get('access-control-expose-headers')!, /X-CDL-Archive-Entry/);
+  assert.equal(res.bytes.toString(), CSV);
+  const plain = await getRaw('/api/sources/counties/file');
+  assert.equal(plain.headers.get('x-cdl-archive-entry'), null);
+});
+
+test('file route serves names outside Latin-1 (en dash, CJK) without a 500', async () => {
+  const dash = await getRaw('/api/sources/en-dash/file');
+  assert.equal(dash.status, 200);
+  assert.equal(decodeURIComponent(dash.headers.get('x-cdl-filename')!), 'pop–2020.csv');
+  assert.equal(
+    dash.headers.get('content-disposition'),
+    `attachment; filename="pop_2020.csv"; filename*=UTF-8''pop%E2%80%932020.csv`,
+  );
+  const cjk = await getRaw('/api/sources/cjk/file');
+  assert.equal(cjk.status, 200);
+  assert.equal(decodeURIComponent(cjk.headers.get('x-cdl-filename')!), '人口统计.csv');
+  const disp = cjk.headers.get('content-disposition')!;
+  assert.match(disp, /^attachment; filename="____\.csv"; filename\*=UTF-8''/);
+  assert.equal(decodeURIComponent(disp.split("UTF-8''")[1]), '人口统计.csv');
+  assert.equal(cjk.bytes.toString(), CSV);
+});
+
 test('file route returns 413 above PREVIEW_FILE_MAX_BYTES', async () => {
   const prev = process.env.PREVIEW_FILE_MAX_BYTES;
   process.env.PREVIEW_FILE_MAX_BYTES = '10';
@@ -228,6 +281,25 @@ test('sheet param selects a sheet (digits are an index)', async () => {
   assert.equal(byName.body.layout.sheet, 'Data');
   const byIndex = await get('/api/sources/notes-first/preview?sheet=1');
   assert.equal(byIndex.body.layout.sheet, 'Data');
+});
+
+test('sheets named like numbers are chosen by index, never read as positions', async () => {
+  const auto = await get('/api/sources/numeric-sheets/preview');
+  assert.equal(auto.status, 200);
+  assert.deepEqual(auto.body.layout.sheets, ['Notes', '2023', '2024']);
+  assert.equal(auto.body.layout.sheet, '2023');
+  // The page sends layout.sheets.indexOf("2024") === 2.
+  const y2024 = await get('/api/sources/numeric-sheets/preview?sheet=2');
+  assert.equal(y2024.status, 200);
+  assert.equal(y2024.body.layout.sheet, '2024');
+  assert.deepEqual(y2024.body.columns, ['County', 'Pop', 'Change']);
+  assert.equal(y2024.body.total, 3);
+  // "1" is the second sheet ("2023"), not a sheet named "1"; "2024" is out of range.
+  const one = await get('/api/sources/numeric-sheets/preview?sheet=1');
+  assert.equal(one.body.layout.sheet, '2023');
+  const asName = await get('/api/sources/numeric-sheets/preview?sheet=2024');
+  assert.equal(asName.status, 400);
+  assert.equal(asName.body.code, 'UNKNOWN_SHEET');
 });
 
 test('unknown sheet and out-of-range header row are 400 with sheet list', async () => {

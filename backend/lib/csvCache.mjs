@@ -128,13 +128,16 @@ export async function getSourceFile(source) {
   let bytes = await downloadBytes(downloadUrl);
   let filename = lastSegment(downloadUrl);
   let archive = null;
+  // Zipped sources: the full entry name inside the zip (e.g. "data/sub/file.csv").
+  let archiveEntry = null;
   if (isZip(bytes) && !isXlsx(bytes)) {
     const extracted = pickFileFromZip(bytes);
     bytes = extracted.data;
+    archiveEntry = extracted.filename;
     filename = extracted.filename.split("/").pop();
     archive = "zip";
   }
-  const file = { bytes, filename, format: formatOf(bytes, filename), archive };
+  const file = { bytes, filename, format: formatOf(bytes, filename), archive, archiveEntry };
   fileCache.set(source.id, { file, fetchedAt: Date.now() });
   return file;
 }

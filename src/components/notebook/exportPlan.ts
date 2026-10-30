@@ -14,11 +14,19 @@ type ExportLoadSource = Exclude<LoadSource, { kind: 'file' }>;
 
 /** Where the exported notebook reads the original data from. */
 export function exportSourceFor(
-  file: { origin: 'catalog' | 'upload'; filename: string; archive: 'zip' | null },
+  file: {
+    origin: 'catalog' | 'upload';
+    filename: string;
+    archive: 'zip' | null;
+    archiveEntry?: string | null;
+  },
   downloadUrl: string | undefined,
 ): ExportLoadSource {
   if (file.origin === 'upload' || !downloadUrl) return { kind: 'upload', filename: file.filename };
-  if (file.archive === 'zip') return { kind: 'zip', url: downloadUrl, innerName: file.filename };
+  if (file.archive === 'zip') {
+    // The full path inside the zip; `filename` is only the basename used in Python's filesystem.
+    return { kind: 'zip', url: downloadUrl, innerName: file.archiveEntry || file.filename };
+  }
   return { kind: 'url', url: downloadUrl };
 }
 

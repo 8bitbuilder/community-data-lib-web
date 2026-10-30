@@ -11,6 +11,8 @@ export interface NotebookFile {
   format: FileFormat;
   /** Catalog files only: the server unzipped this file from a zip download. */
   archive: 'zip' | null;
+  /** Zipped catalog files: the full path inside the zip, used by exported notebooks. */
+  archiveEntry?: string | null;
   encoding?: 'utf-8' | 'latin-1';
   /** Excel only: the sheet / header row / data region the load cell reads. */
   layout?: ExcelLayout;

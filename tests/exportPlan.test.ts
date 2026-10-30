@@ -19,6 +19,17 @@ test('exportSourceFor: zip archive uses the zip form with the inner file name', 
   });
 });
 
+test('exportSourceFor: a file in a folder inside the zip keeps its full entry name', () => {
+  const src = exportSourceFor(
+    { origin: 'catalog', filename: 'file.csv', archive: 'zip', archiveEntry: 'data/sub/file.csv' },
+    URL_,
+  );
+  assert.deepEqual(src, { kind: 'zip', url: URL_, innerName: 'data/sub/file.csv' });
+  const cells = notebookCellsFor(['load', 'df = df.dropna()'], src, { format: 'csv', encoding: 'utf-8' });
+  assert.match(cells[0], /"data\/sub\/file\.csv"/);
+  assert.doesNotMatch(cells[0], /open\("file\.csv"\)/);
+});
+
 test('exportSourceFor: uploads use the upload form even when a URL exists', () => {
   assert.deepEqual(exportSourceFor({ origin: 'upload', filename: 'mine.csv', archive: null }, URL_), {
     kind: 'upload',
