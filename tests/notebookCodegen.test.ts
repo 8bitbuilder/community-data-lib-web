@@ -25,6 +25,13 @@ const cond = (column: string, op: Condition['op'], value: string, numeric: boole
   numeric,
 });
 
+function latin1TsvZip() {
+  return loadCell(
+    { kind: 'zip', url: 'https://x.gov/a.zip', innerName: 'inner.csv' },
+    { format: 'tsv', encoding: 'latin-1' },
+  );
+}
+
 test('pyStr escapes quotes, backslashes and control characters, keeps Unicode', () => {
   assert.equal(pyStr('a "b"\\c\n'), '"a \\"b\\"\\\\c\\n"');
   assert.equal(pyStr('Ñandú – 東京'), '"Ñandú – 東京"');
@@ -51,14 +58,8 @@ test('latin-1 and tsv add read_csv arguments', () => {
     loadCell({ kind: 'url', url: 'https://x/a.tsv' }, { format: 'tsv', encoding: 'latin-1' }),
     /df = pd\.read_csv\(url, encoding="latin-1", sep="\\t", storage_options=\{"User-Agent": "Mozilla\/5\.0"\}\)$/,
   );
-  assert.match(utf8Zip(), /df = pd\.read_csv\(archive\.open\("inner\.csv"\), encoding="latin-1", sep="\\t"\)$/);
+  assert.match(latin1TsvZip(), /df = pd\.read_csv\(archive\.open\("inner\.csv"\), encoding="latin-1", sep="\\t"\)$/);
 });
-function utf8Zip() {
-  return loadCell(
-    { kind: 'zip', url: 'https://x.gov/a.zip', innerName: 'inner.csv' },
-    { format: 'tsv', encoding: 'latin-1' },
-  );
-}
 
 test('CSV and TSV load cells do not get the column-name lines', () => {
   assert.doesNotMatch(loadCell({ kind: 'file', filename: 'a.csv' }, csv), /astype\(str\)/);
@@ -193,7 +194,7 @@ test('dropColumns, dropRowsByPosition, dropRowsWhere', () => {
   );
   assert.equal(
     actionCell({ kind: 'dropRowsWhere', condition: cond('X', 'contains', 'abc', false) }),
-    L('# Drop rows where X contains "abc"', 'df = df[~(df["X"].astype("string").str.contains("abc", na=False))]'),
+    L('# Drop rows where X contains "abc"', 'df = df[~df["X"].astype("string").str.contains("abc", regex=False, na=False)]'),
   );
 });
 
@@ -266,7 +267,7 @@ test('rename, changeType, filterRows, dropDuplicates', () => {
   );
   assert.equal(
     actionCell({ kind: 'filterRows', condition: cond('X', 'contains', 'abc', false) }),
-    L('# Keep only rows where X contains "abc"', 'df = df[df["X"].astype("string").str.contains("abc", na=False)]'),
+    L('# Keep only rows where X contains "abc"', 'df = df[df["X"].astype("string").str.contains("abc", regex=False, na=False)]'),
   );
   assert.equal(actionCell({ kind: 'dropDuplicates' }), L('# Remove duplicate rows', 'df = df.drop_duplicates()'));
 });
@@ -311,4 +312,30 @@ test('toIpynb builds an nbformat 4.5 notebook', () => {
   assert.deepEqual(toIpynb(['x\ny\n']).includes('"x\\n"'), true);
   assert.deepEqual(JSON.parse(toIpynb(['l1\nl2'])).cells[0].source, ['l1\n', 'l2']);
   assert.match(text, /\n "nbformat": 4/);
+});
+
+test('numeric values are emitted bare only when plain decimals, normalised', () => {
+  const lit = (value: string) =>
+    actionCell({ kind: 'filterRows', condition: cond('A', '>', value, true) }).split('\n')[1];
+  assert.equal(lit('007'), 'df = df[df["A"] > 7]');
+  assert.equal(lit('1.50'), 'df = df[df["A"] > 1.5]');
+  assert.equal(lit('-3'), 'df = df[df["A"] > -3]');
+  assert.equal(lit('.5'), 'df = df[df["A"] > 0.5]');
+  assert.equal(lit('0x10'), 'df = df[df["A"] > "0x10"]');
+  assert.equal(lit('Infinity'), 'df = df[df["A"] > "Infinity"]');
+  assert.equal(lit('1e999'), 'df = df[df["A"] > "1e999"]');
+  assert.match(
+    actionCell({ kind: 'fillMissing', columns: ['A'], strategy: 'value', value: '08', numeric: true }),
+    /\.fillna\(8\)$/,
+  );
+});
+
+test('contains is a literal, always-quoted match', () => {
+  const f = actionCell({ kind: 'filterRows', condition: cond('X', 'contains', '(', false) });
+  assert.equal(f.split('\n')[1], 'df = df[df["X"].astype("string").str.contains("(", regex=False, na=False)]');
+  const d = actionCell({ kind: 'dropRowsWhere', condition: cond('X', 'contains', '5', true) });
+  assert.equal(
+    d,
+    L('# Drop rows where X contains "5"', 'df = df[~df["X"].astype("string").str.contains("5", regex=False, na=False)]'),
+  );
 });

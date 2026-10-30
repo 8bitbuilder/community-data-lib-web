@@ -185,22 +185,30 @@ function names(columns: string[]): string {
   return commentText(columns.join(', '));
 }
 
+const PLAIN_DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
 /** Numeric values are emitted verbatim only when they parse as finite numbers. */
 function valueLiteral(value: string, numeric: boolean): string {
   const t = value.trim();
-  if (numeric && t !== '' && Number.isFinite(Number(t))) return t;
+  if (numeric && PLAIN_DECIMAL.test(t) && Number.isFinite(Number(t))) return String(Number(t));
   return pyStr(value);
 }
 
 function conditionExpr(c: Condition): string {
   const col = `df[${pyStr(c.column)}]`;
-  const v = valueLiteral(c.value, c.numeric);
-  if (c.op === 'contains') return `${col}.astype("string").str.contains(${v}, na=False)`;
-  return `${col} ${c.op} ${v}`;
+  if (c.op === 'contains') {
+    return `${col}.astype("string").str.contains(${pyStr(c.value)}, regex=False, na=False)`;
+  }
+  return `${col} ${c.op} ${valueLiteral(c.value, c.numeric)}`;
+}
+
+/** Comparisons need parentheses under `~`; method calls do not. */
+function wrapNot(c: Condition): string {
+  return c.op === 'contains' ? conditionExpr(c) : `(${conditionExpr(c)})`;
 }
 
 function conditionText(c: Condition): string {
-  const v = valueLiteral(c.value, c.numeric);
+  const v = c.op === 'contains' ? pyStr(c.value) : valueLiteral(c.value, c.numeric);
   return commentText(`${c.column} ${c.op} ${v}`);
 }
 
@@ -211,7 +219,7 @@ export function actionCell(action: CleaningAction): string {
     case 'dropRowsByPosition':
       return `# Drop rows ${action.start} through ${action.end} (counting from 0)\ndf = df.drop(df.index[${action.start}:${action.end + 1}])`;
     case 'dropRowsWhere':
-      return `# Drop rows where ${conditionText(action.condition)}\ndf = df[~(${conditionExpr(action.condition)})]`;
+      return `# Drop rows where ${conditionText(action.condition)}\ndf = df[~${wrapNot(action.condition)}]`;
     case 'dropMissing': {
       const { columns, how } = action;
       if (columns.length === 0) {
@@ -226,14 +234,15 @@ export function actionCell(action: CleaningAction): string {
         how === 'any'
           ? `# Drop rows where any of ${names(columns)} is missing`
           : `# Drop rows where all of ${names(columns)} are missing`;
-      const how_ = how === 'all' ? ', how="all"' : '';
-      return `${comment}\ndf = df.dropna(subset=[${colList(columns)}]${how_})`;
+      const howArg = how === 'all' ? ', how="all"' : '';
+      return `${comment}\ndf = df.dropna(subset=[${colList(columns)}]${howArg})`;
     }
     case 'fillMissing': {
       const { columns, strategy } = action;
+      const literal = valueLiteral(action.value ?? '', action.numeric ?? false);
       let what: string;
       if (strategy === 'value') {
-        what = valueLiteral(action.value ?? '', action.numeric ?? false);
+        what = literal;
       } else {
         what = columns.length === 1 ? `the column's ${strategy}` : `each column's ${strategy}`;
       }
@@ -246,7 +255,7 @@ export function actionCell(action: CleaningAction): string {
               ? `${col}.median()`
               : strategy === 'mode'
                 ? `${col}.mode()[0]`
-                : valueLiteral(action.value ?? '', action.numeric ?? false);
+                : literal;
         return `${col} = ${col}.fillna(${fill})`;
       });
       return [`# Fill missing values in ${names(columns)} with ${commentText(what)}`, ...lines].join('\n');
