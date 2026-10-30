@@ -45,9 +45,13 @@
   "homepage": "https://github.com/community-data-libraries/web#readme",
   "dependencies": {
     "@astrojs/react": "^5.0.4",
+    "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
     "@netlify/blobs": "^10.7.13",
     "adm-zip": "^0.5.16",
     "astro": "^6.1.9",
+    "codemirror": "^6.0.2",
     "csv-parse": "^5.6.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
