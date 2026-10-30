@@ -1,6 +1,6 @@
 // Excel layout detection in the browser for the notebook. SheetJS is loaded
 // lazily, only when an Excel file is involved.
-import type { BackendSource, ExcelLayout } from '@lib/api/backend';
+import { parseSheetParam, type BackendSource, type ExcelLayout } from '@lib/api/backend';
 
 type ExcelModule = typeof import('@lib/data/excelLayout.mjs');
 type ReadOptions = Parameters<ExcelModule['readExcelTable']>[1];
@@ -27,11 +27,17 @@ export async function catalogLayout(bytes: Uint8Array, source: BackendSource): P
   if (fromPage) return fromPage;
   const params = new URLSearchParams(window.location.search);
   const headerRow = Number.parseInt(params.get('header_row') ?? '', 10);
-  return readLayout(bytes, {
-    visitor: {
-      sheet: params.get('sheet') || undefined,
-      headerRow: Number.isInteger(headerRow) && headerRow > 0 ? headerRow : undefined,
-    },
-    curator: { sheet: source.download?.sheet, headerRow: source.download?.header_row },
-  });
+  const curator = { sheet: source.download?.sheet, headerRow: source.download?.header_row };
+  // The page URL's `sheet` is a 0-based index (see SheetParam), never a name.
+  const visitor = {
+    sheet: parseSheetParam(params.get('sheet')),
+    headerRow: Number.isInteger(headerRow) && headerRow > 0 ? headerRow : undefined,
+  };
+  try {
+    return await readLayout(bytes, { visitor, curator });
+  } catch (e) {
+    // A stale link (sheet or header row no longer in the file): use the default, like the page does.
+    if (visitor.sheet === undefined && visitor.headerRow === undefined) throw e;
+    return readLayout(bytes, { curator });
+  }
 }

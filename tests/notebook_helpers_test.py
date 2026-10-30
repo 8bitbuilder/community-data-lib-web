@@ -133,6 +133,12 @@ class HelpersTest(unittest.TestCase):
                 self.assertEqual(list(df.columns), e["headers"])
                 self.assertEqual(len(df), e["rowCount"])
 
+    def test_sheet_named_like_a_number_is_read_by_name(self):
+        # Generated code passes sheet_name="2024" (a string) -> the sheet named 2024, not position 2024.
+        df = pd.read_excel(ROOT / "tests/fixtures/numeric-sheets.xlsx", sheet_name="2024")
+        self.assertEqual(list(df.columns), ["County", "Pop", "Change"])
+        self.assertEqual(len(df), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

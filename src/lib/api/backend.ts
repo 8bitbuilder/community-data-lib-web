@@ -66,8 +66,17 @@ export interface Datasheet {
   when: string;
 }
 
-/** Sheet name, or a 0-based index. */
-export type SheetParam = string | number;
+/**
+ * A sheet, always as its 0-based position in the workbook. The `sheet` query and
+ * page-URL parameter is an index, never a name, so sheets named like numbers
+ * ("2024", "1") can't be confused with positions.
+ */
+export type SheetParam = number;
+
+/** The `sheet` URL/query value -> 0-based index; anything but whole digits is ignored. */
+export function parseSheetParam(value: string | null | undefined): SheetParam | undefined {
+  return value != null && /^\d+$/.test(value) ? Number(value) : undefined;
+}
 
 export interface ExcelLayout {
   format: 'xlsx' | 'xls';
@@ -142,7 +151,7 @@ export class ApiError extends Error {
 }
 
 function setLayoutParams(search: URLSearchParams, params: { sheet?: SheetParam; headerRow?: number }) {
-  if (params.sheet != null && params.sheet !== '') search.set('sheet', String(params.sheet));
+  if (params.sheet != null) search.set('sheet', String(params.sheet));
   if (params.headerRow != null) search.set('header_row', String(params.headerRow));
 }
 
@@ -262,6 +271,8 @@ export interface SourceFileResult {
   filename: string;
   format: 'csv' | 'tsv' | 'xlsx' | 'xls';
   archive: 'zip' | null;
+  /** Zipped sources: the file's full path inside the zip (e.g. "data/sub/file.csv"). */
+  archiveEntry: string | null;
 }
 
 /** Downloads the source's raw file through the API (used by the notebook). */
@@ -281,18 +292,21 @@ export async function fetchSourceFile(id: string): Promise<SourceFileResult> {
     const message = typeof body.error === 'string' ? body.error : `API error ${response.status}`;
     throw new ApiError(message, response.status, body);
   }
-  const rawName = response.headers.get('X-CDL-Filename') ?? '';
-  let filename = rawName;
-  try {
-    filename = decodeURIComponent(rawName);
-  } catch {
-    /* keep raw */
-  }
+  const decodeHeader = (raw: string) => {
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  };
+  const archive = response.headers.get('X-CDL-Archive') === 'zip' ? 'zip' : null;
+  const entry = response.headers.get('X-CDL-Archive-Entry');
   return {
     bytes: new Uint8Array(await response.arrayBuffer()),
-    filename,
+    filename: decodeHeader(response.headers.get('X-CDL-Filename') ?? ''),
     format: (response.headers.get('X-CDL-Format') ?? 'csv') as SourceFileResult['format'],
-    archive: response.headers.get('X-CDL-Archive') === 'zip' ? 'zip' : null,
+    archive,
+    archiveEntry: archive && entry ? decodeHeader(entry) : null,
   };
 }
 

@@ -96,6 +96,31 @@ const files = {
     bookType: 'xlsx',
     wb: book([['Sheet1', [['A', 'B'], ['1', '2'], [], ['3', '4'], ['5', '6']]]]),
   },
+  // Sheets named like numbers: the API's ?sheet= is always a 0-based index, so
+  // "2024" must be picked as index 2, never as sheet number 2024.
+  'numeric-sheets.xlsx': {
+    bookType: 'xlsx',
+    wb: book([
+      ['Notes', [['About this workbook'], ['One sheet per year.']]],
+      [
+        '2023',
+        [
+          ['County', 'Pop'],
+          ['Knox', 1],
+          ['Blount', 2],
+        ],
+      ],
+      [
+        '2024',
+        [
+          ['County', 'Pop', 'Change'],
+          ['Knox', 3, 2],
+          ['Blount', 4, 2],
+          ['Sevier', 5, 1],
+        ],
+      ],
+    ]),
+  },
   'empty.xlsx': { bookType: 'xlsx', wb: book([['Sheet1', []]]) },
   'legacy.xls': { wb: book([['Sheet1', cleanAoa]]), bookType: 'biff8' },
 };

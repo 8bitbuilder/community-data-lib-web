@@ -67,6 +67,16 @@
     ],
     "rowCount": 4
   },
+  "numeric-sheets.xlsx": {
+    "sheet": "2023",
+    "headerRow": 1,
+    "dataRowCount": 2,
+    "headers": [
+      "County",
+      "Pop"
+    ],
+    "rowCount": 2
+  },
   "legacy.xls": {
     "sheet": "Sheet1",
     "headerRow": 1,

@@ -193,6 +193,7 @@ const catalogHref = withBasePath('/complete-catalog');
       fetchFilterOptions,
       fetchSources,
       ApiError,
+      parseSheetParam,
       buildCatalogDescription,
       normalizeDescriptionTags,
       getPedagogicalTags,
@@ -229,10 +230,12 @@ const catalogHref = withBasePath('/complete-catalog');
     const excelHeaderRowSelect = document.getElementById('excel-header-row') as HTMLSelectElement;
 
     // Visitor's sheet / header-row choice for Excel sources, seeded from the URL.
+    // `sheet` is the sheet's 0-based index (in the URL and the API), never its name,
+    // so sheets named "2024" or "1" can't be mistaken for positions.
     const initialUrlParams = new URLSearchParams(window.location.search);
     const initialHeaderRow = Number.parseInt(initialUrlParams.get('header_row') ?? '', 10);
-    const excelOverride: { sheet: string | undefined; headerRow: number | undefined } = {
-      sheet: initialUrlParams.get('sheet') || undefined,
+    const excelOverride: { sheet: number | undefined; headerRow: number | undefined } = {
+      sheet: parseSheetParam(initialUrlParams.get('sheet')),
       headerRow: Number.isInteger(initialHeaderRow) && initialHeaderRow >= 1 ? initialHeaderRow : undefined,
     };
     let excelStaleNotice = false;
@@ -267,7 +270,7 @@ const catalogHref = withBasePath('/complete-catalog');
 
     function syncExcelUrl() {
       const url = new URL(window.location.href);
-      if (excelOverride.sheet) url.searchParams.set('sheet', excelOverride.sheet);
+      if (excelOverride.sheet !== undefined) url.searchParams.set('sheet', String(excelOverride.sheet));
       else url.searchParams.delete('sheet');
       if (excelOverride.headerRow) url.searchParams.set('header_row', String(excelOverride.headerRow));
       else url.searchParams.delete('header_row');
@@ -279,15 +282,16 @@ const catalogHref = withBasePath('/complete-catalog');
       const note = document.getElementById('excel-layout-note');
       if (!bar || !note || !excelSheetSelect || !excelHeaderRowSelect) return;
       bar.removeAttribute('hidden');
+      // Option values are sheet indexes; labels are the names.
       excelSheetSelect.replaceChildren(
-        ...layout.sheets.map((name) => {
+        ...layout.sheets.map((name, i) => {
           const opt = document.createElement('option');
-          opt.value = name;
+          opt.value = String(i);
           opt.textContent = name;
           return opt;
         }),
       );
-      excelSheetSelect.value = layout.sheet;
+      excelSheetSelect.value = String(layout.sheets.indexOf(layout.sheet));
       const maxRow = Math.max(20, layout.headerRow);
       setSelectOptions(
         excelHeaderRowSelect,
@@ -298,12 +302,14 @@ const catalogHref = withBasePath('/complete-catalog');
       const origin = ORIGIN_WORDS[layout.origin?.headerRow] ?? ORIGIN_WORDS.auto;
       let text = `Read from sheet "${layout.sheet}", header on row ${layout.headerRow} (${origin}).`;
       if (layout.trimmedRows > 0) {
-        text += ` ${layout.trimmedRows} note rows at the bottom were skipped.`;
+        const rows = layout.trimmedRows === 1 ? 'note row' : 'note rows';
+        text += ` ${layout.trimmedRows} ${rows} at the bottom ${layout.trimmedRows === 1 ? 'was' : 'were'} skipped.`;
       }
       if (excelStaleNotice) {
         text += " That sheet or header row isn't in this file anymore, so we went back to the default.";
       }
-      note.textContent = text;
+      // role="status": rewriting the same text would re-announce it on every refresh.
+      if (note.textContent !== text) note.textContent = text;
       lastGoodLayout = layout;
       lastGoodNote = text;
 
@@ -322,7 +328,7 @@ const catalogHref = withBasePath('/complete-catalog');
           error instanceof ApiError &&
           error.status === 400 &&
           (code === 'UNKNOWN_SHEET' || code === 'HEADER_OUT_OF_RANGE') &&
-          (excelOverride.sheet || excelOverride.headerRow);
+          (excelOverride.sheet !== undefined || excelOverride.headerRow !== undefined);
         if (!stale) throw error;
         excelOverride.sheet = undefined;
         excelOverride.headerRow = undefined;
@@ -356,7 +362,7 @@ const catalogHref = withBasePath('/complete-catalog');
       const layoutToken = ++layoutSeq;
       layoutInFlight = true;
       if (changed === 'sheet') {
-        excelOverride.sheet = excelSheetSelect.value || undefined;
+        excelOverride.sheet = parseSheetParam(excelSheetSelect.value);
         excelOverride.headerRow = undefined; // new sheet: re-detect the header
       } else {
         excelOverride.headerRow = Number.parseInt(excelHeaderRowSelect.value, 10) || undefined;
@@ -379,7 +385,7 @@ const catalogHref = withBasePath('/complete-catalog');
           excelOverride.headerRow = previous.headerRow;
           syncExcelUrl();
           if (lastGoodLayout) {
-            excelSheetSelect.value = lastGoodLayout.sheet;
+            excelSheetSelect.value = String(lastGoodLayout.sheets.indexOf(lastGoodLayout.sheet));
             excelHeaderRowSelect.value = String(lastGoodLayout.headerRow);
           }
           try {
