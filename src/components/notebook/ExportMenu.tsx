@@ -104,7 +104,7 @@ export default function ExportMenu({ sourceId, source, file, cells, exportDf, di
         Export ▾
       </button>
       {open && (
-        <ul className="nb-action-list" id={`${uid}-list`}>
+        <ul className="nb-action-list nb-action-list--end" id={`${uid}-list`}>
           {ITEMS.map((m) => (
             <li key={m.kind}>
               <button type="button" className="nb-action-item" onClick={() => void choose(m.kind)}>
