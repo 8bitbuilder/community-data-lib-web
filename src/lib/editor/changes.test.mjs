@@ -49,3 +49,16 @@ test('download changes send only the url', () => {
   edited.download.url = 'https://usda.gov/b.csv';
   assert.deepEqual(diffFields(original, edited), { download: { url: 'https://usda.gov/b.csv' } });
 });
+
+test('sheet and header_row send only when changed', () => {
+  const edited = structuredClone(original);
+  edited.download = { url: original.download.url, sheet: '', header_row: '' };
+  assert.deepEqual(diffFields(original, edited), {});
+  edited.download.sheet = 'Data';
+  assert.deepEqual(diffFields(original, edited), { download: { sheet: 'Data' } });
+  edited.download.header_row = 4;
+  edited.download.url = 'https://usda.gov/b.xlsx';
+  assert.deepEqual(diffFields(original, edited), { download: { url: 'https://usda.gov/b.xlsx', sheet: 'Data', header_row: 4 } });
+  const had = { ...original, download: { url: 'u', sheet: 'Data', header_row: 4 } };
+  assert.deepEqual(diffFields(had, { ...had, download: { url: 'u', sheet: '', header_row: '4' } }), { download: { sheet: null } });
+});

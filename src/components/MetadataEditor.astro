@@ -90,6 +90,16 @@
       const [group, key] = name.split('.');
       form.append(el('label', {}, [label, el('input', { name, type: 'url', value: fields[group][key] })]));
     }
+    const excelBox = el('div', { 'data-excel-fields': '' }, [
+      el('label', {}, ['Excel sheet (name or number)', el('input', { name: 'download.sheet', type: 'text', value: fields.download.sheet })]),
+      el('label', {}, ['Header row (row number in Excel)', el('input', { name: 'download.header_row', type: 'number', min: '1', step: '1', value: fields.download.header_row })]),
+      el('small', {}, ['Leave blank to detect automatically']),
+    ]);
+    const urlInput = form.elements.namedItem('download.url') as HTMLInputElement;
+    const syncExcel = () => { excelBox.hidden = !/\.xlsx?$/i.test(urlInput.value.trim().split(/[?#]/)[0]); };
+    urlInput.addEventListener('input', syncExcel);
+    syncExcel();
+    form.append(excelBox);
     for (const [name, label] of [['sensitive', 'Sensitive'], ['requires_account', 'Requires account']]) {
       form.append(el('label', {}, [el('input', { name, type: 'checkbox', checked: fields[name] }), label]));
     }
@@ -116,7 +126,9 @@
     const edited: any = {};
     for (const [name] of TEXT) edited[name] = value(name);
     edited.provider = { name: value('provider.name'), agency: value('provider.agency'), url: value('provider.url') };
-    edited.download = { url: value('download.url') };
+    const sheet = value('download.sheet').trim();
+    const headerRow = value('download.header_row').trim();
+    edited.download = { url: value('download.url'), sheet: sheet === '' ? null : sheet, header_row: headerRow === '' ? null : Number(headerRow) };
     edited.sensitive = (form.elements.namedItem('sensitive') as HTMLInputElement).checked;
     edited.requires_account = (form.elements.namedItem('requires_account') as HTMLInputElement).checked;
     edited.student_suitability = value('student_suitability');

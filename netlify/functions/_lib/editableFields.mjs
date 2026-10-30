@@ -59,6 +59,32 @@ function validateProvider(value) {
   return out;
 }
 
+function validateDownload(value) {
+  onlyKeys(value, 'download', ['url', 'sheet', 'header_row']);
+  const out = {};
+  if ('url' in value) out.url = httpsUrl(value.url, 'download.url', { required: true });
+  if ('sheet' in value) {
+    const raw = value.sheet;
+    if (typeof raw === 'number') {
+      if (!Number.isInteger(raw) || raw < 0) fail('download.sheet', 'must be a name or a whole number');
+      out.sheet = raw;
+    } else {
+      const name = text(raw, 'download.sheet', { max: 100 });
+      out.sheet = name !== null && /^\d+$/.test(name) ? Number(name) : name;
+    }
+  }
+  if ('header_row' in value) {
+    const raw = value.header_row;
+    if (raw === null || raw === '') out.header_row = null;
+    else {
+      const n = typeof raw === 'string' && /^\d+$/.test(raw.trim()) ? Number(raw.trim()) : raw;
+      if (!Number.isInteger(n) || n < 1) fail('download.header_row', 'must be a whole number, 1 or more');
+      out.header_row = n;
+    }
+  }
+  return out;
+}
+
 function validateTopicTags(value, allowed) {
   const field = 'description_tags';
   if (!Array.isArray(value)) fail(field, 'must be a list');
@@ -86,8 +112,7 @@ export function validateChanges(changes, vocabulary) {
     if (Object.hasOwn(SIMPLE, field)) out[field] = SIMPLE[field](value, field);
     else if (field === 'provider') out.provider = validateProvider(value);
     else if (field === 'download') {
-      onlyKeys(value, 'download', ['url']);
-      out.download = { url: httpsUrl(value.url, 'download.url', { required: true }) };
+      out.download = validateDownload(value);
     } else if (field === 'description_tags') out.description_tags = validateTopicTags(value, vocabulary.description_tags);
     else if (Object.hasOwn(vocabulary.statistical_tags, field)) out[field] = validateGroup(value, vocabulary.statistical_tags[field], field);
     else fail(field, 'is not editable');
@@ -105,7 +130,8 @@ export function pickEditable(data, vocabulary) {
   picked.student_suitability = SUITABILITY.includes(d.student_suitability) ? d.student_suitability : 'unreviewed';
   const provider = isPlainObject(d.provider) ? d.provider : {};
   picked.provider = { name: provider.name ?? '', agency: provider.agency ?? '', url: provider.url ?? '' };
-  picked.download = { url: isPlainObject(d.download) ? d.download.url ?? '' : '' };
+  const download = isPlainObject(d.download) ? d.download : {};
+  picked.download = { url: download.url ?? '', sheet: download.sheet == null ? '' : String(download.sheet), header_row: download.header_row == null ? '' : String(download.header_row) };
   picked.description_tags = Array.isArray(d.description_tags) ? d.description_tags : [];
   for (const [group, keys] of Object.entries(vocabulary.statistical_tags)) {
     const existing = isPlainObject(d[group]) ? d[group] : {};
@@ -125,10 +151,14 @@ const canonical = (v) =>
 export function toTopLevelUpdates(current, normalized, vocabulary) {
   const updates = {};
   for (const [field, value] of Object.entries(normalized)) {
-    const merged =
+    let merged =
       field === 'provider' || field === 'download'
         ? { ...(isPlainObject(current[field]) ? current[field] : {}), ...value }
         : value;
+    if (field === 'download') {
+      // A cleared sheet/header_row means "auto-detect": drop the key instead of writing null.
+      merged = Object.fromEntries(Object.entries(merged).filter(([k, v]) => !(['sheet', 'header_row'].includes(k) && v === null)));
+    }
     if (canonical(merged) !== canonical(current[field])) updates[field] = merged;
   }
   const tagFields = Object.keys(updates).filter((f) => f === 'description_tags' || Object.hasOwn(vocabulary.statistical_tags, f));
