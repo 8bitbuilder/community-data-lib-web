@@ -60,10 +60,6 @@ const activeFilters = [
   query ? `Search: ${query}` : '',
 ].filter(Boolean);
 
-const teacherViewHref = withBasePath('/complete-catalog?audience=teacher');
-const studentViewHref = withBasePath('/complete-catalog?audience=student');
-const communityViewHref = withBasePath('/complete-catalog?audience=community');
-
 function formatDate(date: Date | undefined): string {
   if (!date) return 'Not specified';
   return date.toLocaleDateString('en-US', {
@@ -135,7 +131,7 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
 
 
   <section class="suggestion-block" aria-labelledby="suggestion-heading">
-    <h2 id="suggestion-heading">Can't find what you're looking for?</h2>
+    <h2 id="suggestion-heading">Have a dataset suggestion?</h2>
     <p>Click here to submit a request to add a new dataset to our catalog.</p>
     <a class="button suggestion-cta" href={suggestionHref}>
       Suggest A Data Resource
@@ -149,28 +145,12 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
         Filters
       </button>
 
-      <!-- View guide cards: clicking switches audience (client-side, no reload) -->
-      <section class="view-guide" aria-label="Audience views">
-        <a href={teacherViewHref} data-audience="teacher" class="view-card view-card-teacher">
-          <h2>Teacher View</h2>
-          <p>Shows pedagogical tags and the full dataset set for classroom planning.</p>
-        </a>
-        <a href={studentViewHref} data-audience="student" class="view-card view-card-student">
-          <h2>Student View</h2>
-          <p>Shows the student-safe catalog with sensitive datasets removed.</p>
-        </a>
-        <a href={communityViewHref} data-audience="community" class="view-card view-card-community">
-          <h2>Communities View</h2>
-          <p>Shows the full catalog with every dataset included.</p>
-        </a>
-      </section>
-
       <header class="content-header">
         <div>
           <h1>Complete Catalog</h1>
           <p id="audience-label-text">
-            Showing <strong>Community Member</strong> view.
-            Switch views to compare audience-specific filters.
+            Showing <strong>Complete Catalog</strong> view.
+            All datasets are located here. Adjust filters on the left to locate a specific resource.
           </p>
         </div>
       </header>
@@ -348,7 +328,7 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
     const audienceDescriptions: Record<string, string> = {
       teacher: 'Teacher view — pedagogical tags are available in this view.',
       student: 'Student view — sensitive datasets are excluded.',
-      community: 'Communities view — complete, unfiltered catalog showing all datasets.',
+      community: 'Complete catalog showing all datasets. Adjust filters on the left to locate a specific resource.',
     };
     const audienceDisplayNames: Record<string, string> = {
       teacher: 'Teacher',
@@ -378,11 +358,11 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
       }
 
       // Update audience label paragraph
-      if (audienceLabelEl) {
-        const name = audienceDisplayNames[audience] ?? 'Community Member';
-        const desc = audienceDescriptions[audience] ?? '';
-        audienceLabelEl.innerHTML = `Showing <strong>${name}</strong> view. ${desc}`;
-      }
+      // if (audienceLabelEl) {
+      //   const name = audienceDisplayNames[audience] ?? 'Community Member';
+      //   const desc = audienceDescriptions[audience] ?? '';
+      //   audienceLabelEl.innerHTML = `Showing <strong>${name}</strong> view. ${desc}`;
+      // }
 
       // Update hidden form input so form submissions preserve the audience
       if (hiddenAudienceInput) hiddenAudienceInput.value = audience;

@@ -344,7 +344,7 @@ function isDataResourcesActive(path: string): boolean {
     background: var(--color-primary-glow);
   }
 
-  .nav-link.active::after {
+  .nav-link.active:not(.nav-summary)::after {
     content: '';
     position: absolute;
     bottom: 0;
