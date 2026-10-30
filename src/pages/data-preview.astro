@@ -2,6 +2,7 @@
 import Layout from '@layouts/Layout.astro';
 import { withBasePath } from '@lib/paths';
 import MetadataEditor from '@components/MetadataEditor.astro';
+import Notebook from '@components/notebook/Notebook';
 
 const audience = (Astro.url.searchParams.get('audience') ?? '').trim();
 const tutorialHref = withBasePath('/data-resources');
@@ -178,6 +179,8 @@ const catalogHref = withBasePath('/complete-catalog');
           </div>
         </div>
       </div>
+
+      <Notebook client:only="react" />
     </div>
   </section>
 
@@ -1034,7 +1037,8 @@ const catalogHref = withBasePath('/complete-catalog');
       gap: var(--space-8);
     }
 
-    .panel-card {
+    .panel-card,
+    :global(.cdl-notebook.panel-card) {
       background: var(--color-surface);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-lg);
@@ -1216,7 +1220,8 @@ const catalogHref = withBasePath('/complete-catalog');
       white-space: nowrap;
     }
 
-    .section-title {
+    .section-title,
+    :global(.cdl-notebook .section-title) {
       margin: 0;
       font-family: var(--font-display);
       font-size: var(--font-size-lg);
@@ -1283,6 +1288,7 @@ const catalogHref = withBasePath('/complete-catalog');
     }
 
     .btn-download,
+    :global(.cdl-notebook .btn-download),
     .btn-tutorial {
       display: inline-flex;
       align-items: center;
@@ -1300,13 +1306,15 @@ const catalogHref = withBasePath('/complete-catalog');
       white-space: nowrap;
     }
 
-    .btn-download {
+    .btn-download,
+    :global(.cdl-notebook .btn-download) {
       background: var(--color-secondary);
       color: #fff;
       border-color: var(--color-secondary);
     }
 
-    .btn-download:hover {
+    .btn-download:hover,
+    :global(.cdl-notebook .btn-download:hover) {
       background: var(--color-secondary-light);
       opacity: 1;
     }
