@@ -5,10 +5,11 @@ const currentPath = Astro.url.pathname;
 
 const homeHref = withBasePath('/');
 const catalogHref = withBasePath('/complete-catalog');
-const communityHref = withBasePath('/community-library');
+const exampleCommunityHref = withBasePath('/communities/knox-county/');
 const mapHref = withBasePath('/maps');
 const dataResourcesHref = withBasePath('/data-resources');
 const submitHref = withBasePath('/submit');
+const createCommunityHref = withBasePath('/create-community-library');
 
 const navItems = [
   { href: homeHref, label: 'Home' },
@@ -17,7 +18,7 @@ const navItems = [
 
 const navItemsAfter = [
   { href: mapHref, label: 'Interactive Map' },
-  { href: communityHref, label: 'Example Community Library', external: true },
+  { href: exampleCommunityHref, label: 'Example Community Library', external: true },
 ];
 
 const dataResourcesItems = [
@@ -92,7 +93,7 @@ function isDataResourcesActive(path: string): boolean {
 
     <!-- CTA + hamburger -->
     <div class="nav-actions">
-      <a href={submitHref} class="nav-cta">Create A Community Library</a>
+      <a href={createCommunityHref} class="nav-cta">Create A Community Library</a>
       <button
         class="mobile-menu-button"
         aria-label="Toggle navigation menu"
@@ -134,7 +135,7 @@ function isDataResourcesActive(path: string): boolean {
         </details>
       </li>
       <li><a href={homeHref} class={`mobile-link ${isActive(homeHref, currentPath) ? 'active' : ''}`}>Home</a></li>
-      <li><a href={submitHref} class="mobile-link mobile-link-cta">Create Your Community's Library →</a></li>
+      <li><a href={createCommunityHref} class="mobile-link mobile-link-cta">Create Your Community's Library →</a></li>
     </ul>
   </div>
 </nav>

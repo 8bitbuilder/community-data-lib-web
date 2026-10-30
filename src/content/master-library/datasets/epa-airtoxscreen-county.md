@@ -6,21 +6,18 @@ sourceId: "epa-airtoxscreen-county"
 category: "dataset"
 syncedFromBackend: true
 tags:
-  - "dataset"
-  - "government-data"
+  - "Energy & Environment"
+  - "Government Administration"
   - "county"
-  - "energy-environment"
-  - "government-administration"
 dataThemes:
-  - "energy-environment"
-  - "government-administration"
-pedagogicalTags:
-  - data-literacy
-audienceAccess:
-  teacher: true
-  student: true
-  community: true
+  - "Energy & Environment"
+  - "Government Administration"
+pedagogicalTags: []
 sensitive: false
+studentSuitability: "unreviewed"
+granularity: "county"
+coverage:
+  - { level: "nation", geoid: "US" }
 url: "https://www.epa.gov/system/files/other-files/2024-05/airtoxscreen_2020_emissions_county_sourcegroup.zip"
 featured: false
 difficulty: "beginner"

@@ -1,30 +1,16 @@
 ---
 title: "U.S. Milk Production and Related Data"
-description: "U.S. Milk Production and Related Data from USDA Economic Research Service (ERS) (U.S. Department of Agriculture). Topics include Agriculture, Economy, Energy & Environment, Government Administration, Health & Social Services, and more. Data is available for direct download."
+description: "U.S. Milk Production and Related Data from USDA Economic Research Service (ERS) (U.S. Department of Agriculture). Topics include Agriculture, Business & Economy. Data is available for direct download."
 author: "USDA Economic Research Service (ERS)"
 sourceId: "usda-milk-production"
 category: "dataset"
 syncedFromBackend: true
 tags:
-  - "dataset"
-  - "government-data"
-  - "agriculture"
-  - "economy"
-  - "energy-environment"
-  - "government-administration"
-  - "health-social-services"
-  - "housing-buildings"
-  - "population-data"
-  - "restaurant-and-food-service"
+  - "Agriculture"
+  - "Business & Economy"
 dataThemes:
-  - "agriculture"
-  - "economy"
-  - "energy-environment"
-  - "government-administration"
-  - "health-social-services"
-  - "housing-buildings"
-  - "population-data"
-  - "restaurant-and-food-service"
+  - "Agriculture"
+  - "Business & Economy"
 pedagogicalTags:
   - "good for one way anova"
   - "good for chi square independence"
@@ -34,11 +20,38 @@ pedagogicalTags:
   - "has multiple numeric columns"
   - "has categorical variable"
   - "has group comparison candidates"
-audienceAccess:
-  teacher: true
-  student: true
-  community: true
+  - "meets minimum sample size"
+  - "has paired test candidates"
+  - "mean median similar"
+  - "mean median different"
+  - "has mode"
+  - "multiple groups present"
+  - "groups have different centers"
+  - "groups have different spreads"
+  - "groups overlap substantially"
+  - "symmetric distribution"
+  - "right skewed distribution"
+  - "good for one sample t test"
+  - "good for one sample z test"
+  - "fails normality test"
+  - "large enough for clt"
+  - "contains outliers"
+  - "extreme outliers"
+  - "poor linear fit"
+  - "has influential points"
+  - "good for transformation"
+  - "multivariate"
+  - "large dataset"
+  - "large scale values"
+  - "high variability"
+  - "low variability"
+  - "wide range"
+  - "mixed types"
 sensitive: false
+studentSuitability: "unreviewed"
+granularity: "nation"
+coverage:
+  - { level: "nation", geoid: "US" }
 url: "https://www.ers.usda.gov/data-products/dairy-data"
 featured: false
 difficulty: "beginner"

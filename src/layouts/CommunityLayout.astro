@@ -7,7 +7,7 @@ interface Props {
   description?: string;
   communityName: string;
   communityLocation?: string;
-  communityBase: string; // e.g. '/example-community-library'
+  communityBase: string; // e.g. '/communities/knox-county'
 }
 
 const {
@@ -22,11 +22,18 @@ const pageTitle = title ? `${title} | ${communityName}` : communityName;
 
 const base = communityBase.replace(/\/$/, '');
 const homeHref   = withBasePath(`${base}/`);
-const catalogHref = withBasePath(`${base}/catalog`);
-const mapHref     = withBasePath(`${base}/map`);
-const dataHref    = withBasePath(`${base}/data-resources`);
+const catalogHref = withBasePath(`${base}/catalog/`);
+// Data Resources and Suggest a Data Resource are main-site pages; community
+// libraries never get their own copies (or their own map).
+const dataHref    = withBasePath('/data-resources');
 const submitHref  = withBasePath('/submit');
 const cdlHref     = withBasePath('/');
+
+const navItems = [
+  { href: catalogHref, label: 'Community Catalog', carryAudience: true },
+  { href: dataHref, label: 'Data Resources', carryAudience: false },
+  { href: submitHref, label: 'Suggest a Data Resource', carryAudience: false },
+];
 
 const currentPath = Astro.url.pathname;
 function isActive(href: string): boolean {
@@ -74,17 +81,13 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
 
         <!-- Desktop links -->
         <ul class="nav-links" id="nav-links">
-          {[
-            { href: homeHref,    label: 'Home'           },
-            { href: catalogHref, label: 'Catalog'        },
-            { href: mapHref,     label: 'Map'            },
-            { href: dataHref,    label: 'Data Resources' },
-          ].map(item => (
+          {navItems.map(item => (
             <li class="nav-item">
               <a
                 href={item.href}
                 class={`nav-link ${isActive(item.href) ? 'active' : ''}`}
                 aria-current={isActive(item.href) ? 'page' : undefined}
+                data-carry-audience={item.carryAudience ? '' : undefined}
               >{item.label}</a>
             </li>
           ))}
@@ -92,7 +95,6 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
 
         <!-- Actions -->
         <div class="nav-actions">
-          <a href={submitHref} class="nav-cta">Suggest a Dataset</a>
           <a href={cdlHref} class="nav-cdl" title="Community Data Libraries network">
             <span class="cdl-badge">CDL</span>
           </a>
@@ -112,19 +114,17 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
       <!-- Mobile drawer -->
       <div class="mobile-drawer" id="mobile-drawer" aria-hidden="true">
         <ul class="mobile-links">
-          {[
-            { href: homeHref,    label: 'Home'           },
-            { href: catalogHref, label: 'Catalog'        },
-            { href: mapHref,     label: 'Map'            },
-            { href: dataHref,    label: 'Data Resources' },
-          ].map(item => (
+          {navItems.map(item => (
             <li>
-              <a href={item.href} class={`mobile-link ${isActive(item.href) ? 'active' : ''}`}>
+              <a
+                href={item.href}
+                class={`mobile-link ${isActive(item.href) ? 'active' : ''}`}
+                data-carry-audience={item.carryAudience ? '' : undefined}
+              >
                 {item.label}
               </a>
             </li>
           ))}
-          <li><a href={submitHref} class="mobile-link mobile-link-cta">Suggest a Dataset →</a></li>
           <li><a href={cdlHref} class="mobile-link mobile-link-cdl">← Back to Community Data Libraries</a></li>
         </ul>
       </div>
@@ -146,10 +146,9 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
           </div>
           <nav class="footer-links" aria-label="Footer navigation">
             <a href={homeHref}>Home</a>
-            <a href={catalogHref}>Catalog</a>
-            <a href={mapHref}>Map</a>
+            <a href={catalogHref} data-carry-audience>Community Catalog</a>
             <a href={dataHref}>Data Resources</a>
-            <a href={submitHref}>Suggest a Dataset</a>
+            <a href={submitHref}>Suggest a Data Resource</a>
             <a href={cdlHref}>Community Data Libraries ↗</a>
           </nav>
         </div>
@@ -163,6 +162,12 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
 </html>
 
 <script>
+  import { applyAudienceToLinks, currentAudience } from '../lib/client/audience';
+
+  // Keep the visitor's chosen role on links within this community library.
+  const audience = currentAudience();
+  if (audience) applyAudienceToLinks(audience);
+
   const btn = document.getElementById('mobile-menu-button');
   const drawer = document.getElementById('mobile-drawer');
   btn?.addEventListener('click', () => {

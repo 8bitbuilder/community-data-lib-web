@@ -120,9 +120,12 @@ const THEME_GROUPS = [
               id="url"
               name="url"
               required
-              placeholder="https://example.org/dataset"
+              placeholder="https://example.org/data.csv"
               autocomplete="off"
             />
+            <span class="field-hint">
+              Link straight to the data file (CSV, TSV, or a .zip containing one), not to a web page about it.
+            </span>
           </div>
 
           <!-- <div class="field-row">
@@ -305,6 +308,21 @@ const THEME_GROUPS = [
           <div>
             <strong>Publicly accessible</strong>
             <p>Datasets must be freely available online. Clearly document any access requirements.</p>
+          </div>
+        </div>
+
+        <div class="guideline-item">
+          <div class="guideline-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div>
+            <strong>A file we can preview</strong>
+            <p>
+              We list datasets we can open and preview, so the URL must download the data directly
+              without a login: a CSV or TSV file, or a .zip that contains one. We can't use yet:
+              Excel files (.xlsx/.xls), data portals or search pages you have to click through,
+              APIs, PDFs, or anything behind an account.
+            </p>
           </div>
         </div>
 

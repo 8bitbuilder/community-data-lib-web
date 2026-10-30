@@ -34,10 +34,13 @@ DecapCMS works with or without Netlify, but on Netlify the typical path is `git-
 
 ## Notes for this repo
 
-- Content maps to `src/content/complete-catalog`.
-- New metadata fields are included for role-aware views:
-  - `dataThemes`
-  - `pedagogicalTags`
-  - `audienceAccess`
-  - `sensitive`
-- Teacher view can include pedagogical tags; student/community views are theme-only and filtered.
+- Decap manages **community configuration only**: `src/content/communities/*.md`
+  (`name`, `place_name`, `slug`, `state_code`, `county`, `county_fips`, `zip_codes`). Librarian
+  emails are kept privately by the librarian portal, not in these files.
+- There is no dataset collection in Decap. Datasets are generated from the backend
+  pipeline into `src/content/master-library/datasets/` and must be maintained there.
+- Community libraries (`/communities/<slug>/`) are filtered views of the main catalog.
+- Community librarians now use the librarian portal (`/librarian/`, see the README) rather
+  than Decap; Decap is kept for the team, with Git Gateway restricted to a team role.
+  Visitors never sign in; the Teacher / Student / Community Member choice only customizes
+  the catalog view.

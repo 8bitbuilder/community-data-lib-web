@@ -1,0 +1,335 @@
+---
+import CommunityLayout from '@layouts/CommunityLayout.astro';
+import { getCollection, type CollectionEntry } from 'astro:content';
+import { withBasePath } from '@lib/paths';
+import {
+  AUDIENCE_LABELS,
+  AUDIENCE_ROLES,
+  communityDisplay,
+  matchesCommunity,
+  topicalTags,
+  visibleAudiences,
+} from '@lib/data/communityFilter';
+
+export async function getStaticPaths() {
+  const communities = await getCollection('communities');
+  return communities.map((community) => ({
+    params: { slug: community.data.slug },
+    props: { community },
+  }));
+}
+
+interface Props {
+  community: CollectionEntry<'communities'>;
+}
+
+const { community } = Astro.props;
+const data = community.data;
+const { libraryTitle, placeName } = communityDisplay(data);
+const base = `/communities/${data.slug}`;
+const location = [data.county, data.state_code].filter(Boolean).join(', ');
+
+// A community catalog is always a filtered view of the main catalog.
+const resources = (await getCollection('master-library'))
+  .filter((entry) => matchesCommunity(entry.data, data))
+  .sort((a, b) => a.data.title.localeCompare(b.data.title));
+
+function detailHref(entry: CollectionEntry<'master-library'>): string {
+  if (entry.data.sourceId) {
+    return withBasePath(
+      `/data-preview?source=${encodeURIComponent(entry.data.sourceId)}&audience=community&community=${encodeURIComponent(data.slug)}`
+    );
+  }
+  return entry.data.url ?? withBasePath('/complete-catalog');
+}
+---
+
+<CommunityLayout
+  title="Community Catalog"
+  description={`Datasets for ${placeName} from the Community Data Libraries catalog.`}
+  communityName={libraryTitle}
+  communityLocation={location || undefined}
+  communityBase={base}
+>
+  <div class="catalog-shell">
+    <header class="page-header">
+      <p class="eyebrow">Community Catalog</p>
+      <h1>Data for {placeName}</h1>
+      <p class="intro">
+        A view of the main Community Data Libraries catalog filtered to {placeName}. Pick a view to
+        adjust which datasets and tags are shown.
+      </p>
+    </header>
+
+    <div class="view-switch" role="group" aria-label="Catalog view">
+      {
+        AUDIENCE_ROLES.map((role) => (
+          <button type="button" class="view-btn" data-audience={role} aria-pressed="false">
+            {AUDIENCE_LABELS[role]}
+          </button>
+        ))
+      }
+    </div>
+
+    <section
+      class="catalog"
+      id="community-catalog"
+      data-audience="community"
+      aria-labelledby="catalog-heading"
+    >
+      <div class="catalog-header">
+        <h2 id="catalog-heading">
+          <span id="catalog-view-label">{AUDIENCE_LABELS.community}</span> view
+        </h2>
+        <p><strong id="catalog-count">{resources.length}</strong> datasets</p>
+      </div>
+
+      {
+        resources.length === 0 ? (
+          <div class="empty-state">
+            <p>
+              No datasets in the main catalog are linked to {placeName} yet. Browse the
+              <a href={withBasePath('/complete-catalog')}>complete catalog</a> or
+              <a href={withBasePath('/submit')}>suggest a data resource</a>.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div class="cards">
+              {resources.map((entry) => {
+                const external = !entry.data.sourceId && Boolean(entry.data.url);
+                return (
+                  <article class="dataset-card" data-audiences={visibleAudiences(entry.data)}>
+                    <h3>
+                      <a
+                        href={detailHref(entry)}
+                        class="detail-link"
+                        data-carry-audience={entry.data.sourceId ? '' : undefined}
+                        target={external ? '_blank' : undefined}
+                        rel={external ? 'noopener noreferrer' : undefined}
+                      >
+                        {entry.data.title}
+                        {external && ' ↗'}
+                      </a>
+                    </h3>
+                    <p>{entry.data.description}</p>
+                    <div class="chips">
+                      {topicalTags(entry.data, data)
+                        .slice(0, 4)
+                        .map((tag) => (
+                          <span class="chip chip-topical">{tag}</span>
+                        ))}
+                      {entry.data.pedagogicalTags.slice(0, 3).map((tag) => (
+                        <span class="chip chip-pedagogical">{tag}</span>
+                      ))}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            <p class="empty-state" id="view-empty" hidden>
+              No datasets are shown in this view. Try another view above.
+            </p>
+          </>
+        )
+      }
+    </section>
+  </div>
+
+  <script>
+    import { currentAudience, selectAudience } from '../../../lib/client/audience';
+    import {
+      AUDIENCE_LABELS,
+      normalizeAudience,
+      type AudienceRole,
+    } from '../../../lib/data/communityFilter';
+
+    const catalog = document.getElementById('community-catalog');
+    const label = document.getElementById('catalog-view-label');
+    const count = document.getElementById('catalog-count');
+    const viewEmpty = document.getElementById('view-empty');
+    const buttons = document.querySelectorAll<HTMLButtonElement>('.view-btn[data-audience]');
+
+    function render(audience: AudienceRole) {
+      if (!catalog) return;
+      catalog.dataset.audience = audience;
+      buttons.forEach((button) =>
+        button.setAttribute('aria-pressed', String(button.dataset.audience === audience))
+      );
+      if (label) label.textContent = AUDIENCE_LABELS[audience];
+      const cards = catalog.querySelectorAll<HTMLElement>('.dataset-card');
+      let visible = 0;
+      cards.forEach((card) => {
+        if ((card.dataset.audiences ?? '').split(' ').includes(audience)) visible++;
+      });
+      if (count) count.textContent = String(visible);
+      if (viewEmpty) viewEmpty.hidden = cards.length === 0 || visible > 0;
+    }
+
+    buttons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const audience = normalizeAudience(button.dataset.audience);
+        if (!audience) return;
+        selectAudience(audience);
+        render(audience);
+      });
+    });
+
+    render(currentAudience() ?? 'community');
+  </script>
+
+  <style>
+    .catalog-shell {
+      display: grid;
+      gap: var(--space-8);
+    }
+
+    .page-header {
+      display: grid;
+      gap: var(--space-3);
+      max-width: 72ch;
+    }
+
+    .eyebrow {
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      color: var(--color-secondary);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3rem);
+    }
+
+    .intro {
+      margin: 0;
+      color: var(--color-text-muted);
+      font-size: var(--font-size-lg);
+      line-height: var(--line-height-relaxed);
+    }
+
+    .view-switch {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+    }
+
+    .view-btn {
+      padding: var(--space-2) var(--space-4);
+      border: 1.5px solid var(--color-border);
+      border-radius: 999px;
+      background: var(--color-surface);
+      color: var(--color-text);
+      font: inherit;
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .view-btn[aria-pressed='true'] {
+      background: var(--color-secondary);
+      border-color: var(--color-secondary);
+      color: #f8fafc;
+    }
+
+    .catalog {
+      display: grid;
+      gap: var(--space-4);
+    }
+
+    .catalog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      border-bottom: 1px solid var(--color-border);
+      padding-bottom: var(--space-3);
+    }
+
+    .catalog-header h2 {
+      margin: 0;
+      font-size: var(--font-size-xl);
+    }
+
+    .catalog-header p {
+      margin: 0;
+      color: var(--color-text-muted);
+      font-size: var(--font-size-sm);
+    }
+
+    .cards {
+      display: grid;
+      gap: var(--space-3);
+    }
+
+    .dataset-card {
+      display: grid;
+      gap: var(--space-3);
+      padding: var(--space-5);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface);
+    }
+
+    .dataset-card h3 {
+      margin: 0;
+      font-size: var(--font-size-lg);
+    }
+
+    .dataset-card p {
+      margin: 0;
+      color: var(--color-text-muted);
+      font-size: var(--font-size-sm);
+      line-height: var(--line-height-relaxed);
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+    }
+
+    .chip {
+      font-size: var(--font-size-xs);
+      padding: 2px var(--space-2);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-raised);
+      color: var(--color-text-muted);
+    }
+
+    .chip-pedagogical {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+      background: var(--color-primary-glow);
+    }
+
+    /* Role views (display only, not access control). */
+    .catalog[data-audience='teacher'] .dataset-card:not([data-audiences~='teacher']),
+    .catalog[data-audience='student'] .dataset-card:not([data-audiences~='student']),
+    .catalog[data-audience='community'] .dataset-card:not([data-audiences~='community']) {
+      display: none;
+    }
+
+    .catalog:not([data-audience='teacher']) .chip-pedagogical {
+      display: none;
+    }
+
+    .empty-state {
+      margin: 0;
+      padding: var(--space-8);
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius-md);
+      text-align: center;
+      color: var(--color-text-muted);
+    }
+
+    .empty-state p {
+      margin: 0;
+    }
+  </style>
+</CommunityLayout>

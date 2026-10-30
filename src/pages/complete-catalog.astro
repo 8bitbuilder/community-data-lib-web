@@ -2,7 +2,7 @@
 import Layout from '@layouts/Layout.astro';
 import { getCollection } from 'astro:content';
 import { canAudienceAccess, extractPedagogicalTags, type AudienceRole } from '@lib/data/libraryAccess';
-import { withBasePath } from '@lib/paths';
+import { catalogEntryHref, withBasePath } from '@lib/paths';
 
 const resources = await getCollection('master-library');
 
@@ -73,11 +73,7 @@ function formatDate(date: Date | undefined): string {
 }
 
 function getPreviewHref(resource: (typeof resources)[number]): string {
-  const source = resource.data.sourceId;
-  if (!source) {
-    return resource.data.url ?? withBasePath('/complete-catalog');
-  }
-  return withBasePath(`/data-preview?source=${encodeURIComponent(source)}&audience=AUDIENCE_PLACEHOLDER`);
+  return catalogEntryHref(resource.data, 'AUDIENCE_PLACEHOLDER');
 }
 ---
 
@@ -210,6 +206,7 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
                     data-title={resource.data.title}
                     data-search={[resource.data.title, resource.data.description, ...themes].join(' ').toLowerCase()}
                     data-themes={themes.join('|')}
+                    data-pedagogical={resource.data.pedagogicalTags.join('|')}
                     data-date={resource.data.publishedDate ? new Date(resource.data.publishedDate).getTime() : 0}
                   >
                     <div class="result-main">
@@ -254,6 +251,7 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
                         data-title={resource.data.title}
                         data-search={[resource.data.title, resource.data.description, ...themes].join(' ').toLowerCase()}
                         data-themes={themes.join('|')}
+                        data-pedagogical={resource.data.pedagogicalTags.join('|')}
                         data-date={resource.data.publishedDate ? new Date(resource.data.publishedDate).getTime() : 0}
                       >
                         <td class="td-title">
@@ -393,6 +391,7 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
         url.searchParams.set('audience', audience);
         history.pushState({ audience }, '', url.toString());
         applyAudience(audience);
+        applyFilters();
       });
     });
 
@@ -400,6 +399,7 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
     window.addEventListener('popstate', () => {
       const audience = new URLSearchParams(window.location.search).get('audience') ?? 'community';
       applyAudience(audience);
+      applyFilters();
     });
 
     // Apply audience on page load from URL
@@ -412,10 +412,22 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
     const themeSelect   = filterForm?.querySelector<HTMLSelectElement>('[name="theme"]') ?? null;
     const sortSelect    = filterForm?.querySelector<HTMLSelectElement>('[name="sort"]') ?? null;
     const resetBtn      = document.getElementById('catalog-reset-btn');
-    const pedagFilterEl = document.getElementById('pedagogical-tag-filter');
     const pedagSelect   = filterForm?.querySelector<HTMLSelectElement>('[name="pedagogicalTag"]') ?? null;
     const cardsView     = document.querySelector<HTMLElement>('.cards-view');
     const tableBody     = document.querySelector<HTMLElement>('.table-view tbody');
+
+    // The pedagogical filter only applies in teacher view, where it's visible.
+    function matchesFilters(el: HTMLElement, q: string, theme: string, ptag: string) {
+      const search = el.dataset.search ?? '';
+      const themes = (el.dataset.themes ?? '').split('|').filter(Boolean);
+      const pedagogical = (el.dataset.pedagogical ?? '').split('|').filter(Boolean);
+      const teacherView = section?.dataset.audience === 'teacher';
+      return (
+        (!q || search.includes(q)) &&
+        (!theme || themes.includes(theme)) &&
+        (!ptag || !teacherView || pedagogical.includes(ptag))
+      );
+    }
 
     function applyFilters() {
       const q     = searchInput?.value.trim().toLowerCase() ?? '';
@@ -426,18 +438,14 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
       // Filter cards
       const cards = Array.from(document.querySelectorAll<HTMLElement>('.result-card:not(.empty)'));
       cards.forEach(card => {
-        const search = card.dataset.search ?? '';
-        const themes = (card.dataset.themes ?? '').split('|').filter(Boolean);
-        const ok = (!q || search.includes(q)) && (!theme || themes.includes(theme));
+        const ok = matchesFilters(card, q, theme, ptag);
         card.classList.toggle('filtered-out', !ok);
       });
 
       // Filter table rows
       const rows = Array.from(document.querySelectorAll<HTMLElement>('tr[data-audiences]'));
       rows.forEach(row => {
-        const search = row.dataset.search ?? '';
-        const themes = (row.dataset.themes ?? '').split('|').filter(Boolean);
-        const ok = (!q || search.includes(q)) && (!theme || themes.includes(theme));
+        const ok = matchesFilters(row, q, theme, ptag);
         row.classList.toggle('filtered-out', !ok);
       });
 

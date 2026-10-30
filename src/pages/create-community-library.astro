@@ -1,0 +1,237 @@
+---
+import Layout from '@layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+import { withBasePath } from '@lib/paths';
+
+// Existing libraries come from the same collection that generates community pages,
+// so this list can never drift from what is actually published.
+const communities = (await getCollection('communities')).sort((a, b) =>
+  a.data.name.localeCompare(b.data.name)
+);
+
+const librarianPortalHref = withBasePath('/librarian/');
+---
+
+<Layout
+  title="Create a Community Library"
+  description="What a community data library is, how to start one, and which communities already have one."
+>
+  <section class="create-shell">
+    <header class="page-header">
+      <p class="eyebrow">Community Libraries</p>
+      <h1>Create a community library.</h1>
+      <p class="intro">
+        A community library is a local view of the main Community Data Libraries catalog. It gives
+        your community its own landing page and a catalog filtered to your place, while every
+        dataset continues to come from, and be maintained in, the main library.
+      </p>
+    </header>
+
+    <div class="info-grid">
+      <article class="info-card">
+        <h2>What you get</h2>
+        <ul>
+          <li>A welcome page with your community's name.</li>
+          <li>Teacher, Student, and Community Member entry points.</li>
+          <li>A community catalog filtered from the main catalog by your geography.</li>
+        </ul>
+      </article>
+      <article class="info-card">
+        <h2>What you maintain</h2>
+        <ul>
+          <li>Your community's name and web address (slug).</li>
+          <li>Its geographic identifiers, especially the five-digit county FIPS code.</li>
+          <li>Who else can edit it: add colleagues as librarians by email.</li>
+        </ul>
+        <p class="note">
+          Dataset details are maintained in the main library. To add a dataset, use
+          <a href={withBasePath('/submit')}>Suggest a Data Resource</a>.
+        </p>
+      </article>
+    </div>
+
+    <section class="steps" aria-labelledby="steps-heading">
+      <h2 id="steps-heading">How to create one</h2>
+      <ol>
+        <li>
+          <strong>Check the list below.</strong> Each county can have one library. If yours already has
+          one, use the contact form on its page to reach its librarian instead of creating a duplicate.
+        </li>
+        <li>
+          <strong>Create a librarian account.</strong> Sign up in the librarian portal with your email
+          address and confirm it from the email we send you.
+        </li>
+        <li>
+          <strong>Look up your county FIPS code.</strong> It is the five-digit code for your county (for
+          example, Knox County, Tennessee is <code>47093</code>). The
+          <a
+            href="https://www.census.gov/library/reference/code-lists/ansi.html"
+            target="_blank"
+            rel="noopener noreferrer">Census ANSI code lists</a
+          > include every county.
+        </li>
+        <li>
+          <strong>Register your library.</strong> In the portal, enter its name, state, county FIPS code, and
+          ZIP codes. You become its first librarian and can add colleagues afterwards.
+        </li>
+        <li>
+          <strong>Approval.</strong> The Community Data Libraries team reviews new libraries. Once approved,
+          the site rebuilds within a few minutes and your library appears on the list below. After that,
+          your edits in the portal publish right away.
+        </li>
+      </ol>
+      <a href={librarianPortalHref} class="button">Open the librarian portal</a>
+      <p class="note">Only librarians sign in. Visitors never need an account.</p>
+    </section>
+
+    <section class="existing" id="existing" aria-labelledby="existing-heading">
+      <h2 id="existing-heading">Existing community libraries</h2>
+      {
+        communities.length > 0 ? (
+          <ul class="community-list">
+            {communities.map((community) => (
+              <li class="community-item">
+                <a href={withBasePath(`/communities/${community.data.slug}/`)}>
+                  {community.data.name}
+                </a>
+                <span class="community-meta">
+                  {[community.data.county, community.data.state_code].filter(Boolean).join(', ')}
+                  {community.data.county_fips && ` · FIPS ${community.data.county_fips}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p class="empty-state">No community libraries have been created yet.</p>
+        )
+      }
+    </section>
+  </section>
+
+  <style>
+    .create-shell {
+      display: grid;
+      gap: var(--space-8);
+    }
+
+    .page-header {
+      display: grid;
+      gap: var(--space-3);
+      max-width: 70ch;
+    }
+
+    .eyebrow {
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      color: var(--color-secondary);
+    }
+
+    .page-header h1 {
+      margin: 0;
+      font-size: clamp(2.25rem, 4vw, 3.5rem);
+    }
+
+    .intro {
+      margin: 0;
+      color: var(--color-text-muted);
+      font-size: var(--font-size-lg);
+    }
+
+    .info-grid {
+      display: grid;
+      gap: var(--space-5);
+    }
+
+    @media (min-width: 900px) {
+      .info-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    .info-card,
+    .steps,
+    .existing {
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      border-radius: var(--radius-xl);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-sm);
+      display: grid;
+      gap: var(--space-4);
+      align-content: start;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-2xl);
+    }
+
+    ul,
+    ol {
+      margin: 0;
+      padding-left: 1.5rem;
+      color: var(--color-text-muted);
+    }
+
+    ul {
+      list-style: disc;
+    }
+
+    ol {
+      list-style: decimal;
+    }
+
+    li + li {
+      margin-top: var(--space-2);
+    }
+
+    .steps .button {
+      justify-self: start;
+    }
+
+    .note {
+      margin: 0;
+      color: var(--color-text-muted);
+      font-size: var(--font-size-sm);
+    }
+
+    .community-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .community-list li + li {
+      margin-top: 0;
+    }
+
+    .community-item {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2) var(--space-4);
+      align-items: baseline;
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .community-item a {
+      font-weight: 600;
+    }
+
+    .community-meta {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-dim);
+    }
+
+    .empty-state {
+      margin: 0;
+      padding: var(--space-6);
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius-md);
+      text-align: center;
+      color: var(--color-text-muted);
+    }
+  </style>
+</Layout>

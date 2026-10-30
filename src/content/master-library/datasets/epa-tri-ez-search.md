@@ -6,23 +6,20 @@ sourceId: "epa-tri-ez-search"
 category: "dataset"
 syncedFromBackend: true
 tags:
-  - "dataset"
-  - "government-data"
+  - "Energy & Environment"
+  - "Government Administration"
   - "state"
   - "county"
   - "year"
-  - "energy-environment"
-  - "government-administration"
 dataThemes:
-  - "energy-environment"
-  - "government-administration"
-pedagogicalTags:
-  - data-literacy
-audienceAccess:
-  teacher: true
-  student: true
-  community: true
+  - "Energy & Environment"
+  - "Government Administration"
+pedagogicalTags: []
 sensitive: false
+studentSuitability: "unreviewed"
+granularity: "zip"
+coverage:
+  - { level: "nation", geoid: "US" }
 featured: false
 difficulty: "beginner"
 language: "English"

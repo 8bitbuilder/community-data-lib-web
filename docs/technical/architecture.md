@@ -1,6 +1,6 @@
 # Web Architecture
 
-`web/` is a static Astro site (`output: 'static'`) that renders the CDL dataset catalog for different audiences, plus a geographic marker map and a content-editing CMS. This document covers the site's structure, routing, content model, its relationship to the backend, and CI/CD. For the data-pipeline side, see [`backend/docs/PIPELINE.md`](../../../backend/docs/PIPELINE.md); for how the two projects fit together, see the repo-root [`ARCHITECTURE.md`](../../../ARCHITECTURE.md).
+`web/` is a static Astro site (`output: 'static'`) that renders the CDL dataset catalog for different audiences, plus a county coverage map, static data previews, and a content-editing CMS. This document covers the site's structure, routing, content model, its relationship to the backend, and CI/CD. For the data-pipeline side, see [`backend/docs/PIPELINE.md`](../../../backend/docs/PIPELINE.md); for how the two projects fit together, see the repo-root [`ARCHITECTURE.md`](../../../ARCHITECTURE.md).
 
 ## Tech stack
 
@@ -12,7 +12,8 @@
 | Language | TypeScript, `astro/tsconfigs/strict`, path aliases `@components/*`, `@layouts/*`, `@content/*`, `@lib/*`, `@data/*` |
 | Content layer | Astro Content Collections — one collection, `master-library`, loaded via `glob()` from `src/content/master-library/**/*.md` |
 | Local backend (dev) | Plain Node `http` server mirrored at `web/backend/`, run with `node --experimental-sqlite` |
-| Validation | ajv + ajv-formats + `@mapbox/geojsonhint` for GeoJSON |
+| Map | Leaflet 1.9.4 (from unpkg) and `topojson-client` with one Census cartographic boundary TopoJSON file; `mapshaper` (dev) builds it |
+| Data previews | Static Tier 1 files from the backend (`public/previews/`, copied at build) |
 | CMS | Decap CMS, static admin at `public/admin/` |
 | Hosting | Netlify (`netlify.toml`, functions, forms) and GitHub Pages (`.github/workflows/astro.yml`) |
 | CI | GitHub Actions: `ci.yml` (lint/validate/build), `astro.yml` (Pages deploy) |
@@ -28,30 +29,36 @@
 | `sync:catalog` | Generates `src/content/master-library/datasets/*.md` from backend YAML |
 | `backend:import` | Runs canonical backend's SQLite importer, copies `sources.db` into the mirror |
 | `backend:pipeline` | Runs variable extraction for pipeline-ready sources, then `backend:import` |
-| `prebuild` | `sync:backend-yaml && check:backend-yaml && sync:catalog` (auto-runs before `build`) |
+| `check:geo` | Fails if any catalog coverage or community FIPS code is not in `src/data/geo-vocabulary.json` |
+| `sync:previews` | Copies the backend's Tier 1 preview files into `public/previews/` (gitignored, incremental, 250 KB per file limit) |
+| `prebuild` | `sync:backend-yaml && check:backend-yaml && sync:catalog && check:geo && sync:previews` (auto-runs before `build`) |
 | `build` | `astro build` |
-| `validate:geo` / `validate:schema` | Both run `scripts/validate-geojson.mjs` (lint + schema check on `data/geo/markers.geojson`) |
+| `geo:boundaries` | Builds the TopoJSON boundary file and the county vocabulary from the Census files (manual; not in `prebuild`; `--from`, `--backend`) |
 | `lint` | `eslint . --ext .ts,.tsx,.js,.jsx,.astro` |
-| `check` | `lint && validate:geo && build` — full local gate |
+| `check` | `lint && test && build` — full local gate |
 
 ## Directory overview
 
 ```
 web/
 ├── backend/            local MIRROR of ../backend (do not edit directly — see ARCHITECTURE.md)
-├── data/geo/           geographic marker data, independent of the dataset pipeline
 ├── docs/               this documentation
 ├── netlify/functions/  Netlify Forms webhook (submission-notify.js)
 ├── public/admin/       Decap CMS static admin app
+├── public/geo/boundaries/  Census TopoJSON boundaries for /maps (generated, committed)
+├── public/previews/    Tier 1 preview files copied from the backend at build time (gitignored)
 ├── scripts/            sync/validation scripts (Node ESM, run directly)
 └── src/
     ├── components/     Navigation.astro, etc.
     ├── content/         master-library/ — the one content collection (hand-authored + generated)
     ├── content.config.ts  Zod schema for master-library
+    ├── data/geo-vocabulary.json  every state and county GEOID (Census 2025), from geo:boundaries
     ├── layouts/          Layout.astro (site shell), CommunityLayout.astro (per-community branding)
     ├── lib/
     │   ├── api/backend.ts        typed client for the live backend proxy (preview/chart/datasheet)
-    │   ├── data/geo.ts            loads data/geo/markers.geojson
+    │   ├── community/geoVocabulary.mjs  state and county lookups over the vocabulary (pure, tested)
+    │   ├── data/coverageMap.ts    pure coverage logic for /maps (FIPS expansion, counts, labels)
+    │   ├── data/staticPreview.ts  Data Preview logic over the static files (pure, tested)
     │   ├── data/libraryAccess.ts  audience-access logic (teacher/student/community + sensitive-keyword filter)
     │   └── paths.ts               withBasePath() for GH-Pages base path handling
     ├── pages/            routes — see below
@@ -68,19 +75,19 @@ Content/catalog pages:
 - `/community-library` — community-submitted resources browser
 - `/community-member`, `/student`, `/teacher` — audience-specific views (via `extractThemes()`/`libraryAccess.ts`)
 - `/data-resources` — submission/lesson-plan links
-- `/data-preview` — interactive dataset preview (ApexCharts), requires `backend:dev` running locally
+- `/data-preview` — dataset preview from static Tier 1 files (ApexCharts); `?community=<slug>` opens that county's rows. See [previews.md](previews.md)
 - `/submit` — resource submission form (Netlify Forms)
-- `/maps` — interactive marker map, embeds `data/geo/markers.geojson`
+- `/maps` — county coverage map: counties shaded by how many datasets cover them, or one dataset's coverage
 - `/example-community-library/{index,catalog,data-resources,map}` — a reference community-library implementation (Knox County, TN) using `CommunityLayout`
 
 Static (build-time-rendered) API routes, `src/pages/api/*.ts`:
 
-- `/api/geo.json` — `data/geo/markers.geojson` as `application/geo+json`
 - `/api/complete-catalog.json` — full catalog (community-visible subset)
 - `/api/master-library.json` — legacy alias of the above
 - `/api/community.json` — `community-submissions.json`
+- `/geo/county-names.json` — county and state names by FIPS code, for the Data Preview county picker
 
-These are pre-rendered static files (because `output: 'static'`) — distinct from the *live* backend proxy (`/api/sources`, `/api/health`), which only exists via the Vite dev proxy or `PUBLIC_API_BASE_URL` in production, and is used only by `/data-preview`.
+These are pre-rendered static files (because `output: 'static'`). The old preview API (`/api/sources`, `/api/health`) exists only in local development, through the Vite dev proxy to `npm run backend:dev`; the deployed `/data-preview` reads static files.
 
 ## Content model
 
@@ -91,27 +98,21 @@ Entries come from two sources:
 1. **Generated** — `npm run sync:catalog` reads backend YAML sources and writes `src/content/master-library/datasets/*.md`, one per dataset, inferring frontmatter (tags, themes, difficulty) from the pipeline output.
 2. **Hand-authored / CMS-edited** — non-dataset resources (guides, tools, papers) live in the same collection, editable directly or via Decap CMS.
 
-Decap CMS (`public/admin/config.yml`) manages exactly this one collection — it does not manage `data/geo/markers.geojson`, `community-submissions.json`, or backend YAML. In production it authenticates via `git-gateway` + Netlify Identity; locally via `npx decap-server` (`local_backend: true`).
+Decap CMS (`public/admin/config.yml`) manages exactly this one collection — it does not manage `community-submissions.json` or backend YAML. In production it authenticates via `git-gateway` + Netlify Identity; locally via `npx decap-server` (`local_backend: true`).
 
-## Geographic markers
+Dataset metadata (backend YAML) is edited separately through the magic-link metadata editor on `/data-preview`; see [metadata-editor.md](metadata-editor.md).
 
-Independent of the dataset pipeline. `data/geo/markers.geojson` is a GeoJSON `FeatureCollection` of `Point` features, validated against `data/geo/schema/marker.schema.json` (draft-07):
+## Coverage map
 
-| Field | Required | Notes |
-|---|---|---|
-| `id` | yes | slug, `^[a-z0-9-]+$`, never change once assigned |
-| `name` | yes | human-readable |
-| `category` | yes | enum: `dataset`, `site`, `organization`, `event`, `other` |
-| `tags` | no | array of strings |
-| `region` | no | ISO 3166-1 alpha-2 or free-form label |
-| `sourceUrl` | no | canonical reference link |
-| `updatedAt` | no | ISO 8601 date-time |
+`/maps` shows where each catalog dataset applies, from its canonical `coverage` (`nation`, a state FIPS or a county FIPS, from the backend's `source_coverage`). Coverage is defined by FIPS codes only; the geometry is for display. Boundaries, the county vocabulary and the build check are described in [coverage-and-boundaries.md](coverage-and-boundaries.md).
 
-Edit → `npm run validate:geo` → PR. See `data/geo/README.md` for full contribution guidelines and `docs/technical/geo-branching.md` for the branch-vs-separate-repo tradeoff discussion.
+## Data previews
+
+Tier 1 static preview files (exported by the backend, copied at build) are described in [previews.md](previews.md).
 
 ## CI/CD
 
-- **`ci.yml`** — on push/PR to `main`: `npm ci` → `lint` (non-blocking) → `validate:geo` (hard gate) → `build` (hard gate, runs `prebuild`). In CI, the canonical `../backend` sibling isn't checked out, so `sync:backend-yaml`/`check:backend-yaml` no-op with a warning rather than fail — CI builds against whatever dataset content is already committed in `src/content/master-library/`.
+- **`ci.yml`** — on push/PR to `main`: `npm ci` → `test:functions` → `lint` (non-blocking) → `test` → `build` (hard gate, runs `prebuild`). In CI, the canonical `../backend` sibling isn't checked out, so `sync:backend-yaml`/`check:backend-yaml` no-op with a warning rather than fail — CI builds against whatever dataset content is already committed in `src/content/master-library/`.
 - **`astro.yml`** — on push to `main`: builds with `astro build --site … --base …` (via `actions/configure-pages`) and deploys to GitHub Pages.
 - Netlify deploys separately via its own GitHub integration (`netlify.toml`), not a workflow file in this repo.
 

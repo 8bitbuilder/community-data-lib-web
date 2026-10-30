@@ -1,0 +1,225 @@
+---
+// Editor sign-in and metadata form. Server side lives in netlify/functions/;
+// on hosts without Netlify Functions (GitHub Pages) this renders nothing visible.
+---
+<section id="metadata-editor" class="metadata-editor" hidden>
+  <p id="editor-message" class="editor-message" role="status" hidden></p>
+
+  <div id="editor-signed-out" hidden>
+    <button type="button" id="editor-signin-toggle" class="editor-link">Editor sign in</button>
+    <form id="editor-signin-form" hidden>
+      <label>Email <input type="email" name="email" required autocomplete="email" /></label>
+      <button type="submit">Send sign-in link</button>
+    </form>
+  </div>
+
+  <div id="editor-signed-in" hidden>
+    <p>Signed in as <strong id="editor-email"></strong> · <button type="button" id="editor-signout" class="editor-link">Sign out</button></p>
+    <button type="button" id="editor-open">Edit metadata</button>
+    <div id="editor-panel" hidden>
+      <ul id="editor-open-prs" class="editor-prs"></ul>
+      <form id="editor-form"></form>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { diffFields } from '@lib/editor/changes.mjs';
+
+  /* eslint-disable @typescript-eslint/no-explicit-any -- server JSON and dynamic form values are untyped */
+  /* global RequestInit, HTMLElementTagNameMap */
+
+  const FN = '/.netlify/functions';
+  const TEXT = [['title', 'Title'], ['notes', 'Notes'], ['who', 'Who'], ['how', 'How'], ['where', 'Where'], ['why', 'Why'], ['when', 'When']];
+  const AUTH_MESSAGES: Record<string, string> = {
+    ok: 'You are signed in.',
+    expired: 'That sign-in link has expired or was already used. Request a new one.',
+    invalid: 'That sign-in link is not valid. Request a new one.',
+  };
+
+  const NETWORK_ERROR = 'Network error — please try again.';
+
+  const $ = (id: string) => document.getElementById(id) as HTMLElement;
+  const root = $('metadata-editor');
+  const message = $('editor-message');
+  const sourceId = new URLSearchParams(location.search).get('source')?.trim() ?? '';
+  let original: any = null;
+  let vocabulary: any = null;
+
+  function say(text: string, isError = false) {
+    message.textContent = text;
+    message.classList.toggle('is-error', isError);
+    message.hidden = !text;
+  }
+
+  async function api(path: string, init: RequestInit = {}) {
+    let res: Response;
+    try {
+      res = await fetch(`${FN}/${path}`, { credentials: 'same-origin', ...init, headers: { 'content-type': 'application/json', ...(init.headers ?? {}) } });
+    } catch {
+      return { res: null as Response | null, body: null as any };
+    }
+    let body: any = null;
+    try {
+      if ((res.headers.get('content-type') ?? '').includes('application/json')) body = await res.json();
+    } catch {
+      body = null;
+    }
+    return { res: res as Response | null, body };
+  }
+
+  function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, any> = {}, children: (Node | string)[] = []) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'checked' || k === 'value') (node as any)[k] = v;
+      else node.setAttribute(k, String(v));
+    }
+    node.append(...children);
+    return node;
+  }
+
+  function renderForm(fields: any, manualTags: string[]) {
+    const form = $('editor-form') as HTMLFormElement;
+    form.replaceChildren();
+    for (const [name, label] of TEXT) {
+      const input = name === 'notes' ? el('textarea', { name, rows: 4 }) : el('input', { name, type: 'text' });
+      (input as HTMLInputElement).value = fields[name];
+      form.append(el('label', {}, [label, input]));
+    }
+    for (const [name, label] of [['provider.name', 'Provider name'], ['provider.agency', 'Provider agency'], ['provider.url', 'Provider URL'], ['download.url', 'Download URL']]) {
+      const [group, key] = name.split('.');
+      form.append(el('label', {}, [label, el('input', { name, type: 'url', value: fields[group][key] })]));
+    }
+    for (const [name, label] of [['sensitive', 'Sensitive'], ['requires_account', 'Requires account']]) {
+      form.append(el('label', {}, [el('input', { name, type: 'checkbox', checked: fields[name] }), label]));
+    }
+    const suitability = el('select', { name: 'student_suitability' }, ['suitable', 'not_suitable', 'unreviewed'].map((v) => el('option', { value: v }, [v.replace('_', ' ')])));
+    (suitability as HTMLSelectElement).value = fields.student_suitability;
+    form.append(el('label', {}, ['Student suitability', suitability]));
+
+    const groupBox = (field: string, title: string, options: string[], isChecked: (k: string) => boolean) =>
+      el('fieldset', { 'data-tag-field': field }, [
+        el('legend', {}, [title, manualTags.includes(field) ? el('span', { class: 'editor-badge' }, ['set by hand']) : '']),
+        ...options.map((k) => el('label', {}, [el('input', { type: 'checkbox', value: k, checked: isChecked(k) }), k])),
+      ]);
+    form.append(groupBox('description_tags', 'Topic tags', vocabulary.description_tags, (k) => fields.description_tags.includes(k)));
+    const stats = el('details', {}, [el('summary', {}, ['Statistical tags'])]);
+    for (const [group, keys] of (Object.entries(vocabulary.statistical_tags) as [string, string[]][])) {
+      stats.append(groupBox(group, group.replace(/_tags$/, '').replace(/_/g, ' '), keys, (k) => fields[group][k]));
+    }
+    form.append(stats, el('button', { type: 'submit' }, ['Submit for review']));
+  }
+
+  function readForm() {
+    const form = $('editor-form') as HTMLFormElement;
+    const value = (name: string) => (form.elements.namedItem(name) as HTMLInputElement).value;
+    const edited: any = {};
+    for (const [name] of TEXT) edited[name] = value(name);
+    edited.provider = { name: value('provider.name'), agency: value('provider.agency'), url: value('provider.url') };
+    edited.download = { url: value('download.url') };
+    edited.sensitive = (form.elements.namedItem('sensitive') as HTMLInputElement).checked;
+    edited.requires_account = (form.elements.namedItem('requires_account') as HTMLInputElement).checked;
+    edited.student_suitability = value('student_suitability');
+    for (const fieldset of form.querySelectorAll<HTMLFieldSetElement>('fieldset[data-tag-field]')) {
+      const field = fieldset.dataset.tagField!;
+      const boxes = [...fieldset.querySelectorAll<HTMLInputElement>('input[type=checkbox]')];
+      edited[field] = field === 'description_tags'
+        ? boxes.filter((b) => b.checked).map((b) => b.value)
+        : Object.fromEntries(boxes.map((b) => [b.value, b.checked]));
+    }
+    return edited;
+  }
+
+  async function openEditor() {
+    say('Loading current metadata…');
+    const { res, body } = await api(`metadata-edit?id=${encodeURIComponent(sourceId)}`);
+    if (!res) return say(NETWORK_ERROR, true);
+    if (!res.ok || !body?.fields) return say(body?.error ?? 'Could not load metadata.', true);
+    original = body.fields;
+    vocabulary = body.vocabulary;
+    const prs = $('editor-open-prs');
+    prs.replaceChildren(...body.openPullRequests.map((p: any) => el('li', {}, ['Open edit awaiting review: ', el('a', { href: p.url, target: '_blank', rel: 'noopener' }, [`PR #${p.number}`])])));
+    renderForm(original, body.manualTags);
+    $('editor-panel').hidden = false;
+    say('');
+  }
+
+  async function init() {
+    const authResult = new URLSearchParams(location.search).get('auth');
+    const { res, body } = await api('auth-me');
+    if (!res || ![200, 401, 403].includes(res.status)) return; // no Netlify Functions here
+    if (res.status === 200 && typeof body?.email !== 'string') return;
+    root.hidden = false;
+    if (authResult && AUTH_MESSAGES[authResult]) say(AUTH_MESSAGES[authResult], authResult !== 'ok');
+    if (res.status === 403) say('Your editor access has been removed.', true);
+
+    if (res.status === 200) {
+      $('editor-signed-in').hidden = false;
+      $('editor-email').textContent = body.email;
+      $('editor-open').hidden = !sourceId;
+    } else {
+      $('editor-signed-out').hidden = false;
+    }
+  }
+
+  $('editor-signin-toggle').addEventListener('click', () => {
+    $('editor-signin-form').hidden = false;
+  });
+
+  $('editor-signin-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const formEl = event.target as HTMLFormElement;
+    const button = formEl.querySelector<HTMLButtonElement>('button[type=submit]')!;
+    const email = new FormData(formEl).get('email');
+    button.disabled = true;
+    const { res, body } = await api('auth-request-link', { method: 'POST', body: JSON.stringify({ email }) });
+    button.disabled = false;
+    if (!res) return say(NETWORK_ERROR, true);
+    if (res.status === 403) return say('Editing is only available on the main site.', true);
+    say(body?.message ?? body?.error ?? 'Something went wrong.', !res.ok);
+  });
+
+  $('editor-signout').addEventListener('click', async () => {
+    await api('auth-logout', { method: 'POST' });
+    location.reload();
+  });
+
+  $('editor-open').addEventListener('click', openEditor);
+
+  $('editor-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const changes = diffFields(original, readForm());
+    if (Object.keys(changes).length === 0) return say('No changes to submit.');
+    const button = ($('editor-form') as HTMLFormElement).querySelector<HTMLButtonElement>('button[type=submit]')!;
+    button.disabled = true;
+    const { res, body } = await api('metadata-edit', { method: 'POST', body: JSON.stringify({ id: sourceId, changes }) });
+    if (!res) {
+      button.disabled = false;
+      return say(NETWORK_ERROR, true);
+    }
+    if (res.status === 401) {
+      button.disabled = false;
+      return say('Your session expired. Sign in again.', true);
+    }
+    if (!res.ok || typeof body?.prUrl !== 'string') {
+      button.disabled = false;
+      return say(body?.field ? `${body.field}: ${body.error}` : body?.error ?? 'Could not submit.', true);
+    }
+    say(`Submitted for review: PR #${body.prNumber}.`);
+    const link = el('a', { href: body.prUrl, target: '_blank', rel: 'noopener' }, [' View pull request']);
+    message.append(link);
+    $('editor-panel').hidden = true;
+  });
+
+  init();
+</script>
+
+<style>
+  .metadata-editor { margin: 1rem 0; padding: 1rem; border: 1px solid var(--color-border, #d0d7de); border-radius: 8px; }
+  .metadata-editor label { display: flex; flex-direction: column; gap: 0.25rem; margin: 0.5rem 0; }
+  .metadata-editor fieldset label { flex-direction: row; align-items: center; display: inline-flex; margin-right: 1rem; }
+  .metadata-editor input[type='text'], .metadata-editor input[type='url'], .metadata-editor input[type='email'], .metadata-editor textarea, .metadata-editor select { width: 100%; max-width: 40rem; }
+  .editor-link { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; }
+  .editor-message.is-error { color: #b42318; }
+  .editor-badge { margin-left: 0.5rem; font-size: 0.75rem; padding: 0.1rem 0.4rem; border-radius: 999px; background: #fff4d6; }
+</style>
