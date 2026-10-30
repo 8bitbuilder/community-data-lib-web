@@ -2,6 +2,8 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { readFileSync } from 'node:fs';
+import AdmZip from 'adm-zip';
 
 import { createApiHandler, nodeEngine } from '../backend/lib/apiHandler.mjs';
 import { loadAllSources as loadExported } from '../backend/lib/exportStore.mjs';
@@ -15,6 +17,13 @@ const CSV = [
   '37,183,North Carolina,Wake County,1200000',
 ].join('\n');
 
+const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url));
+const ZIP = (() => {
+  const zip = new AdmZip();
+  zip.addFile('title-rows.xlsx', fixture('title-rows.xlsx'));
+  return zip.toBuffer();
+})();
+
 let server: http.Server;
 let base = '';
 
@@ -23,6 +32,18 @@ before(async () => {
     if (req.url === '/counties.csv') {
       res.writeHead(200, { 'Content-Type': 'text/csv' });
       res.end(CSV);
+    } else if (req.url === '/bundle.zip') {
+      res.writeHead(200, { 'Content-Type': 'application/zip' });
+      res.end(ZIP);
+    } else if (req.url?.startsWith('/fx/')) {
+      try {
+        const body = fixture(req.url.slice(4));
+        res.writeHead(200);
+        res.end(body);
+      } catch {
+        res.writeHead(404);
+        res.end();
+      }
     } else {
       res.writeHead(404);
       res.end();
@@ -42,7 +63,14 @@ function sources() {
       download: { url: `${base}/counties.csv` },
       variables: ['CTYNAME', 'POPESTIMATE2025'],
     },
-    { id: 'excel', title: 'Excel', download: { url: `${base}/file.xlsx` } },
+    { id: 'excel', title: 'Excel', download: { url: `${base}/fx/title-rows.xlsx` } },
+    {
+      id: 'excel-curated',
+      title: 'Excel curated',
+      download: { url: `${base}/fx/title-rows.xlsx`, header_row: 1 },
+    },
+    { id: 'zipped', title: 'Zipped', download: { url: `${base}/bundle.zip` } },
+    { id: 'notes-first', title: 'Notes', download: { url: `${base}/fx/notes-first.xlsx` } },
     { id: 'portal', title: 'Portal only', provider: { url: 'https://example.gov' } },
   ];
 }
@@ -65,7 +93,7 @@ test('health and source listing', async () => {
   assert.equal(health.status, 200);
   assert.equal(health.body.previewEngine, 'node');
   const list = await get('/api/sources');
-  assert.equal(list.body.count, 3);
+  assert.equal(list.body.count, 6);
   assert.equal((await get('/api/sources/counties')).body.title, 'Counties');
   assert.equal(list.headers.get('access-control-allow-origin'), '*');
 });
@@ -97,9 +125,6 @@ test('chart and filter options', async () => {
 });
 
 test('datasets that cannot be previewed get a clear 422, not a crash', async () => {
-  const excel = await get('/api/sources/excel/preview');
-  assert.equal(excel.status, 422);
-  assert.match(excel.body.details, /XLSX/);
   const portal = await get('/api/sources/portal/preview');
   assert.equal(portal.status, 422);
   assert.match(portal.body.details, /no download URL/);
@@ -130,4 +155,100 @@ test('an unreachable data provider returns 502', async () => {
   });
   const res = await get('/api/sources/gone/preview', handle);
   assert.equal(res.status, 502);
+});
+
+async function getRaw(path: string, handle = makeHandler()) {
+  const response = await handle(new Request(`http://site.test${path}`));
+  return { status: response.status, headers: response.headers, bytes: Buffer.from(await response.arrayBuffer()) };
+}
+
+test('file route returns raw CSV bytes with filename headers', async () => {
+  const res = await getRaw('/api/sources/counties/file');
+  assert.equal(res.status, 200);
+  assert.equal(res.bytes.toString(), CSV);
+  assert.equal(res.headers.get('x-cdl-filename'), 'counties.csv');
+  assert.equal(res.headers.get('x-cdl-format'), 'csv');
+  assert.equal(res.headers.get('x-cdl-archive'), null);
+  assert.match(res.headers.get('content-type')!, /text\/csv/);
+  assert.match(res.headers.get('content-disposition')!, /attachment; filename="counties.csv"/);
+  assert.match(res.headers.get('access-control-expose-headers')!, /X-CDL-Filename/);
+});
+
+test('file route unzips and reports the inner file', async () => {
+  const res = await getRaw('/api/sources/zipped/file');
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('x-cdl-archive'), 'zip');
+  assert.equal(res.headers.get('x-cdl-filename'), 'title-rows.xlsx');
+  assert.equal(res.headers.get('x-cdl-format'), 'xlsx');
+  assert.ok(res.bytes.equals(fixture('title-rows.xlsx')));
+});
+
+test('file route returns 413 above PREVIEW_FILE_MAX_BYTES', async () => {
+  const prev = process.env.PREVIEW_FILE_MAX_BYTES;
+  process.env.PREVIEW_FILE_MAX_BYTES = '10';
+  try {
+    const res = await get('/api/sources/counties/file');
+    assert.equal(res.status, 413);
+    assert.equal(typeof res.body.size, 'number');
+    assert.equal(res.body.downloadUrl, `${base}/counties.csv`);
+  } finally {
+    if (prev === undefined) delete process.env.PREVIEW_FILE_MAX_BYTES;
+    else process.env.PREVIEW_FILE_MAX_BYTES = prev;
+  }
+});
+
+test('Excel preview returns rows and layout', async () => {
+  const res = await get('/api/sources/excel/preview');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.layout.headerRow, 4);
+  assert.equal(res.body.total, 5);
+});
+
+test('zipped Excel previews too', async () => {
+  const res = await get('/api/sources/zipped/preview');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.layout.headerRow, 4);
+});
+
+test('curator header_row is honored and visitor param overrides it', async () => {
+  const curated = await get('/api/sources/excel-curated/preview');
+  assert.equal(curated.status, 200);
+  assert.equal(curated.body.layout.headerRow, 1);
+  assert.equal(curated.body.layout.origin.headerRow, 'curator');
+  const visitor = await get('/api/sources/excel-curated/preview?header_row=4');
+  assert.equal(visitor.body.layout.headerRow, 4);
+  assert.equal(visitor.body.layout.origin.headerRow, 'visitor');
+});
+
+test('sheet param selects a sheet (digits are an index)', async () => {
+  const byName = await get('/api/sources/notes-first/preview?sheet=Data');
+  assert.equal(byName.status, 200);
+  assert.equal(byName.body.layout.sheet, 'Data');
+  const byIndex = await get('/api/sources/notes-first/preview?sheet=1');
+  assert.equal(byIndex.body.layout.sheet, 'Data');
+});
+
+test('unknown sheet and out-of-range header row are 400 with sheet list', async () => {
+  const bad = await get('/api/sources/excel/preview?sheet=Nope');
+  assert.equal(bad.status, 400);
+  assert.ok(Array.isArray(bad.body.sheets) && bad.body.sheets.length > 0);
+  assert.equal(bad.body.code, 'UNKNOWN_SHEET');
+  const hdr = await get('/api/sources/excel/preview?header_row=99');
+  assert.equal(hdr.status, 400);
+  assert.equal(hdr.body.code, 'HEADER_OUT_OF_RANGE');
+});
+
+test('Excel sources skip a preferred pandas engine', async () => {
+  const boom = () => {
+    throw new Error('pandas must not be called');
+  };
+  const handle = createApiHandler({
+    loadAllSources: async () => sources(),
+    loadSourceById: async (id: string) => sources().find((s) => s.id === id) ?? null,
+    engine: { name: 'pandas', buildPreview: boom, buildChart: boom, listFilterOptions: boom },
+  });
+  const res = await get('/api/sources/excel/preview', handle);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.engine, 'node');
+  assert.equal(res.body.pandasFallback, undefined);
 });

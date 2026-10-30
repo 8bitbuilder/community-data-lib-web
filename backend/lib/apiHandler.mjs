@@ -10,12 +10,15 @@
  *   GET /api/sources
  *   GET /api/sources/:id
  *   GET /api/sources/:id/datasheet
- *   GET /api/sources/:id/preview?state&county&limit&offset&columns
- *   GET /api/sources/:id/chart?variable&xVariable&plotType&state&county&limit
- *   GET /api/sources/:id/filters?type&state
+ *   GET /api/sources/:id/preview?state&county&limit&offset&columns&sheet&header_row
+ *   GET /api/sources/:id/chart?variable&xVariable&plotType&state&county&limit&sheet&header_row
+ *   GET /api/sources/:id/filters?type&state&sheet&header_row
+ *   GET /api/sources/:id/file   raw (unzipped) source bytes; X-CDL-Filename/Format/Archive headers
  */
 
 import { buildChart, buildPreview, listFilterOptions } from './dataPreview.mjs';
+import { getSourceFile } from './csvCache.mjs';
+import { LayoutError } from '../../src/lib/data/excelLayout.mjs';
 import { buildDatasheet } from './datasheet.mjs';
 
 /** The JS preview engine; works anywhere Node runs (including Netlify Functions). */
@@ -29,9 +32,8 @@ const CORS_HEADERS = {
 
 /** Errors that mean "this dataset can't be previewed", not "the server broke". */
 const UNPREVIEWABLE = [
-  /XLSX files are not supported/i,
   /has no download URL/i,
-  /no CSV or TSV files/i,
+  /no CSV, TSV or Excel files/i,
 ];
 
 function json(status, payload) {
@@ -39,6 +41,33 @@ function json(status, payload) {
     status,
     headers: { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS },
   });
+}
+
+const MIME = {
+  csv: 'text/csv',
+  tsv: 'text/tab-separated-values',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  xls: 'application/vnd.ms-excel',
+};
+
+/** `sheet` and `header_row` query params -> table options (digits in sheet = 0-based index). */
+function tableParams(q) {
+  const out = {};
+  const sheet = q.get('sheet');
+  if (sheet !== null && sheet !== '') out.sheet = /^\d+$/.test(sheet) ? Number(sheet) : sheet;
+  const row = q.get('header_row');
+  if (row !== null && /^\d+$/.test(row)) out.headerRow = Number(row);
+  return out;
+}
+
+function isExcelSource(source, table) {
+  const path = String(source.download?.url ?? '').split('?')[0].toLowerCase();
+  return (
+    path.endsWith('.xlsx') ||
+    path.endsWith('.xls') ||
+    table.sheet !== undefined ||
+    table.headerRow !== undefined
+  );
 }
 
 function parseSourcePath(pathname) {
@@ -65,8 +94,8 @@ export function createApiHandler({
   health = () => ({}),
 }) {
   // Run with the preferred engine; on failure retry with the Node engine (same as before).
-  async function run(method, args) {
-    if (engine === nodeEngine) return { result: await nodeEngine[method](...args), engine: 'node' };
+  async function run(method, args, { excel = false } = {}) {
+    if (engine === nodeEngine || excel) return { result: await nodeEngine[method](...args), engine: 'node' };
     try {
       return { result: await engine[method](...args), engine: engine.name };
     } catch (error) {
@@ -111,19 +140,47 @@ export function createApiHandler({
         return json(200, { id: parsed.id, datasheet: buildDatasheet(source) });
       }
 
+      if (parsed.action === 'file') {
+        const file = await getSourceFile(source);
+        const limit = Number(process.env.PREVIEW_FILE_MAX_BYTES ?? 4_000_000);
+        if (file.bytes.length > limit) {
+          return json(413, {
+            error: 'File too large to open automatically',
+            size: file.bytes.length,
+            downloadUrl: source.download?.url,
+          });
+        }
+        const headers = {
+          ...CORS_HEADERS,
+          'Content-Type': MIME[file.format] ?? 'application/octet-stream',
+          'Content-Disposition': `attachment; filename="${file.filename.replace(/["\\\r\n]/g, '_')}"`,
+          'X-CDL-Filename': encodeURIComponent(file.filename),
+          'X-CDL-Format': file.format,
+          'Access-Control-Expose-Headers': 'X-CDL-Filename, X-CDL-Format, X-CDL-Archive',
+        };
+        if (file.archive) headers['X-CDL-Archive'] = file.archive;
+        return new Response(file.bytes, { status: 200, headers });
+      }
+
       if (parsed.action === 'preview') {
+        const table = tableParams(q);
         const options = {
+          ...table,
           state: q.get('state') ?? undefined,
           county: q.get('county') ?? undefined,
           limit: Number(q.get('limit') ?? 25),
           offset: Number(q.get('offset') ?? 0),
           columns: q.get('columns') ?? undefined,
         };
-        return json(200, withEngine(await run('buildPreview', [source, options])));
+        return json(200, withEngine(await run('buildPreview', [source, options], {
+            excel: isExcelSource(source, table),
+          })));
       }
 
       if (parsed.action === 'chart') {
+        const table = tableParams(q);
         const options = {
+          ...table,
           variable: q.get('variable') ?? undefined,
           xVariable: q.get('xVariable') ?? undefined,
           plotType: q.get('plotType') ?? undefined,
@@ -131,17 +188,22 @@ export function createApiHandler({
           county: q.get('county') ?? undefined,
           limit: Number(q.get('limit') ?? 50),
         };
-        return json(200, withEngine(await run('buildChart', [source, options])));
+        return json(200, withEngine(await run('buildChart', [source, options], {
+            excel: isExcelSource(source, table),
+          })));
       }
 
       if (parsed.action === 'filters') {
         const type = q.get('type') ?? 'state';
         const parent = { state: q.get('state') ?? undefined };
+        const table = tableParams(q);
         const {
           result,
           engine: used,
           fallback,
-        } = await run('listFilterOptions', [source, type, parent]);
+        } = await run('listFilterOptions', [source, type, parent, table], {
+          excel: isExcelSource(source, table),
+        });
         return json(200, {
           id: parsed.id,
           type,
@@ -153,6 +215,12 @@ export function createApiHandler({
 
       return json(404, { error: 'Not found', action: parsed.action });
     } catch (error) {
+      if (error instanceof LayoutError) {
+        if (error.code === 'NO_DATA') {
+          return json(422, { error: 'This sheet has no data rows', code: error.code });
+        }
+        return json(400, { error: error.message, code: error.code, sheets: error.sheets });
+      }
       const message = error instanceof Error ? error.message : String(error);
       if (UNPREVIEWABLE.some((re) => re.test(message))) {
         return json(422, { error: "This dataset can't be previewed yet", details: message });
