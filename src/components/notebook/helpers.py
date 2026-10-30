@@ -21,12 +21,27 @@ def _cell(v):
     return str(v)
 
 
+def _label(v):
+    if isinstance(v, tuple):
+        return ", ".join(_cell(x) for x in v)
+    return _cell(v)
+
+
+def _index_header(index):
+    names = [n for n in index.names if n is not None]
+    return ", ".join(str(n) for n in names) if names else ""
+
+
 def _table(obj):
     frame = obj.to_frame() if isinstance(obj, pd.Series) else obj
     head = frame.head(MAX_ROWS)
+    labels = [_label(v) for v in head.index]
     return {
-        "columns": [str(c) for c in head.columns],
-        "rows": [[_cell(v) for v in row] for row in head.itertuples(index=False, name=None)],
+        "columns": [_index_header(head.index)] + [str(c) for c in head.columns],
+        "rows": [
+            [label] + [_cell(v) for v in row]
+            for label, row in zip(labels, head.itertuples(index=False, name=None))
+        ],
     }
 
 

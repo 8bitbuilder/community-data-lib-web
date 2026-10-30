@@ -2,6 +2,7 @@
 // Pyodide web worker: loads Python + pandas, runs notebook cells.
 import helpersSource from './helpers.py?raw';
 import type { CellOutput } from './notebookStore';
+import { safeFileName } from './pyodideProtocol';
 
 const PYODIDE_BASE = 'https://cdn.jsdelivr.net/pyodide/v0.27.2/full/';
 
@@ -32,6 +33,7 @@ let pyodide: PyodideLike | null = null;
 let helpers: Record<string, PyCallable> | null = null;
 let ns: unknown = null;
 let queue: Promise<void> = Promise.resolve();
+let initStarted = false;
 
 function toJs(value: unknown): unknown {
   if (value && typeof (value as PyProxyLike).toJs === 'function') {
@@ -76,42 +78,51 @@ function errorOutput(e: unknown): CellOutput {
 }
 
 async function handle(msg: InMessage) {
-  if (msg.type === 'init') return init();
+  if (msg.type === 'init') {
+    if (initStarted) return;
+    initStarted = true;
+    return init();
+  }
   if (!pyodide || !helpers) {
-    if (msg.type === 'export' || msg.type === 'run') {
-      ctx.postMessage({ type: 'result', id: msg.id, output: errorOutput(new Error('Python is not ready')), dfInfo: null });
-    }
+    ctx.postMessage({ type: 'error', id: msg.id, message: 'Python is not ready' });
     return;
   }
   const py = pyodide;
   const h = helpers;
   try {
     if (msg.type === 'writeFile') {
-      if (msg.name.endsWith('.xls')) await py.pyimport('micropip').install('xlrd');
-      py.FS.writeFile(`/home/pyodide/${msg.name}`, msg.bytes);
+      const name = safeFileName(msg.name);
+      if (!name) throw new Error(`Invalid file name: ${msg.name}`);
+      if (name.endsWith('.xls')) await py.pyimport('micropip').install('xlrd');
+      py.FS.writeFile(`/home/pyodide/${name}`, msg.bytes);
       ctx.postMessage({ type: 'done', id: msg.id });
     } else if (msg.type === 'run') {
       const output = toJs(h.run_cell(msg.code, ns)) as CellOutput;
       const dfInfo = toJs(h.df_info(ns)) ?? null;
       ctx.postMessage({ type: 'result', id: msg.id, output, dfInfo });
     } else if (msg.type === 'export') {
-      try {
-        const proxy = h.export_df(ns, msg.format) as PyProxyLike;
-        const bytes = proxy.toJs() as Uint8Array;
-        const copy = new Uint8Array(bytes);
-        proxy.destroy();
-        ctx.postMessage({ type: 'file', id: msg.id, bytes: copy }, [copy.buffer]);
-      } catch (e) {
-        ctx.postMessage({ type: 'result', id: msg.id, output: errorOutput(e), dfInfo: null });
-      }
+      const proxy = h.export_df(ns, msg.format) as PyProxyLike;
+      const bytes = proxy.toJs() as Uint8Array;
+      const copy = new Uint8Array(bytes);
+      proxy.destroy();
+      ctx.postMessage({ type: 'file', id: msg.id, bytes: copy }, [copy.buffer]);
     }
   } catch (e) {
-    const id = 'id' in msg ? msg.id : undefined;
-    ctx.postMessage({ type: 'result', id, output: errorOutput(e), dfInfo: null });
+    const message = e instanceof Error ? e.message : String(e);
+    if (msg.type === 'run') {
+      ctx.postMessage({ type: 'result', id: msg.id, output: errorOutput(e), dfInfo: null });
+    } else {
+      ctx.postMessage({ type: 'error', id: msg.id, message });
+    }
   }
 }
 
 ctx.onmessage = (ev: MessageEvent<InMessage>) => {
   // Serialise messages so a writeFile finishes before the next run starts.
-  queue = queue.then(() => handle(ev.data));
+  queue = queue
+    .then(() => handle(ev.data))
+    .catch((e: unknown) => {
+      const message = e instanceof Error ? e.message : String(e);
+      ctx.postMessage({ type: 'error', id: 'id' in ev.data ? ev.data.id : undefined, message });
+    });
 };

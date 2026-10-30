@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CellOutput } from './notebookStore';
+import { settleReply, type PendingEntry, type PendingKind, type WorkerOut } from './pyodideProtocol';
 
 export interface DfColumn {
   name: string;
@@ -20,21 +21,11 @@ export interface RunResult {
   dfInfo: DfInfo | null;
 }
 
-type Pending = { resolve: (v: never) => void; reject: (e: Error) => void };
-
-type WorkerOut =
-  | { type: 'status'; text: string }
-  | { type: 'ready' }
-  | { type: 'fatal'; message: string }
-  | { type: 'done'; id: number }
-  | { type: 'result'; id: number; output: CellOutput; dfInfo: DfInfo | null }
-  | { type: 'file'; id: number; bytes: Uint8Array };
-
 export function usePyodide() {
   const [state, setState] = useState<PyodideState>('idle');
   const [status, setStatus] = useState('');
   const workerRef = useRef<Worker | null>(null);
-  const pending = useRef(new Map<number, Pending>());
+  const pending = useRef(new Map<number, PendingEntry>());
   const nextId = useRef(1);
 
   const rejectAll = useCallback((message: string) => {
@@ -63,17 +54,9 @@ export function usePyodide() {
           setStatus(m.message);
           rejectAll(m.message);
           break;
-        case 'done':
-        case 'result':
-        case 'file': {
-          const p = pending.current.get(m.id);
-          if (!p) break;
-          pending.current.delete(m.id);
-          if (m.type === 'done') (p.resolve as () => void)();
-          else if (m.type === 'file') (p.resolve as (v: Uint8Array) => void)(m.bytes);
-          else (p.resolve as (v: RunResult) => void)({ output: m.output, dfInfo: m.dfInfo });
+        default:
+          settleReply(pending.current, m);
           break;
-        }
       }
     };
     worker.onerror = (ev) => {
@@ -89,26 +72,38 @@ export function usePyodide() {
     if (!workerRef.current) spawn();
   }, [spawn]);
 
-  const request = useCallback(<T,>(msg: Record<string, unknown>, transfer: Transferable[] = []) => {
-    return new Promise<T>((resolve, reject) => {
-      const worker = workerRef.current;
-      if (!worker) {
-        reject(new Error('Python has not been started'));
-        return;
-      }
-      const id = nextId.current++;
-      pending.current.set(id, { resolve: resolve as (v: never) => void, reject });
-      worker.postMessage({ ...msg, id }, transfer);
-    });
-  }, []);
+  const request = useCallback(
+    <T,>(kind: PendingKind, msg: Record<string, unknown>, transfer: Transferable[] = []) => {
+      return new Promise<T>((resolve, reject) => {
+        const worker = workerRef.current;
+        if (!worker) {
+          reject(new Error('Python has not been started'));
+          return;
+        }
+        const id = nextId.current++;
+        pending.current.set(id, { kind, resolve: resolve as (v: unknown) => void, reject });
+        try {
+          worker.postMessage({ ...msg, type: kind, id }, transfer);
+        } catch (e) {
+          pending.current.delete(id);
+          reject(e instanceof Error ? e : new Error(String(e)));
+        }
+      });
+    },
+    [],
+  );
 
   const writeFile = useCallback(
-    (name: string, bytes: Uint8Array) => request<void>({ type: 'writeFile', name, bytes }, [bytes.buffer]),
+    (name: string, bytes: Uint8Array) => {
+      // Transfer a copy so the caller keeps its own buffer (needed to re-write after restart).
+      const copy = bytes.slice();
+      return request<void>('writeFile', { name, bytes: copy }, [copy.buffer]);
+    },
     [request],
   );
-  const run = useCallback((code: string) => request<RunResult>({ type: 'run', code }), [request]);
+  const run = useCallback((code: string) => request<RunResult>('run', { code }), [request]);
   const exportDf = useCallback(
-    (format: 'csv' | 'xlsx') => request<Uint8Array>({ type: 'export', format }),
+    (format: 'csv' | 'xlsx') => request<Uint8Array>('export', { format }),
     [request],
   );
 
@@ -123,8 +118,9 @@ export function usePyodide() {
     () => () => {
       workerRef.current?.terminate();
       workerRef.current = null;
+      rejectAll('Stopped');
     },
-    [],
+    [rejectAll],
   );
 
   return { state, status, start, writeFile, run, exportDf, restart };
