@@ -18,6 +18,8 @@ export interface SourceDownload {
   url?: string;
   description?: string;
   file_size?: string;
+  sheet?: string | number;
+  header_row?: number;
 }
 
 export interface SourceFilters {
