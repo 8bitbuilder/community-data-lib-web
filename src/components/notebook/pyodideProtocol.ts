@@ -33,6 +33,18 @@ export function settleReply(pending: Map<number, PendingEntry>, m: WorkerOut): v
   else p.reject(new Error(`Unexpected '${m.type}' reply to ${p.kind} request`));
 }
 
+/** The file format sent with a writeFile request (the detected format, not the file name). */
+export type WriteFileFormat = 'csv' | 'tsv' | 'xlsx' | 'xls';
+
+/**
+ * pandas needs xlrd for legacy .xls files. Trust the detected format (catalog files may
+ * have no extension; uploads may be "TABLE1.XLS"); fall back to a case-insensitive suffix.
+ */
+export function needsXlrd(name: string, format?: WriteFileFormat): boolean {
+  if (format) return format === 'xls';
+  return name.toLowerCase().endsWith('.xls');
+}
+
 // Basename only; null if nothing usable remains.
 export function safeFileName(name: string): string | null {
   const base = name.split(/[\\/]/).pop() ?? '';

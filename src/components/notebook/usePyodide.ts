@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CellOutput } from './notebookStore';
-import { settleReply, type PendingEntry, type PendingKind, type WorkerOut } from './pyodideProtocol';
+import {
+  settleReply,
+  type PendingEntry,
+  type PendingKind,
+  type WorkerOut,
+  type WriteFileFormat,
+} from './pyodideProtocol';
 
 export interface DfColumn {
   name: string;
@@ -94,10 +100,10 @@ export function usePyodide() {
   );
 
   const writeFile = useCallback(
-    (name: string, bytes: Uint8Array) => {
+    (name: string, bytes: Uint8Array, format?: WriteFileFormat) => {
       // Transfer a copy so the caller keeps its own buffer (needed to re-write after restart).
       const copy = bytes.slice();
-      return request<void>('writeFile', { name, bytes: copy }, [copy.buffer]);
+      return request<void>('writeFile', { name, bytes: copy, format }, [copy.buffer]);
     },
     [request],
   );

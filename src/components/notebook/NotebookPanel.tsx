@@ -101,7 +101,7 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
       }
       const gen = generation.current;
       try {
-        await writeFile(f.filename, f.bytes);
+        await writeFile(f.filename, f.bytes, f.format);
       } catch (e) {
         if (gen === generation.current) {
           setLoadError(`Couldn't load the dataset: ${errorMessage(e)}`);
@@ -132,6 +132,7 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
           bytes: res.bytes,
           format: res.format,
           archive: res.archive,
+          archiveEntry: res.archiveEntry,
         };
         if (isExcel(f.format)) f.layout = await catalogLayout(res.bytes, source);
         else f.encoding = detectEncoding(res.bytes);
@@ -155,22 +156,52 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
       const f = fileRef.current;
       if (!layout || !f || f.origin !== 'catalog' || !isExcel(f.format)) return;
       const code = loadCodeFor({ ...f, layout });
-      setPendingLayout(code === cellsRef.current[0]?.code ? null : layout);
+      if (code === cellsRef.current[0]?.code) {
+        setPendingLayout(null);
+      } else if (cellsRef.current.length > 1) {
+        // Later steps may depend on the old columns: ask before re-running them.
+        setPendingLayout(layout);
+      } else {
+        // Only the load cell: nothing to lose, just reload.
+        applyLayoutRef.current(layout, false);
+      }
     };
     window.addEventListener('cdl:excel-layout', onLayout);
     return () => window.removeEventListener('cdl:excel-layout', onLayout);
   }, [cellsRef]);
 
-  function reloadWithLayout() {
+  /** Points the load cell at a new sheet / header row, then runs it (and the rest with rerunAll). */
+  function applyLayout(layout: ExcelLayout, rerunAll: boolean) {
     const f = fileRef.current;
-    if (!f || !pendingLayout) return;
-    cancel(); // so the Run all below is the only one running
-    const next = { ...f, layout: pendingLayout };
+    if (!f) return;
+    cancel(); // so the run below is the only one running
+    const next = { ...f, layout };
     setFile(next);
     setPendingLayout(null);
     const code = loadCodeFor(next);
+    const first = cellsRef.current[0];
     setCells((cs) => (cs.length ? [{ ...cs[0], code }, ...cs.slice(1)] : cs));
-    void runAll();
+    if (rerunAll) void runAll();
+    else if (first) void runCellById(first.id);
+  }
+  const applyLayoutRef = useRef(applyLayout);
+  applyLayoutRef.current = applyLayout;
+
+  function reloadWithLayout() {
+    if (pendingLayout) applyLayout(pendingLayout, true);
+  }
+
+  /** After Python failed to load: start a fresh worker and load the file into it again. */
+  async function retryPython() {
+    setLoadError('');
+    try {
+      await restart();
+    } catch (e) {
+      setLoadError(`Python couldn't restart: ${errorMessage(e)}`);
+      return;
+    }
+    const f = fileRef.current;
+    if (f) await loadFile(f);
   }
 
   // Save cell code (not outputs) 500 ms after the last change, and when leaving the page.
@@ -239,7 +270,7 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
     setNotice(RESTARTED);
     const f = fileRef.current;
     if (f) {
-      writeFile(f.filename, f.bytes).catch((e) => setLoadError(`Couldn't load the dataset: ${errorMessage(e)}`));
+      writeFile(f.filename, f.bytes, f.format).catch((e) => setLoadError(`Couldn't load the dataset: ${errorMessage(e)}`));
     }
   }
 
@@ -323,6 +354,11 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
       <p className="nb-status" role="status">
         {statusText || notice}
       </p>
+      {py.state === 'error' && (
+        <button type="button" className="nb-btn" onClick={() => void retryPython()}>
+          Try again
+        </button>
+      )}
       {loadError && (
         <p className="nb-error-text" role="alert">
           {loadError}

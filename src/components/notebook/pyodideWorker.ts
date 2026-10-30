@@ -2,7 +2,7 @@
 // Pyodide web worker: loads Python + pandas, runs notebook cells.
 import helpersSource from './helpers.py?raw';
 import type { CellOutput } from './notebookStore';
-import { safeFileName } from './pyodideProtocol';
+import { needsXlrd, safeFileName, type WriteFileFormat } from './pyodideProtocol';
 
 const PYODIDE_BASE = 'https://cdn.jsdelivr.net/pyodide/v0.27.2/full/';
 
@@ -23,7 +23,7 @@ interface PyodideLike {
 
 type InMessage =
   | { type: 'init' }
-  | { type: 'writeFile'; id: number; name: string; bytes: Uint8Array }
+  | { type: 'writeFile'; id: number; name: string; bytes: Uint8Array; format?: WriteFileFormat }
   | { type: 'run'; id: number; code: string }
   | { type: 'export'; id: number; format: 'csv' | 'xlsx' };
 
@@ -93,7 +93,7 @@ async function handle(msg: InMessage) {
     if (msg.type === 'writeFile') {
       const name = safeFileName(msg.name);
       if (!name) throw new Error(`Invalid file name: ${msg.name}`);
-      if (name.endsWith('.xls')) await py.pyimport('micropip').install('xlrd');
+      if (needsXlrd(name, msg.format)) await py.pyimport('micropip').install('xlrd');
       py.FS.writeFile(`/home/pyodide/${name}`, msg.bytes);
       ctx.postMessage({ type: 'done', id: msg.id });
     } else if (msg.type === 'run') {

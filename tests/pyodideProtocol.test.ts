@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   settleReply,
   safeFileName,
+  needsXlrd,
   type PendingEntry,
   type PendingKind,
 } from '../src/components/notebook/pyodideProtocol.ts';
@@ -60,4 +61,13 @@ test('safeFileName keeps basename and rejects empty or dot names', () => {
   assert.equal(safeFileName(''), null);
   assert.equal(safeFileName('..'), null);
   assert.equal(safeFileName('dir/'), null);
+});
+
+test('needsXlrd follows the detected format, then a case-insensitive suffix', () => {
+  assert.equal(needsXlrd('TABLE1.XLS', 'xls'), true);
+  assert.equal(needsXlrd('download', 'xls'), true); // extensionless catalog .xls
+  assert.equal(needsXlrd('data.xls', 'xlsx'), false); // misnamed: trust the bytes
+  assert.equal(needsXlrd('data.csv', 'csv'), false);
+  assert.equal(needsXlrd('TABLE1.XLS'), true);
+  assert.equal(needsXlrd('table1.xlsx'), false);
 });
