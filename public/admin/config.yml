@@ -7,6 +7,10 @@ local_backend: true
 media_folder: public/uploads
 public_folder: /web/uploads
 
+# Decap manages community configuration only. Datasets and their metadata
+# come from the backend pipeline (see scripts/sync-catalog-from-backend.mjs);
+# community libraries are filtered views of that catalog, so there is no
+# dataset collection here.
 collections:
   - name: communities
     label: Communities
@@ -17,7 +21,16 @@ collections:
     extension: md
     format: frontmatter
     fields:
-      - { label: Name, name: name, widget: string, required: true }
+      - label: Library Name
+        name: name
+        widget: string
+        required: true
+        hint: 'Full library name shown in listings, e.g. "Knox County Data Library".'
+      - label: Place Name
+        name: place_name
+        widget: string
+        required: false
+        hint: 'Short place name used in "Welcome to ..." and "... Community Data Library", e.g. "Knoxville". Defaults to the library name.'
       - label: Slug
         name: slug
         widget: string
@@ -85,6 +98,7 @@ collections:
         name: county_fips
         widget: string
         required: false
+        hint: 'Five-digit county FIPS code (state + county), e.g. 47093 for Knox County, TN. This is the main filter for your community catalog.'
         pattern: ['^[0-9]{5}$', 'Must be a 5-digit FIPS code']
       - label: ZIP Codes
         name: zip_codes
@@ -95,80 +109,3 @@ collections:
           name: zip_code
           widget: string
           pattern: ['^[0-9]{5}$', 'Must be a 5-digit ZIP code']
-      - label: Librarian Email
-        name: librarian_email
-        widget: string
-        required: false
-        pattern: ['^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', 'Must be a valid email address']
-
-  - name: datasets
-    label: Datasets
-    label_singular: Dataset
-    folder: src/content/datasets
-    create: true
-    slug: '{{slug}}'
-    extension: md
-    format: frontmatter
-    fields:
-      - { label: Title, name: title, widget: string, required: true }
-      - { label: Description, name: description, widget: text, required: false }
-      - { label: Source URL, name: source_url, widget: string, required: false }
-      - label: Community
-        name: community
-        widget: relation
-        collection: communities
-        search_fields: [name, slug]
-        value_field: slug
-        display_fields: [name]
-      - label: Audience
-        name: audience
-        widget: select
-        multiple: true
-        options:
-          - { label: Student, value: student }
-          - { label: Teacher, value: teacher }
-          - { label: Community Member, value: community_member }
-
-  - name: master-library
-    label: Master Library
-    folder: src/content/master-library
-    create: true
-    slug: '{{slug}}'
-    extension: md
-    format: frontmatter
-    fields:
-      - { label: Title, name: title, widget: string }
-      - { label: Description, name: description, widget: text }
-      - { label: Author, name: author, widget: string, required: false }
-      - { label: Published Date, name: publishedDate, widget: datetime, required: false }
-      - {
-          label: Category,
-          name: category,
-          widget: select,
-          options: [dataset, tool, guide, paper],
-        }
-      - { label: Tags, name: tags, widget: list, required: false }
-      - { label: Data Themes, name: dataThemes, widget: list, required: false }
-      - { label: Pedagogical Tags, name: pedagogicalTags, widget: list, required: false }
-      - {
-          label: Audience Access,
-          name: audienceAccess,
-          widget: object,
-          fields:
-            - { label: Teacher, name: teacher, widget: boolean, default: true }
-            - { label: Student, name: student, widget: boolean, default: true }
-            - { label: Community, name: community, widget: boolean, default: true },
-        }
-      - { label: Sensitive, name: sensitive, widget: boolean, default: false }
-      - { label: URL, name: url, widget: string, required: false }
-      - { label: File URL, name: fileUrl, widget: string, required: false }
-      - {
-          label: Difficulty,
-          name: difficulty,
-          widget: select,
-          options: [beginner, intermediate, advanced],
-          required: false,
-        }
-      - { label: Language, name: language, widget: string, required: false }
-      - { label: Featured, name: featured, widget: boolean, default: false }
-      - { label: Body, name: body, widget: markdown }

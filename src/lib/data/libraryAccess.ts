@@ -1,43 +1,25 @@
 import type { CollectionEntry } from 'astro:content';
 
-export type AudienceRole = 'teacher' | 'student' | 'community';
+import {
+  AUDIENCE_LABELS,
+  canAudienceAccess as canAudienceAccessData,
+  type AudienceRole,
+} from './communityFilter';
+
+export type { AudienceRole };
 
 type MasterLibraryEntry = CollectionEntry<'master-library'>;
 
-const defaultAudienceAccess = {
-  teacher: true,
-  student: true,
-  community: true,
-};
-
-const restrictedKeywords = ['opioid', 'drug', 'addiction'];
-
+/**
+ * Whether an entry appears in an audience's catalog view.
+ * View customization only; not access control. Logic lives in communityFilter.ts.
+ */
 export function canAudienceAccess(entry: MasterLibraryEntry, audience: AudienceRole): boolean {
-  const access = entry.data.audienceAccess ?? defaultAudienceAccess;
-  if (!access[audience]) {
-    return false;
-  }
-
-  if (audience === 'teacher') {
-    return true;
-  }
-
-  if (audience === 'student' && entry.data.sensitive) {
-    return false;
-  }
-
-  const themes = [...entry.data.dataThemes, ...entry.data.tags].map((theme) => theme.toLowerCase());
-  if (audience === 'student') {
-    return !themes.some((theme) => restrictedKeywords.some((keyword) => theme.includes(keyword)));
-  }
-
-  return true;
+  return canAudienceAccessData(entry.data, audience);
 }
 
 export function audienceLabel(audience: AudienceRole): string {
-  if (audience === 'teacher') return 'Teacher';
-  if (audience === 'student') return 'Student';
-  return 'Community Member';
+  return AUDIENCE_LABELS[audience];
 }
 
 export function extractThemes(entries: MasterLibraryEntry[], audience: AudienceRole): string[] {
@@ -45,13 +27,15 @@ export function extractThemes(entries: MasterLibraryEntry[], audience: AudienceR
     new Set(
       entries
         .filter((entry) => canAudienceAccess(entry, audience))
-        .flatMap((entry) => entry.data.dataThemes.length > 0 ? entry.data.dataThemes : entry.data.tags),
-    ),
+        .flatMap((entry) =>
+          entry.data.dataThemes.length > 0 ? entry.data.dataThemes : entry.data.tags
+        )
+    )
   ).sort((left, right) => left.localeCompare(right));
 }
 
 export function extractPedagogicalTags(entries: MasterLibraryEntry[]): string[] {
-  return Array.from(
-    new Set(entries.flatMap((entry) => entry.data.pedagogicalTags)),
-  ).sort((left, right) => left.localeCompare(right));
+  return Array.from(new Set(entries.flatMap((entry) => entry.data.pedagogicalTags))).sort(
+    (left, right) => left.localeCompare(right)
+  );
 }

@@ -1,30 +1,24 @@
 ---
 title: "FBI State and Agency Crime Data"
-description: "FBI State and Agency Crime Data from Federal Bureau of Investigation (FBI) (U.S. Department of Justice). Topics include Energy & Environment, Government Administration, Law & Public Safety. Download links to multiple types of data available after selecting filters. Each variable is available for download separately."
+description: "FBI State and Agency Crime Data from Federal Bureau of Investigation (FBI) (U.S. Department of Justice). Topics include Government Administration, Law & Public Safety. Download links to multiple types of data available after selecting filters. Each variable is available for download separately."
 author: "Federal Bureau of Investigation (FBI)"
 sourceId: "fbi-state-agency-data"
 category: "dataset"
 syncedFromBackend: true
 tags:
-  - "dataset"
-  - "government-data"
-  - "justice"
+  - "Government Administration"
+  - "Law & Public Safety"
   - "state"
   - "year"
-  - "energy-environment"
-  - "government-administration"
-  - "law-public-safety"
 dataThemes:
-  - "energy-environment"
-  - "government-administration"
-  - "law-public-safety"
-pedagogicalTags:
-  - data-literacy
-audienceAccess:
-  teacher: true
-  student: true
-  community: true
+  - "Government Administration"
+  - "Law & Public Safety"
+pedagogicalTags: []
 sensitive: true
+studentSuitability: "not_suitable"
+granularity: "state"
+coverage:
+  - { level: "nation", geoid: "US" }
 url: "https://cde.ucr.cjis.gov/LATEST/webapp/#/pages/explorer/crime/crime-trend"
 featured: false
 difficulty: "beginner"

@@ -19,6 +19,15 @@ export function getCanonicalSourcesDir() {
   return path.join(getCanonicalBackendRoot(), 'data/sources');
 }
 
+/** SQLite export produced by the backend's export_catalog.py. */
+export function getCanonicalExportsDir() {
+  return path.join(getCanonicalBackendRoot(), 'data/exports');
+}
+
+export function getWebExportsDir() {
+  return path.resolve(webRoot, 'backend/data/exports');
+}
+
 export function getWebSourcesDir() {
   return path.resolve(webRoot, 'backend/data/sources');
 }

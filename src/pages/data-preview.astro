@@ -1,18 +1,100 @@
 ---
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { getCollection } from 'astro:content';
 import Layout from '@layouts/Layout.astro';
 import { withBasePath } from '@lib/paths';
+import MetadataEditor from '@components/MetadataEditor.astro';
+import {
+  buildCatalogDescription,
+  getGeographicDisplayTags,
+  getGeographicTags,
+  getPedagogicalTags,
+  normalizeDescriptionTags,
+  type BackendSource,
+} from '@lib/api/backend';
+import { previewUnavailableReason } from '@lib/data/previewSupport';
+import type { PreviewIndexEntry } from '@lib/data/staticPreview';
+import { buildDatasheet } from '../../backend/lib/datasheet.mjs';
 
-const audience = (Astro.url.searchParams.get('audience') ?? '').trim();
+// Everything on this page is built ahead of time. Dataset details come from the
+// backend's SQLite export (mirrored to backend/data/exports/catalog.json by
+// prebuild); rows come from the static Tier 1 preview files that
+// `npm run sync:previews` copies into public/previews/. No preview server is involved.
 const tutorialHref = withBasePath('/data-resources');
 const catalogHref = withBasePath('/complete-catalog');
+
+function readJson<T>(relative: string): T | null {
+  const file = path.join(process.cwd(), relative);
+  return existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as T) : null;
+}
+
+/** Flatten nested analysis tag sets into the source shape the tag helpers expect. */
+function toSource({ analysis_tags: analysisTags = {}, ...rest }: Record<string, unknown>): BackendSource {
+  return { ...(analysisTags as object), ...rest } as BackendSource;
+}
+
+const catalog = readJson<{ sources: Record<string, unknown>[] }>('backend/data/exports/catalog.json');
+const previewIndex = readJson<{ sources: Record<string, PreviewIndexEntry> }>('public/previews/index.json')?.sources;
+
+const sources = Object.fromEntries(
+  (catalog?.sources ?? [])
+    .map(toSource)
+    .sort((a, b) => a.title.localeCompare(b.title))
+    .map((source) => {
+      const preview = previewIndex?.[source.id];
+      const agency = source.provider?.agency ? ` · ${source.provider.agency}` : '';
+      return [
+        source.id,
+        {
+          id: source.id,
+          title: source.title,
+          provider: source.provider?.name ? `${source.provider.name}${agency}` : '',
+          providerUrl: source.provider?.url ?? '',
+          downloadUrl: source.download?.url ?? '',
+          requiresAccount: Boolean(source.requires_account),
+          description: buildCatalogDescription(source),
+          topical: normalizeDescriptionTags(source.description_tags),
+          pedagogical: getPedagogicalTags(source),
+          geographic: getGeographicDisplayTags(source),
+          fipsReference: getGeographicTags(source).some((tag) => tag === 'state' || tag === 'county'),
+          datasheet: buildDatasheet(source),
+          unavailable: previewUnavailableReason(source, preview),
+          counties: preview?.counties ?? 0,
+        },
+      ];
+    })
+);
+
+// ?community=<slug> preselects that library's county slice.
+const communities = Object.fromEntries(
+  (await getCollection('communities'))
+    .filter((c) => c.data.county_fips)
+    .map((c) => [
+      c.data.slug,
+      {
+        name: c.data.name,
+        county_fips: c.data.county_fips,
+        label: [c.data.county, c.data.state_code].filter(Boolean).join(', '),
+      },
+    ])
+);
+
+const pageData = {
+  sources,
+  communities,
+  previewBase: withBasePath('/previews'),
+  countyNamesUrl: withBasePath('/geo/county-names.json'),
+};
 ---
 
-<Layout title="Data Preview" description="Interactive preview of dataset sources with metrics and geographic filters">
+<Layout title="Data Preview" description="Preview of each dataset in the catalog: details, sample rows, county slices and summary statistics">
   <Fragment slot="head">
     <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.54.1/dist/apexcharts.min.js" is:inline></script>
   </Fragment>
 
   <section class="preview-page" id="preview-page">
+    <MetadataEditor />
     <div id="loading-state" class="status-panel">
       <div class="loading-spinner" aria-hidden="true"></div>
       <p>Loading dataset preview…</p>
@@ -21,8 +103,6 @@ const catalogHref = withBasePath('/complete-catalog');
     <div id="error-state" class="status-panel error-panel" hidden>
       <h2>Unable to load preview</h2>
       <p id="error-message"></p>
-      <p class="error-hint">Start the preview API in a separate terminal: <code>npm run backend:dev</code> (runs on port 4323).</p>
-      <p class="error-hint">The Astro dev server may use port 4322 when 4321 is busy — that is not the preview API.</p>
     </div>
 
     <div id="source-picker" class="source-picker" hidden>
@@ -30,7 +110,7 @@ const catalogHref = withBasePath('/complete-catalog');
         <a href={catalogHref} class="back-link">← Complete Catalog</a>
       </nav>
       <h1 class="page-title">Data Preview</h1>
-      <p class="page-intro">Select a dataset source to preview. Live previews require the backend API.</p>
+      <p class="page-intro">Select a dataset to see its details, a sample of its rows and summary statistics.</p>
       <ul id="source-list" class="source-grid"></ul>
     </div>
 
@@ -44,7 +124,7 @@ const catalogHref = withBasePath('/complete-catalog');
           <h1 class="page-title" id="source-title"></h1>
           <p class="source-provider" id="source-provider" hidden></p>
           <div class="description-card" id="source-description"></div>
-          {audience && <p class="audience-note">Opened from the {audience} catalog view.</p>}
+          <p class="audience-note" id="audience-note" hidden></p>
           <p class="account-warning" id="account-warning" hidden>
             <span class="warning-icon" aria-hidden="true">!</span>
             Requires a free account for downloads.
@@ -94,16 +174,18 @@ const catalogHref = withBasePath('/complete-catalog');
 
         <div class="chart-panel panel-card">
           <div class="chart-header">
-            <h2 class="section-title">Focal variable plot</h2>
+            <h2 class="section-title" id="chart-title">Focal variable plot</h2>
             <div class="chart-controls" id="chart-controls">
               <label class="filter-control" id="state-filter-wrap" hidden>
                 <span>State</span>
-                <select id="state-filter"></select>
+                <select id="state-filter">
+                  <option value="">First rows (all places)</option>
+                </select>
               </label>
               <label class="filter-control" id="county-filter-wrap" hidden>
                 <span>County</span>
-                <select id="county-filter">
-                  <option value="">All counties</option>
+                <select id="county-filter" disabled>
+                  <option value="">Choose a state first</option>
                 </select>
               </label>
               <label class="filter-control" id="x-variable-filter-wrap">
@@ -124,13 +206,34 @@ const catalogHref = withBasePath('/complete-catalog');
               </label>
             </div>
           </div>
+          <p class="slice-note" id="slice-note" aria-live="polite" hidden></p>
           <details class="reference-card" id="reference-card" hidden>
             <summary class="reference-summary">Reference &amp; Guidance</summary>
-            <div class="reference-body" id="reference-body">
-              <!-- filled by JS -->
+            <div class="reference-body">
+              <ul class="reference-links">
+                <li>
+                  <a href="https://www.census.gov/library/reference/code-lists/ansi/ansi-codes-for-states.html" target="_blank" rel="noopener noreferrer">State FIPS Codes (Census.gov)</a>
+                  — two-digit numeric codes used for each U.S. state/territory
+                </li>
+                <li>
+                  <a href="https://www.census.gov/library/reference/code-lists/ansi.html" target="_blank" rel="noopener noreferrer">County FIPS Codes (Census.gov)</a>
+                  — five-digit codes (state + county)
+                </li>
+                <li>
+                  <a href="https://en.wikipedia.org/wiki/Federal_Information_Processing_Standard_state_code" target="_blank" rel="noopener noreferrer">FIPS overview (Wikipedia)</a>
+                </li>
+              </ul>
+              <p class="reference-hint">Tip: pick a state and county above to see only that county's rows.</p>
             </div>
           </details>
+          <div id="preview-unavailable" class="preview-unavailable" hidden>
+            <p id="preview-unavailable-message"></p>
+            <a id="preview-unavailable-link" class="btn-download" href="#" target="_blank" rel="noopener noreferrer" hidden>
+              Visit the provider ↗
+            </a>
+          </div>
           <div class="chart-canvas-wrap">
+            <p id="chart-note" class="chart-note" hidden></p>
             <div id="chart-loading" class="section-loading" hidden>Loading chart…</div>
             <div id="focal-chart" aria-label="Focal variable chart"></div>
           </div>
@@ -139,8 +242,9 @@ const catalogHref = withBasePath('/complete-catalog');
 
       <div class="table-panel panel-card">
         <div class="table-header">
-          <h2 class="section-title">Geographically filtered data preview</h2>
+          <h2 class="section-title">Data preview</h2>
           <p class="table-meta" id="table-meta"></p>
+          <p class="table-meta" id="table-columns-note" hidden></p>
         </div>
         <div class="table-scroll">
           <div id="table-loading" class="section-loading table-section-loading" hidden>Loading table…</div>
@@ -150,236 +254,120 @@ const catalogHref = withBasePath('/complete-catalog');
           </div>
         </div>
       </div>
+
+      <details class="summary-panel panel-card" id="summary-panel" hidden>
+        <summary class="summary-toggle">Summary statistics for every row</summary>
+        <div class="summary-body" id="summary-body">
+          <p class="table-meta">Loading…</p>
+        </div>
+      </details>
     </div>
   </section>
 
+  <script type="application/json" id="preview-data" set:html={JSON.stringify(pageData)} />
+
   <script>
-    import {
-      fetchSource,
-      fetchDatasheet,
-      fetchPreview,
-      fetchChart,
-      fetchFilterOptions,
-      fetchSources,
-      buildCatalogDescription,
-      normalizeDescriptionTags,
-      getPedagogicalTags,
-      getGeographicTags,
-    } from '@lib/api/backend';
     import { withBasePath } from '@lib/paths';
+    import {
+      audienceNote,
+      chooseSlice,
+      communityCounty,
+      countyFileUrl,
+      defaultXVariable,
+      meanByGroup,
+      numericVariables,
+      pickFocalVariable,
+      previewFileUrl,
+      rowsMeta,
+      scatterPoints,
+      tableColumns,
+      xVariableOptions,
+      type CommunityCounty,
+      type PreviewManifest,
+      type PreviewVariable,
+      type RowFile,
+    } from '@lib/data/staticPreview';
 
-    function getSourceIdFromUrl() {
-      return new URLSearchParams(window.location.search).get('source')?.trim() ?? '';
+    interface SourceModel {
+      id: string;
+      title: string;
+      provider: string;
+      providerUrl: string;
+      downloadUrl: string;
+      requiresAccount: boolean;
+      description: string;
+      topical: string[];
+      pedagogical: string[];
+      geographic: string[];
+      fipsReference: boolean;
+      datasheet: { who: string; how: string; where: string; why: string; when: string };
+      unavailable: string | null;
+      counties: number;
+    }
+    interface SummaryColumn {
+      name: string;
+      type: string;
+      count: number;
+      missing: number;
+      unique: number;
+      unique_at_least?: boolean;
+      min?: number;
+      max?: number;
+      mean?: number;
+      median?: number;
+      top?: [string, number][];
+    }
+    interface VariablesFile {
+      columns: PreviewVariable[];
+    }
+    interface SummaryFile {
+      rows: number;
+      columns: SummaryColumn[];
+    }
+    interface CountyNames {
+      states: Record<string, string>;
+      counties: Record<string, [string, string]>;
     }
 
-    let sourceId = getSourceIdFromUrl();
-    let focalVariable = '';
-    let initialStateFilter = '';
+    // Rows drawn in the table; the chart uses every row of the current slice.
+    const TABLE_ROWS = 100;
 
-    const loadingState = document.getElementById('loading-state');
-    const errorState = document.getElementById('error-state');
-    const errorMessage = document.getElementById('error-message');
-    const sourcePicker = document.getElementById('source-picker');
-    const sourceList = document.getElementById('source-list');
-    const previewContent = document.getElementById('preview-content');
+    const page = JSON.parse(document.getElementById('preview-data')?.textContent ?? '{}') as {
+      sources: Record<string, SourceModel>;
+      communities: Record<string, CommunityCounty>;
+      previewBase: string;
+      countyNamesUrl: string;
+    };
 
-    const stateFilter = document.getElementById('state-filter') as HTMLSelectElement;
-    const countyFilter = document.getElementById('county-filter') as HTMLSelectElement;
-    const variableFilter = document.getElementById('variable-filter') as HTMLSelectElement;
-    const xVariableFilter = document.getElementById('x-variable-filter') as HTMLSelectElement;
-    const plotTypeFilter = document.getElementById('plot-type-filter') as HTMLSelectElement;
-    const stateFilterWrap = document.getElementById('state-filter-wrap');
-    const countyFilterWrap = document.getElementById('county-filter-wrap');
+    const $ = (id: string) => document.getElementById(id) as HTMLElement;
+    const stateFilter = $('state-filter') as HTMLSelectElement;
+    const countyFilter = $('county-filter') as HTMLSelectElement;
+    const variableFilter = $('variable-filter') as HTMLSelectElement;
+    const xVariableFilter = $('x-variable-filter') as HTMLSelectElement;
+    const plotTypeFilter = $('plot-type-filter') as HTMLSelectElement;
 
-    let chartInstance = null;
-    // Full X-variable option list (value + numeric flag), captured once per source
-    // so the dropdown can be narrowed to numeric-only columns when Plot Type is Scatter.
-    let xVariableOptions: { value: string; numeric: boolean }[] = [];
+    let chartInstance: { destroy(): void; render(): void } | null = null;
+    let variables: PreviewVariable[] = [];
+    let manifest: PreviewManifest;
+    let sample: RowFile;
+    let current: { file: RowFile; scope: string } = { file: { rows: [], rows_included: 0, rows_total: 0 }, scope: 'the dataset' };
+    let countyNames: CountyNames | null = null;
 
-    // In raw-YAML mode (no SQLite DB), the pipeline writes column names as
-    // `variable_names`; only the SQLite import path renames it to `variables`.
-    // The chart backends already fall back to `variable_names` — mirror that here.
-    function getSourceVariables(source): string[] {
-      return source.variables ?? source.variable_names ?? [];
+    async function getJson(url: string): Promise<unknown> {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Could not load ${url} (HTTP ${response.status}).`);
+      return response.json();
     }
 
-    function pickFocalVariable(source) {
-      const numeric = source.variable_report?.find(
-        (v) => v.type === 'integer' || v.type === 'float',
-      );
-      if (numeric?.name) return numeric.name;
-
-      const vars = getSourceVariables(source);
-      const preferred = vars.find((v) => /estimate|total|value|amount|production|population/i.test(v));
-      return preferred ?? vars[vars.length - 1] ?? '';
+    function showError(message: string) {
+      $('loading-state').hidden = true;
+      $('preview-content').hidden = true;
+      $('source-picker').hidden = true;
+      $('error-state').hidden = false;
+      $('error-message').textContent = message;
     }
 
-    function pickInitialState(source) {
-      if (source.id === 'census-county-estimates-all-2025') return '47';
-      return '';
-    }
-
-    function showPreviewContent() {
-      loadingState?.setAttribute('hidden', '');
-      previewContent?.removeAttribute('hidden');
-    }
-
-    function setSectionLoading(chartLoading, tableLoading) {
-      document.getElementById('chart-loading')?.toggleAttribute('hidden', !chartLoading);
-      document.getElementById('table-loading')?.toggleAttribute('hidden', !tableLoading);
-      document.getElementById('preview-grid')?.toggleAttribute('hidden', tableLoading);
-    }
-
-    function showError(message) {
-      loadingState?.setAttribute('hidden', '');
-      previewContent?.setAttribute('hidden', '');
-      sourcePicker?.setAttribute('hidden', '');
-      errorState?.removeAttribute('hidden');
-      if (errorMessage) errorMessage.textContent = message;
-    }
-
-    function renderTags(containerId, tags, filledFirst = false) {
-      const container = document.getElementById(containerId);
-      if (!container) return;
-      container.innerHTML = '';
-      if (!tags.length) {
-        container.innerHTML = '<span class="tag-chip tag-outline">Not specified</span>';
-        return;
-      }
-      tags.forEach((tag, i) => {
-        const chip = document.createElement('span');
-        chip.className = `tag-chip ${filledFirst && i === 0 ? 'tag-filled' : 'tag-outline'}`;
-        chip.textContent = tag;
-        container.appendChild(chip);
-        if (i < tags.length - 1) {
-          container.appendChild(document.createTextNode(', '));
-        }
-      });
-    }
-
-    function isNumericCell(value) {
-      if (value === '' || value == null) return false;
-      const n = Number(String(value).replace(/,/g, ''));
-      return !Number.isNaN(n) && String(value).trim() !== '';
-    }
-
-    function formatCell(value) {
-      if (!isNumericCell(value)) return String(value ?? '');
-      const n = Number(String(value).replace(/,/g, ''));
-      if (Number.isInteger(n) && Math.abs(n) >= 1000) return n.toLocaleString();
-      if (!Number.isInteger(n)) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
-      return String(n);
-    }
-
-    function renderChart(chartData, plotType: string = 'bar') {
-      const container = document.getElementById('focal-chart');
-      const Apex = window.ApexCharts;
-      if (!container || typeof Apex === 'undefined') return;
-
-      if (chartInstance) {
-        chartInstance.destroy();
-        chartInstance = null;
-      }
-
-      if (plotType === 'scatter') {
-        const points = (chartData.points ?? []).map((p: { x: number; y: number }) => [p.x, p.y]);
-        chartInstance = new Apex(container, {
-          chart: {
-            type: 'scatter',
-            height: 300,
-            toolbar: { show: false },
-            fontFamily: 'Outfit, sans-serif',
-            zoom: { enabled: true, type: 'xy' },
-          },
-          series: [{ name: chartData.label, data: points }],
-          xaxis: {
-            title: {
-              text: chartData.xLabel ?? chartData.xVariable ?? 'X',
-              style: { fontSize: '11px', color: '#52606D' },
-            },
-            labels: { style: { fontSize: '11px', colors: '#52606D' } },
-            tickAmount: 6,
-          },
-          yaxis: {
-            title: { text: chartData.label, style: { fontSize: '11px', color: '#52606D' } },
-            labels: { style: { colors: '#52606D', fontSize: '11px' } },
-          },
-          colors: ['#155E75'],
-          dataLabels: { enabled: false },
-          grid: {
-            strokeDashArray: 4,
-            borderColor: '#D2DEE6',
-          },
-          tooltip: {
-            theme: 'light',
-            x: { formatter: (v: number) => Number(v).toLocaleString() },
-            y: { formatter: (v: number) => Number(v).toLocaleString() },
-          },
-        });
-        chartInstance.render();
-        return;
-      }
-
-      const labels = (chartData.series ?? []).map((p) => p.label);
-      const values = (chartData.series ?? []).map((p) => p.value);
-      const chartType = plotType === 'line' ? 'line' : 'bar';
-
-      chartInstance = new Apex(container, {
-        chart: {
-          type: chartType,
-          height: 300,
-          toolbar: { show: false },
-          fontFamily: 'Outfit, sans-serif',
-        },
-        series: [{ name: chartData.label, data: values }],
-        xaxis: {
-          categories: labels,
-          labels: {
-            rotate: labels.length > 8 ? -45 : 0,
-            trim: true,
-            hideOverlappingLabels: true,
-            style: { fontSize: '11px', colors: '#52606D' },
-          },
-          axisBorder: { show: false },
-          axisTicks: { show: false },
-        },
-        yaxis: {
-          labels: {
-            style: { colors: '#52606D', fontSize: '11px' },
-            formatter: (v) => {
-              const n = Number(v);
-              if (Math.abs(n) >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
-              if (Math.abs(n) >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
-              if (Math.abs(n) >= 1e3) return `${(n / 1e3).toFixed(0)}k`;
-              return String(n);
-            },
-          },
-        },
-        colors: ['#155E75'],
-        plotOptions: {
-          bar: {
-            borderRadius: 3,
-            columnWidth: '60%',
-          },
-        },
-        dataLabels: { enabled: false },
-        grid: {
-          strokeDashArray: 4,
-          borderColor: '#D2DEE6',
-          xaxis: { lines: { show: false } },
-        },
-        tooltip: {
-          theme: 'light',
-          y: {
-            formatter: (v) => Number(v).toLocaleString(),
-          },
-        },
-      });
-
-      chartInstance.render();
-    }
-
-    function escapeHtml(value) {
+    function escapeHtml(value: unknown) {
       return String(value ?? '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -387,298 +375,398 @@ const catalogHref = withBasePath('/complete-catalog');
         .replace(/"/g, '&quot;');
     }
 
-    function buildGridTemplate(columns, numericCols) {
-      return columns
-        .map((col, i) => {
-          if (numericCols[i]) return 'minmax(5.5rem, 1fr)';
-          const name = col.toUpperCase();
-          if (/NAME|COUNTY|LABEL|TITLE|DESCRIPTION/.test(name)) return 'minmax(9rem, 1.6fr)';
-          if (/STUSPS|STATE|FIPS|GEOID|ID|CODE/.test(name)) return 'minmax(4.5rem, 0.75fr)';
-          return 'minmax(7rem, 1fr)';
-        })
-        .join(' ');
+    function isNumericCell(value: unknown) {
+      const text = String(value ?? '').trim();
+      return text !== '' && !Number.isNaN(Number(text.replace(/,/g, '')));
     }
 
-    function renderTable(preview) {
-      const grid = document.getElementById('preview-grid');
-      const header = document.getElementById('preview-grid-header');
-      const body = document.getElementById('preview-grid-body');
-      const meta = document.getElementById('table-meta');
-      if (!grid || !header || !body) return;
+    function formatNumber(n: number) {
+      if (Number.isInteger(n)) return Math.abs(n) >= 1000 ? n.toLocaleString() : String(n);
+      return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    }
 
-      const numericCols = preview.columns.map((_, colIdx) =>
-        preview.rows.some((row) => isNumericCell(row[colIdx])),
-      );
-      const gridTemplate = buildGridTemplate(preview.columns, numericCols);
+    // Years, IDs and codes are labels, not quantities: no thousands separators.
+    const IDENTIFIER_COLUMN = /year|\bid\b|code|fips|zip|trifd|geoid/i;
 
-      grid.style.setProperty('--grid-template', gridTemplate);
-      grid.style.gridTemplateColumns = gridTemplate;
-      grid.setAttribute('aria-colcount', String(preview.columns.length));
-      grid.setAttribute('aria-rowcount', String(preview.rows.length + 1));
+    function formatCell(value: unknown, column: string) {
+      if (!isNumericCell(value) || IDENTIFIER_COLUMN.test(column)) return String(value ?? '');
+      return formatNumber(Number(String(value).replace(/,/g, '')));
+    }
 
-      header.innerHTML = `<div class="grid-row" role="row">${preview.columns
-        .map(
-          (c, i) =>
-            `<div class="grid-cell grid-header ${numericCols[i] ? 'col-numeric' : ''}" role="columnheader" title="${escapeHtml(c)}">${escapeHtml(c.replace(/_/g, ' '))}</div>`,
-        )
-        .join('')}</div>`;
-
-      body.innerHTML = preview.rows
-        .map(
-          (row, i) =>
-            `<div class="grid-row ${i % 2 === 0 ? 'row-even' : 'row-odd'}" role="row">${row
-              .map(
-                (cell, colIdx) =>
-                  `<div class="grid-cell ${numericCols[colIdx] ? 'col-numeric' : ''}" role="gridcell" title="${escapeHtml(cell)}">${escapeHtml(formatCell(cell))}</div>`,
-              )
-              .join('')}</div>`,
-        )
-        .join('');
-
-      if (meta) {
-        meta.textContent = `Showing ${preview.rows.length.toLocaleString()} of ${preview.total.toLocaleString()} rows`;
+    function renderTags(containerId: string, tags: string[], filledFirst = false) {
+      const container = $(containerId);
+      container.replaceChildren();
+      if (!tags.length) {
+        container.innerHTML = '<span class="tag-chip tag-outline">Not specified</span>';
+        return;
       }
+      tags.forEach((tag, i) => {
+        const chip = document.createElement('span');
+        chip.className = `tag-chip ${filledFirst && i === 0 ? 'tag-filled' : 'tag-outline'}`;
+        // Keep the comma inside the chip so the flex gap only falls after it.
+        chip.textContent = i < tags.length - 1 ? `${tag},` : tag;
+        container.appendChild(chip);
+      });
     }
 
-    async function loadCountyOptions(currentState) {
-      if (!countyFilter) return;
-      countyFilter.innerHTML = '<option value="">All counties</option>';
-      if (!currentState) return;
-      const options = await fetchFilterOptions(sourceId, 'county', currentState);
-      for (const opt of options) {
-        const el = document.createElement('option');
-        el.value = opt.value;
-        el.textContent = opt.label;
-        countyFilter.appendChild(el);
-      }
-    }
-
-    async function refreshPreviewAndChart() {
-      const state = stateFilter?.value || undefined;
-      const county = countyFilter?.value || undefined;
-      const variable = variableFilter?.value || focalVariable;
-      const xVariable = xVariableFilter?.value || undefined;
-      const plotType = (plotTypeFilter?.value || 'bar') as 'bar' | 'line' | 'scatter';
-
-      setSectionLoading(true, true);
-      try {
-        const [preview, chart] = await Promise.all([
-          fetchPreview(sourceId, {
-            state,
-            county,
-            limit: 25,
-          }),
-          fetchChart(sourceId, {
-            state,
-            county,
-            variable,
-            xVariable,
-            plotType,
-            limit: plotType === 'scatter' ? 300 : 15,
-          }),
-        ]);
-
-        renderTable(preview);
-        renderChart(chart, plotType);
-      } finally {
-        setSectionLoading(false, false);
-      }
-    }
-
-    function populateReferenceCard(source) {
-      const card = document.getElementById('reference-card');
-      const body = document.getElementById('reference-body');
-      if (!card || !body) return;
-      const geoTags = getGeographicTags(source);
-      const hasFips = geoTags.includes('state') || geoTags.includes('county');
-      if (!hasFips) return;
-      card.removeAttribute('hidden');
-      body.innerHTML = `
-        <ul class="reference-links">
-          <li><a href="https://www.census.gov/library/reference/code-lists/ansi/ansi-codes-for-states.html" target="_blank" rel="noopener noreferrer">State FIPS Codes (Census.gov)</a> — two-digit numeric codes used for each U.S. state/territory</li>
-          <li><a href="https://www.census.gov/library/reference/code-lists/ansi.html" target="_blank" rel="noopener noreferrer">County FIPS Codes (Census.gov)</a> — five-digit codes (state + county)</li>
-          <li><a href="https://www.nrcs.usda.gov/wps/portal/nrcs/detail/?cid=nrcs143_013696" target="_blank" rel="noopener noreferrer">USDA State/County Codes</a></li>
-          <li><a href="https://en.wikipedia.org/wiki/Federal_Information_Processing_Standard_state_code" target="_blank" rel="noopener noreferrer">FIPS overview (Wikipedia)</a></li>
-        </ul>
-        <p class="reference-hint">Tip: use the two-digit state FIPS code (e.g., <code>47</code> for Tennessee, <code>06</code> for California) in the State filter above.</p>
-      `;
-    }
-
-    async function initSourcePicker() {
-      const sources = await fetchSources();
-      loadingState?.setAttribute('hidden', '');
-      sourcePicker?.removeAttribute('hidden');
-
-      if (!sourceList) return;
-      sourceList.innerHTML = sources
+    function initSourcePicker() {
+      $('loading-state').hidden = true;
+      $('source-picker').hidden = false;
+      $('source-list').innerHTML = Object.values(page.sources)
         .map(
-          (s) =>
-            `<li class="source-card">
+          (s) => `<li class="source-card">
               <a href="${withBasePath(`/data-preview?source=${encodeURIComponent(s.id)}`)}">
-                <span class="source-card-title">${s.title}</span>
-                ${s.id === 'census-county-estimates-all-2025' ? '<span class="demo-badge">Demo</span>' : ''}
+                <span class="source-card-title">${escapeHtml(s.title)}</span>
+                ${s.unavailable ? '<span class="info-badge">Info only</span>' : ''}
+                ${s.counties > 0 ? '<span class="demo-badge">By county</span>' : ''}
               </a>
-            </li>`,
+            </li>`
         )
         .join('');
     }
 
-    async function initPreview() {
-      sourceId = getSourceIdFromUrl();
-      if (!sourceId) {
-        return initSourcePicker();
-      }
-
-      const [source, datasheet] = await Promise.all([
-        fetchSource(sourceId),
-        fetchDatasheet(sourceId),
-      ]);
-
-      focalVariable = pickFocalVariable(source);
-      initialStateFilter = pickInitialState(source);
-
-      showPreviewContent();
+    function renderDetails(source: SourceModel) {
       document.title = `${source.title} | Community Data Libraries`;
-
-      const titleEl = document.getElementById('source-title');
-      const descEl = document.getElementById('source-description');
-      const providerEl = document.getElementById('source-provider');
-      const downloadBtn = document.getElementById('download-btn') as HTMLAnchorElement;
-      const accountWarning = document.getElementById('account-warning');
-
-      if (titleEl) titleEl.textContent = source.title;
-      if (descEl) descEl.textContent = buildCatalogDescription(source);
-      if (providerEl && source.provider?.name) {
-        const agency = source.provider.agency ? ` · ${source.provider.agency}` : '';
-        providerEl.textContent = `${source.provider.name}${agency}`;
-        providerEl.removeAttribute('hidden');
+      $('source-title').textContent = source.title;
+      $('source-description').textContent = source.description;
+      if (source.provider) {
+        $('source-provider').textContent = source.provider;
+        $('source-provider').hidden = false;
       }
-      if (downloadBtn && source.download?.url) downloadBtn.href = source.download.url;
-      if (accountWarning && source.requires_account) accountWarning.removeAttribute('hidden');
-
-      renderTags('topical-tags', normalizeDescriptionTags(source.description_tags), true);
-      renderTags('pedagogical-tags', getPedagogicalTags(source));
-      renderTags('geographic-tags', getGeographicTags(source));
-
-      const dsWho = document.getElementById('ds-who');
-      const dsHow = document.getElementById('ds-how');
-      const dsWhere = document.getElementById('ds-where');
-      const dsWhy = document.getElementById('ds-why');
-      const dsWhen = document.getElementById('ds-when');
-      if (dsWho) dsWho.textContent = datasheet.who;
-      if (dsHow) dsHow.textContent = datasheet.how;
-      if (dsWhere) dsWhere.textContent = datasheet.where;
-      if (dsWhy) dsWhy.textContent = datasheet.why;
-      if (dsWhen) dsWhen.textContent = datasheet.when;
-
-      const geoTags = getGeographicTags(source);
-      try {
-        if (geoTags.includes('state') && stateFilter && stateFilterWrap) {
-          stateFilterWrap.removeAttribute('hidden');
-          const stateOptions = await fetchFilterOptions(sourceId, 'state');
-          stateFilter.innerHTML =
-            '<option value="">All states</option>' +
-            stateOptions
-              .map(
-                (o) =>
-                  `<option value="${o.value}" ${o.value === initialStateFilter ? 'selected' : ''}>${o.label}</option>`,
-              )
-              .join('');
-        } else if (stateFilterWrap) {
-          stateFilterWrap.setAttribute('hidden', '');
-        }
-
-        if (geoTags.includes('county') && countyFilterWrap) {
-          countyFilterWrap.removeAttribute('hidden');
-          await loadCountyOptions(stateFilter?.value || initialStateFilter || undefined);
-        } else if (countyFilterWrap) {
-          countyFilterWrap.setAttribute('hidden', '');
-        }
-      } catch (filterError) {
-        console.warn('Filter options unavailable:', filterError);
+      const note = audienceNote(window.location.search);
+      if (note) {
+        $('audience-note').textContent = note;
+        $('audience-note').hidden = false;
       }
+      const download = $('download-btn') as HTMLAnchorElement;
+      if (source.downloadUrl) download.href = source.downloadUrl;
+      else if (source.providerUrl) {
+        download.href = source.providerUrl;
+        download.textContent = 'Visit provider ↗';
+      } else download.hidden = true;
+      $('account-warning').hidden = !source.requiresAccount;
 
-      if (variableFilter) {
-        const numericVars =
-          source.variable_report
-            ?.filter((v) => v.type === 'integer' || v.type === 'float')
-            .map((v) => v.name) ?? getSourceVariables(source);
-
-        const uniqueVars = [...new Set(numericVars.filter(Boolean))];
-        const options = uniqueVars.length > 0 ? uniqueVars : [focalVariable].filter(Boolean);
-        variableFilter.innerHTML = options
-          .map(
-            (v) =>
-              `<option value="${v}" ${v === focalVariable ? 'selected' : ''}>${v.replace(/_/g, ' ')}</option>`,
-          )
-          .join('');
+      renderTags('topical-tags', source.topical, true);
+      renderTags('pedagogical-tags', source.pedagogical);
+      renderTags('geographic-tags', source.geographic);
+      for (const key of ['who', 'how', 'where', 'why', 'when'] as const) {
+        $(`ds-${key}`).textContent = source.datasheet[key];
       }
+    }
 
-      let defaultX = '';
-      if (xVariableFilter) {
-        const report = source.variable_report ?? [];
-        const allCols = getSourceVariables(source);
-        const numericNames = new Set(
-          report.filter((v) => v.type === 'integer' || v.type === 'float').map((v) => v.name),
-        );
-        // Non-numeric (label/time) columns first, then numeric
-        const nonNumeric = report
-          .filter((v) => !numericNames.has(v.name))
-          .map((v) => v.name)
-          .filter((n) => allCols.includes(n));
-        const numeric = [...numericNames].filter((n) => allCols.includes(n));
-        const ordered = [...new Set([...nonNumeric, ...numeric, ...allCols])];
-        const xOptions = ordered.length > 0 ? ordered : allCols;
-        xVariableOptions = xOptions.map((v) => ({ value: v, numeric: numericNames.has(v) }));
-        // Auto-detect default X: first temporal column or first column
-        const temporalNames = ['YEAR', 'DATE', 'PERIOD', 'TIMEPERIOD_NAME'];
-        defaultX =
-          xOptions.find((v) => temporalNames.includes(v.toUpperCase())) ?? xOptions[0] ?? '';
-        renderXVariableOptions('bar', defaultX);
+    // Info-only sources: keep the description and datasheet, replace chart and table.
+    function showPreviewUnavailable(message: string, providerUrl: string) {
+      $('chart-title').textContent = 'Data preview';
+      $('chart-controls').hidden = true;
+      (document.querySelector('.chart-canvas-wrap') as HTMLElement).hidden = true;
+      (document.querySelector('.table-panel') as HTMLElement).hidden = true;
+      $('preview-unavailable').hidden = false;
+      $('preview-unavailable-message').textContent = message;
+      const link = $('preview-unavailable-link') as HTMLAnchorElement;
+      if (providerUrl) {
+        link.href = providerUrl;
+        link.hidden = false;
       }
+    }
 
-      populateReferenceCard(source);
-
-      await refreshPreviewAndChart();
-
-      stateFilter?.addEventListener('change', async () => {
-        await loadCountyOptions(stateFilter.value);
-        if (countyFilter) countyFilter.value = '';
-        await refreshPreviewAndChart();
-      });
-      countyFilter?.addEventListener('change', refreshPreviewAndChart);
-      variableFilter?.addEventListener('change', refreshPreviewAndChart);
-      xVariableFilter?.addEventListener('change', refreshPreviewAndChart);
-      plotTypeFilter?.addEventListener('change', async () => {
-        renderXVariableOptions(plotTypeFilter.value, xVariableFilter?.value);
-        await refreshPreviewAndChart();
-      });
+    function fillVariableSelects() {
+      const focal = pickFocalVariable(variables);
+      const numeric = numericVariables(variables);
+      variableFilter.innerHTML = numeric
+        .map((v) => `<option value="${escapeHtml(v)}" ${v === focal ? 'selected' : ''}>${escapeHtml(v.replace(/_/g, ' '))}</option>`)
+        .join('');
+      renderXVariableOptions('bar', defaultXVariable(variables, 'bar'));
     }
 
     // Scatter needs two numeric axes, so its X list is narrowed to numeric columns.
-    // Bar/Line can group by any column. Keeps the current selection when it's still
-    // valid for the new plot type, otherwise falls back to the first option.
-    function renderXVariableOptions(plotType: string, preferredValue: string | undefined) {
-      if (!xVariableFilter) return;
-      const pool =
-        plotType === 'scatter' ? xVariableOptions.filter((o) => o.numeric) : xVariableOptions;
-      const selected = pool.some((o) => o.value === preferredValue)
-        ? preferredValue
-        : (pool[0]?.value ?? '');
+    // Keeps the current selection when it's still valid for the new plot type.
+    function renderXVariableOptions(plotType: string, preferred: string | undefined) {
+      const pool = xVariableOptions(variables, plotType);
+      const selected = preferred && pool.includes(preferred) ? preferred : (pool[0] ?? '');
       xVariableFilter.innerHTML = pool
-        .map(
-          (o) =>
-            `<option value="${o.value}" ${o.value === selected ? 'selected' : ''}>${o.value.replace(/_/g, ' ')}</option>`,
-        )
+        .map((v) => `<option value="${escapeHtml(v)}" ${v === selected ? 'selected' : ''}>${escapeHtml(v.replace(/_/g, ' '))}</option>`)
         .join('');
     }
 
-    const urlParams = new URLSearchParams(window.location.search);
+    const plural = (n: number, word: string) => `${n.toLocaleString()} ${n === 1 ? word : `${word}s`}`;
 
-    if (urlParams.has('source')) {
-      initPreview().catch((err) => showError(err instanceof Error ? err.message : String(err)));
+    const columnIndex = (name: string) => variables.findIndex((v) => v.name === name);
+
+    function renderChart() {
+      const container = $('focal-chart');
+      const Apex = (window as unknown as { ApexCharts?: new (el: HTMLElement, options: object) => { destroy(): void; render(): void } }).ApexCharts;
+      chartInstance?.destroy();
+      chartInstance = null;
+      const note = $('chart-note');
+      const yName = variableFilter.value;
+      const xName = xVariableFilter.value;
+      const plotType = plotTypeFilter.value;
+      const rows = current.file.rows;
+      if (!Apex || !yName || !xName) {
+        note.textContent = 'This dataset has no numeric column to chart.';
+        note.hidden = false;
+        return;
+      }
+      const yIndex = columnIndex(yName);
+      const xIndex = columnIndex(xName);
+      const axisStyle = { fontSize: '11px', colors: '#52606D' };
+
+      if (plotType === 'scatter') {
+        const points = scatterPoints(rows, xIndex, yIndex);
+        note.textContent = `Each point is one row of the ${plural(rows.length, 'row')} loaded.`;
+        note.hidden = false;
+        chartInstance = new Apex(container, {
+          chart: { type: 'scatter', height: 300, toolbar: { show: false }, fontFamily: 'Outfit, sans-serif', zoom: { enabled: true, type: 'xy' } },
+          series: [{ name: yName, data: points }],
+          xaxis: { title: { text: xName, style: { fontSize: '11px', color: '#52606D' } }, labels: { style: axisStyle }, tickAmount: 6 },
+          yaxis: { title: { text: yName, style: { fontSize: '11px', color: '#52606D' } }, labels: { style: axisStyle } },
+          colors: ['#155E75'],
+          dataLabels: { enabled: false },
+          grid: { strokeDashArray: 4, borderColor: '#D2DEE6' },
+          tooltip: { theme: 'light', x: { formatter: (v: number) => Number(v).toLocaleString() }, y: { formatter: (v: number) => Number(v).toLocaleString() } },
+        });
+        chartInstance.render();
+        return;
+      }
+
+      const series = meanByGroup(rows, xIndex, yIndex);
+      // Bar and Line plots average the Y values within each X value; say so.
+      const mark = plotType === 'line' ? 'Each point' : 'Each bar';
+      note.textContent = `${mark} shows the average (mean) ${yName} for that ${xName}, over the ${plural(rows.length, 'row')} loaded.`;
+      note.hidden = false;
+      const labels = series.map((p) => p.label);
+      chartInstance = new Apex(container, {
+        chart: { type: plotType === 'line' ? 'line' : 'bar', height: 300, toolbar: { show: false }, fontFamily: 'Outfit, sans-serif' },
+        series: [{ name: yName, data: series.map((p) => p.value) }],
+        xaxis: {
+          categories: labels,
+          labels: { rotate: labels.length > 8 ? -45 : 0, trim: true, hideOverlappingLabels: true, style: axisStyle },
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+        },
+        yaxis: {
+          labels: {
+            style: axisStyle,
+            formatter: (v: number) => {
+              const n = Number(v);
+              if (Math.abs(n) >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
+              if (Math.abs(n) >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+              if (Math.abs(n) >= 1e3) return `${(n / 1e3).toFixed(0)}k`;
+              return String(Math.round(n * 100) / 100);
+            },
+          },
+        },
+        colors: ['#155E75'],
+        plotOptions: { bar: { borderRadius: 3, columnWidth: '60%' } },
+        dataLabels: { enabled: false },
+        grid: { strokeDashArray: 4, borderColor: '#D2DEE6', xaxis: { lines: { show: false } } },
+        tooltip: { theme: 'light', y: { formatter: (v: number) => Number(v).toLocaleString() } },
+      });
+      chartInstance.render();
+    }
+
+    // Narrow tables share the width (fr); wide ones cap each column, since in a
+    // max-content grid every fr track grows to the longest header in the table.
+    function gridWidth(name: string, numeric: boolean, wide: boolean) {
+      const upper = name.toUpperCase();
+      const [min, fr, cap] = numeric
+        ? ['5.5rem', '1fr', '9rem']
+        : /NAME|COUNTY|LABEL|TITLE|DESCRIPTION/.test(upper)
+          ? ['9rem', '1.6fr', '16rem']
+          : /STUSPS|STATE|FIPS|GEOID|ID|CODE/.test(upper)
+            ? ['4.5rem', '0.75fr', '8rem']
+            : ['7rem', '1fr', '12rem'];
+      return `minmax(${min}, ${wide ? cap : fr})`;
+    }
+
+    function renderTable() {
+      const grid = $('preview-grid');
+      const rows = current.file.rows.slice(0, TABLE_ROWS);
+      const shown = tableColumns(variables.length, [columnIndex(xVariableFilter.value), columnIndex(variableFilter.value)]);
+      const numeric = shown.map((i) => variables[i].type === 'number');
+      const template = shown.map((i, k) => gridWidth(variables[i].name, numeric[k], shown.length > 12)).join(' ');
+      grid.style.setProperty('--grid-template', template);
+      grid.style.gridTemplateColumns = template;
+      grid.setAttribute('aria-colcount', String(shown.length));
+      grid.setAttribute('aria-rowcount', String(rows.length + 1));
+      $('preview-grid-header').innerHTML = `<div class="grid-row" role="row">${shown
+        .map((i, k) => {
+          const v = variables[i];
+          return `<div class="grid-cell grid-header ${numeric[k] ? 'col-numeric' : ''}" role="columnheader" title="${escapeHtml(v.code ? `${v.name} (${v.code})` : v.name)}">${escapeHtml(v.name.replace(/_/g, ' '))}</div>`;
+        })
+        .join('')}</div>`;
+      $('preview-grid-body').innerHTML = rows
+        .map(
+          (row, r) =>
+            `<div class="grid-row ${r % 2 === 0 ? 'row-even' : 'row-odd'}" role="row">${shown
+              .map((i, k) => `<div class="grid-cell ${numeric[k] ? 'col-numeric' : ''}" role="gridcell" title="${escapeHtml(row[i])}">${escapeHtml(formatCell(row[i], variables[i].name))}</div>`)
+              .join('')}</div>`
+        )
+        .join('');
+      $('table-meta').textContent = rowsMeta(current.file, rows.length, current.scope);
+      const columnsNote = $('table-columns-note');
+      columnsNote.hidden = shown.length === variables.length;
+      columnsNote.textContent = `Showing ${shown.length} of ${variables.length} columns (the first ones plus the charted variables). Download the file for every column.`;
+    }
+
+    function refresh() {
+      renderTable();
+      renderChart();
+    }
+
+    async function loadCountyNames() {
+      countyNames ??= (await getJson(page.countyNamesUrl)) as CountyNames;
+      return countyNames;
+    }
+
+    const countyLabel = (names: CountyNames, fips: string) => {
+      const county = names.counties[fips];
+      return county ? `${county[0]}, ${county[1]}` : fips;
+    };
+
+    async function setupCountyPicker() {
+      const counties = manifest.county?.counties ?? [];
+      if (counties.length === 0) return;
+      const names = await loadCountyNames();
+      const states = [...new Set(counties.map((fips) => fips.slice(0, 2)))].sort((a, b) =>
+        (names.states[a] ?? a).localeCompare(names.states[b] ?? b)
+      );
+      stateFilter.append(...states.map((s) => new Option(names.states[s] ?? s, s)));
+      $('state-filter-wrap').hidden = false;
+      $('county-filter-wrap').hidden = false;
+      stateFilter.addEventListener('change', () => {
+        fillCountyOptions(stateFilter.value);
+        if (!stateFilter.value) showSample(null);
+      });
+      countyFilter.addEventListener('change', () => {
+        if (countyFilter.value) showCounty(countyFilter.value, countyLabel(names, countyFilter.value), null).catch(onError);
+      });
+    }
+
+    function fillCountyOptions(stateFips: string) {
+      const names = countyNames;
+      const options = (manifest.county?.counties ?? [])
+        .filter((fips) => fips.startsWith(stateFips))
+        .map((fips) => new Option(names?.counties[fips]?.[0] ?? fips, fips))
+        .sort((a, b) => a.text.localeCompare(b.text));
+      countyFilter.replaceChildren(new Option(stateFips ? 'Choose a county' : 'Choose a state first', ''), ...options);
+      countyFilter.disabled = !stateFips;
+    }
+
+    function setSliceNote(text: string | null) {
+      const note = $('slice-note');
+      note.textContent = text ?? '';
+      note.hidden = !text;
+    }
+
+    function showSample(note: string | null) {
+      current = { file: sample, scope: 'the dataset' };
+      setSliceNote(note);
+      refresh();
+    }
+
+    async function showCounty(fips: string, label: string, note: string | null) {
+      $('table-loading').hidden = false;
+      try {
+        const file = (await getJson(countyFileUrl(page.previewBase, manifest.id, fips))) as RowFile;
+        current = { file, scope: label };
+        stateFilter.value = fips.slice(0, 2);
+        fillCountyOptions(fips.slice(0, 2));
+        countyFilter.value = fips;
+        setSliceNote(note ?? `Showing the rows for ${label}.`);
+        refresh();
+      } finally {
+        $('table-loading').hidden = true;
+      }
+    }
+
+    function renderSummary(columns: SummaryColumn[], rows: number) {
+      const cell = (value: number | undefined) => (value === undefined ? '' : formatNumber(value));
+      $('summary-body').innerHTML = `
+        <p class="table-meta">Computed over all ${rows.toLocaleString()} rows of the downloaded file.</p>
+        <div class="summary-scroll"><table class="summary-table">
+          <thead><tr><th scope="col">Variable</th><th scope="col">Type</th><th scope="col">Filled</th><th scope="col">Missing</th>
+            <th scope="col">Distinct</th><th scope="col">Min</th><th scope="col">Mean</th><th scope="col">Median</th><th scope="col">Max</th><th scope="col">Most common</th></tr></thead>
+          <tbody>${columns
+            .map(
+              (c) => `<tr><th scope="row">${escapeHtml(c.name)}</th><td>${escapeHtml(c.type)}</td><td>${c.count.toLocaleString()}</td>
+                <td>${c.missing.toLocaleString()}</td><td>${c.unique.toLocaleString()}${c.unique_at_least ? '+' : ''}</td>
+                <td>${cell(c.min)}</td><td>${cell(c.mean)}</td><td>${cell(c.median)}</td><td>${cell(c.max)}</td>
+                <td>${escapeHtml((c.top ?? []).slice(0, 3).map(([v, n]) => `${v} (${n.toLocaleString()})`).join('; '))}</td></tr>`
+            )
+            .join('')}</tbody>
+        </table></div>`;
+    }
+
+    function onError(err: unknown) {
+      setSliceNote(err instanceof Error ? err.message : String(err));
+    }
+
+    async function initPreview(sourceId: string) {
+      const source = page.sources[sourceId];
+      if (!source) throw new Error(`No dataset with the id "${sourceId}" is in the catalog.`);
+      $('loading-state').hidden = true;
+      $('preview-content').hidden = false;
+      renderDetails(source);
+      if (source.unavailable) {
+        showPreviewUnavailable(source.unavailable, source.providerUrl);
+        return;
+      }
+
+      const file = (name: string) => previewFileUrl(page.previewBase, source.id, name);
+      $('chart-loading').hidden = false;
+      $('table-loading').hidden = false;
+      let loaded: [PreviewManifest, VariablesFile, RowFile];
+      try {
+        loaded = (await Promise.all([
+          getJson(file('manifest.json')),
+          getJson(file('variables.json')),
+          getJson(file('sample.json')),
+        ])) as [PreviewManifest, VariablesFile, RowFile];
+      } finally {
+        $('chart-loading').hidden = true;
+        $('table-loading').hidden = true;
+      }
+      [manifest, { columns: variables }, sample] = loaded;
+      fillVariableSelects();
+      $('reference-card').hidden = !(source.fipsReference || manifest.county);
+
+      const summaryPanel = $('summary-panel') as HTMLDetailsElement;
+      summaryPanel.hidden = false;
+      summaryPanel.addEventListener(
+        'toggle',
+        () => {
+          getJson(file('summary.json'))
+            .then((summary) => renderSummary((summary as SummaryFile).columns, (summary as SummaryFile).rows))
+            .catch((err) => ($('summary-body').textContent = err instanceof Error ? err.message : String(err)));
+        },
+        { once: true }
+      );
+
+      await setupCountyPicker().catch((err) => console.warn('County names unavailable:', err));
+
+      const params = new URLSearchParams(window.location.search);
+      const community = communityCounty(params.get('community'), page.communities);
+      const choice = chooseSlice(manifest, community ? { fips: community.county_fips, label: community.label } : null);
+      if (choice.kind === 'county' && community) {
+        await showCounty(choice.fips, community.label, `${choice.note} (${community.name})`);
+      } else {
+        showSample(choice.note);
+      }
+
+      variableFilter.addEventListener('change', refresh);
+      xVariableFilter.addEventListener('change', refresh);
+      plotTypeFilter.addEventListener('change', () => {
+        renderXVariableOptions(plotTypeFilter.value, xVariableFilter.value);
+        refresh();
+      });
+    }
+
+    const sourceId = new URLSearchParams(window.location.search).get('source')?.trim() ?? '';
+    if (sourceId) {
+      initPreview(sourceId).catch((err) => showError(err instanceof Error ? err.message : String(err)));
     } else {
-      initSourcePicker().catch((err) => showError(err instanceof Error ? err.message : String(err)));
+      initSourcePicker();
     }
   </script>
 
@@ -891,7 +979,9 @@ const catalogHref = withBasePath('/complete-catalog');
     .tag-chips {
       display: flex;
       flex-wrap: wrap;
-      gap: var(--space-2);
+      column-gap: 0.35em;
+      row-gap: 0;
+      line-height: 1.5;
     }
 
     .tag-chip {
@@ -1139,6 +1229,12 @@ const catalogHref = withBasePath('/complete-catalog');
       border-bottom: 1px solid var(--color-border);
     }
 
+    .chart-note {
+      margin: 0 0 var(--space-2);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+    }
+
     .table-meta {
       margin: 0;
       font-size: var(--font-size-sm);
@@ -1244,11 +1340,11 @@ const catalogHref = withBasePath('/complete-catalog');
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     }
 
-    .source-card {
+    .source-grid :global(.source-card) {
       margin: 0;
     }
 
-    .source-card a {
+    .source-grid :global(.source-card a) {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
@@ -1264,19 +1360,49 @@ const catalogHref = withBasePath('/complete-catalog');
       transition: border-color 0.15s, box-shadow 0.15s;
     }
 
-    .source-card a:hover {
+    .source-grid :global(.source-card a:hover) {
       border-color: var(--color-border-highlight);
       box-shadow: var(--shadow-sm);
       color: var(--color-secondary);
       text-decoration: none;
     }
 
-    .source-card-title {
+    .source-grid :global(.source-card-title) {
       flex: 1;
       font-size: var(--font-size-sm);
     }
 
-    .demo-badge {
+    .source-grid :global(.info-badge) {
+      flex-shrink: 0;
+      padding: 0.15em 0.5em;
+      border: 1px solid var(--color-border, rgba(0, 0, 0, 0.15));
+      border-radius: 999px;
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      opacity: 0.75;
+    }
+
+    .preview-unavailable {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-3);
+      padding: var(--space-4) 0;
+    }
+
+    .preview-unavailable p {
+      margin: 0;
+    }
+
+    .preview-unavailable[hidden],
+    .chart-canvas-wrap[hidden],
+    .chart-controls[hidden],
+    .table-panel[hidden],
+    .btn-download[hidden] {
+      display: none;
+    }
+
+    .source-grid :global(.demo-badge) {
       flex-shrink: 0;
       padding: 0.15em 0.5em;
       background: var(--color-primary-glow);
@@ -1355,6 +1481,64 @@ const catalogHref = withBasePath('/complete-catalog');
       padding: 0.1em 0.35em;
       border-radius: var(--radius-sm);
       border: 1px solid var(--color-border);
+    }
+
+    .slice-note {
+      margin: 0 0 var(--space-3);
+      padding: var(--space-2) var(--space-3);
+      border-left: 3px solid var(--color-secondary);
+      background: var(--color-surface-raised);
+      font-size: var(--font-size-sm);
+      color: var(--color-text);
+    }
+
+    .summary-panel {
+      padding: var(--space-4) var(--space-5);
+    }
+
+    .summary-toggle {
+      cursor: pointer;
+      font-weight: 700;
+      color: var(--color-text);
+    }
+
+    .summary-body {
+      display: grid;
+      gap: var(--space-3);
+      margin-top: var(--space-3);
+    }
+
+    .summary-body :global(.summary-scroll) {
+      max-height: 32rem;
+      overflow: auto;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+    }
+
+    .summary-body :global(.summary-table) {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--font-size-xs);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .summary-body :global(.summary-table th),
+    .summary-body :global(.summary-table td) {
+      padding: var(--space-1) var(--space-2);
+      border-bottom: 1px solid var(--color-border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .summary-body :global(.summary-table thead th) {
+      position: sticky;
+      top: 0;
+      background: var(--color-surface);
+    }
+
+    .summary-body :global(.summary-table tbody th) {
+      font-weight: 600;
+      min-width: 12rem;
     }
   </style>
 </Layout>

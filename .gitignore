@@ -63,3 +63,7 @@ temp/
 backend/pythonscripts/__pycache__/
 backend/database/*.db
 .venv/
+.backend-canonical/
+
+# Tier 1 previews, copied from the backend at build time (npm run sync:previews)
+public/previews/

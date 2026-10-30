@@ -1,26 +1,24 @@
 ---
 title: "eBird Observation Dataset"
-description: "eBird Observation Dataset from Cornell Lab of Ornithology. A free provider account is required to download the full dataset."
+description: "eBird Observation Dataset from Cornell Lab of Ornithology. Topics include Wildlife & Nature. A free provider account is required to download the full dataset."
 author: "Cornell Lab of Ornithology"
 sourceId: "ebird-observation-dataset"
 category: "dataset"
 syncedFromBackend: true
 tags:
-  - "dataset"
-  - "government-data"
+  - "Wildlife & Nature"
   - "state"
   - "county"
   - "year"
   - "account-required"
 dataThemes:
-  - general
-pedagogicalTags:
-  - data-literacy
-audienceAccess:
-  teacher: true
-  student: true
-  community: true
+  - "Wildlife & Nature"
+pedagogicalTags: []
 sensitive: false
+studentSuitability: "unreviewed"
+granularity: "county"
+coverage:
+  - { level: "nation", geoid: "US" }
 url: "https://ebird.org/data/download/ebd"
 featured: false
 difficulty: "advanced"

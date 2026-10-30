@@ -8,7 +8,9 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
+  getCanonicalExportsDir,
   getCanonicalSourcesDir,
+  getWebExportsDir,
   getWebSourcesDir,
 } from './backend-paths.mjs';
 
@@ -69,6 +71,14 @@ async function main() {
     if (canonicalHash !== webHash) {
       mismatches.push(`Content differs: ${file}`);
     }
+  }
+
+  // The SQLite export must match too (compared ignoring CRLF/LF differences).
+  const readNormalized = (p) => readFile(p, 'utf8').then((t) => t.replace(/\r\n/g, '\n'));
+  const canonicalExport = await readNormalized(path.join(getCanonicalExportsDir(), 'catalog.json')).catch(() => null);
+  if (canonicalExport !== null) {
+    const webExport = await readNormalized(path.join(getWebExportsDir(), 'catalog.json')).catch(() => null);
+    if (webExport !== canonicalExport) mismatches.push('SQLite export differs: data/exports/catalog.json');
   }
 
   if (mismatches.length > 0) {

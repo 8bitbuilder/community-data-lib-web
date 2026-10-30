@@ -14,7 +14,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 import {
+  getCanonicalExportsDir,
   getCanonicalSourcesDir,
+  getWebExportsDir,
   getWebSourcesDir,
 } from './backend-paths.mjs';
 
@@ -41,13 +43,6 @@ async function resolveSourcesDir() {
   }
 }
 
-function slugifyTag(value) {
-  return String(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
 function normalizeDescriptionTags(tags) {
   if (!tags) return [];
   if (Array.isArray(tags)) return tags.map((t) => String(t).trim()).filter(Boolean);
@@ -60,16 +55,52 @@ function normalizeDescriptionTags(tags) {
   return [];
 }
 
-function extractPedagogicalTags(source, limit = 8) {
-  const tags = [];
+/**
+ * Load catalog sources, preferring the SQLite export (backend data/exports/catalog.json,
+ * then the committed web mirror). Falls back to reading YAML directly, with a warning.
+ */
+export async function loadCatalogSources() {
+  for (const dir of [getCanonicalExportsDir(), getWebExportsDir()]) {
+    const file = path.join(dir, 'catalog.json');
+    let raw;
+    try {
+      raw = await readFile(file, 'utf8');
+    } catch {
+      continue;
+    }
+    const exported = JSON.parse(raw);
+    // Analysis tag sets are nested in the export; flatten them to the YAML shape.
+    const sources = exported.sources.map(({ analysis_tags: analysis = {}, ...rest }) => ({
+      ...analysis,
+      ...rest,
+    }));
+    return { sources, origin: `SQLite export ${file}` };
+  }
+
+  const sourcesDir = await resolveSourcesDir();
+  console.warn('WARNING: no SQLite export found; reading YAML directly. Run export_catalog.py.');
+  const sources = [];
+  for (const file of await listSourceFiles(sourcesDir)) {
+    sources.push(YAML.parse(await readFile(path.join(sourcesDir, file), 'utf8')));
+  }
+  return { sources, origin: `YAML ${sourcesDir}` };
+}
+
+// All active analysis tags: the catalog's pedagogical filter needs every one, and
+// cards only display the first few anyway.
+export function extractPedagogicalTags(source) {
+  // Curated pedagogical tags come first and keep their exact names.
+  const tags = Object.entries(source.pedagogical_tags ?? {})
+    .filter(([, active]) => active)
+    .map(([name]) => name);
   for (const [key, value] of Object.entries(source)) {
-    if (!key.endsWith('_tags') || key === 'description_tags') continue;
-    if (typeof value !== 'object' || value === null) continue;
+    if (!key.endsWith('_tags') || key === 'description_tags' || key === 'pedagogical_tags' || key === 'manual_tags') continue;
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) continue;
     for (const [tagName, active] of Object.entries(value)) {
       if (active) tags.push(tagName.replace(/-/g, ' '));
     }
   }
-  return [...new Set(tags)].slice(0, limit);
+  return [...new Set(tags)];
 }
 
 function variableCount(source) {
@@ -105,19 +136,13 @@ function buildDescription(source) {
   return (intro + themeSentence + accessNote + detail).replace(/\s+/g, ' ').trim();
 }
 
+// Only tags the backend actually records — no invented placeholders.
 function buildTags(source, themes) {
-  const tags = new Set(['dataset', 'government-data']);
-  if (source.provider?.agency) {
-    const agency = source.provider.agency.split(' ').slice(-1)[0]?.toLowerCase();
-    if (agency) tags.add(slugifyTag(agency));
-  }
+  const tags = new Set(themes);
   if (source.filters?.state) tags.add('state');
   if (source.filters?.county) tags.add('county');
   if (source.filters?.year) tags.add('year');
   if (source.requires_account) tags.add('account-required');
-  for (const theme of themes) {
-    tags.add(slugifyTag(theme));
-  }
   return [...tags];
 }
 
@@ -140,12 +165,16 @@ function yamlQuote(value) {
 function buildMarkdown(source) {
   const themes = normalizeDescriptionTags(source.description_tags);
   const pedagogicalTags = extractPedagogicalTags(source);
-  const description = buildDescription(source);
+  const description = source.description ?? buildDescription(source);
   const tags = buildTags(source, themes);
-  const dataThemes = themes.map((t) => slugifyTag(t)).filter(Boolean);
+  // Keep the backend's tag names as-is (e.g. "Energy & Environment") so the
+  // catalog shows the same tags as Data Preview.
+  const dataThemes = themes;
   const author = source.provider?.name ?? 'Unknown provider';
   const url = source.provider?.url ?? source.download?.url ?? '';
   const difficulty = inferDifficulty(source);
+
+  const coverage = Array.isArray(source.coverage) ? source.coverage : [];
 
   const lines = [
     '---',
@@ -157,27 +186,39 @@ function buildMarkdown(source) {
     `syncedFromBackend: true`,
     'tags:',
     ...tags.map((t) => `  - ${yamlQuote(t)}`),
-    'dataThemes:',
-    ...(dataThemes.length ? dataThemes.map((t) => `  - ${yamlQuote(t)}`) : ['  - general']),
-    'pedagogicalTags:',
+    // No placeholder tags: empty lists stay empty.
+    ...(dataThemes.length ? ['dataThemes:', ...dataThemes.map((t) => `  - ${yamlQuote(t)}`)] : ['dataThemes: []']),
     ...(pedagogicalTags.length
-      ? pedagogicalTags.map((t) => `  - ${yamlQuote(t)}`)
-      : ['  - data-literacy']),
-    'audienceAccess:',
-    '  teacher: true',
-    '  student: true',
-    '  community: true',
+      ? ['pedagogicalTags:', ...pedagogicalTags.map((t) => `  - ${yamlQuote(t)}`)]
+      : ['pedagogicalTags: []']),
     `sensitive: ${source.sensitive === true}`,
+    `studentSuitability: ${yamlQuote(source.student_suitability ?? 'unreviewed')}`,
+    ...(source.geographic_granularity
+      ? [`granularity: ${yamlQuote(source.geographic_granularity)}`]
+      : []),
+    ...(coverage.length
+      ? [
+          'coverage:',
+          ...coverage.map(
+            (c) => `  - { level: ${yamlQuote(c.level)}, geoid: ${yamlQuote(c.geoid ?? c.fips ?? 'US')} }`
+          ),
+        ]
+      : []),
+    ...(source.published_date ? [`publishedDate: ${source.published_date}`] : []),
     ...(url ? [`url: ${yamlQuote(url)}`] : []),
     'featured: false',
     `difficulty: ${yamlQuote(difficulty)}`,
     'language: "English"',
     '---',
     '',
-    `${source.title} — synced from the backend source catalog (\`${source.id}\`).`,
-    '',
-    'Use the **Data Preview** page to explore column statistics, geographic filters, and sample rows.',
-    '',
+    ...(source.about
+      ? [source.about.trim(), '']
+      : [
+          `${source.title} — synced from the backend source catalog (\`${source.id}\`).`,
+          '',
+          'Use the **Data Preview** page to explore column statistics, geographic filters, and sample rows.',
+          '',
+        ]),
   ];
 
   if (source.requires_account) {
@@ -201,17 +242,14 @@ async function listSourceFiles(sourcesDir) {
 }
 
 async function main() {
-  const sourcesDir = await resolveSourcesDir();
-  const files = await listSourceFiles(sourcesDir);
+  const { sources, origin } = await loadCatalogSources();
 
   await mkdir(outputDir, { recursive: true });
 
   const written = [];
-  for (const file of files.sort()) {
-    const raw = await readFile(path.join(sourcesDir, file), 'utf8');
-    const source = YAML.parse(raw);
+  for (const source of sources) {
     if (!source?.id || !source?.title) {
-      console.warn(`Skipping ${file}: missing id or title`);
+      console.warn(`Skipping source: missing id or title (${source?.id ?? 'unknown'})`);
       continue;
     }
     const outPath = path.join(outputDir, `${source.id}.md`);
@@ -228,11 +266,14 @@ async function main() {
     }
   }
 
-  console.log(`Synced ${written.length} dataset(s) from ${sourcesDir}`);
+  console.log(`Synced ${written.length} dataset(s) from ${origin}`);
   console.log(`  → ${outputDir}`);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Run only when executed directly (loadCatalogSources() is exported for reuse).
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

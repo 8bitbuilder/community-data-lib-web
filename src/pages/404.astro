@@ -11,6 +11,11 @@ import { withBasePath } from '@lib/paths';
       <p class="error-description">
         Oops! The page you're looking for doesn't exist or has been moved.
       </p>
+      <p class="error-description community-missing" id="community-missing" hidden>
+        We couldn't find that community library. See the
+        <a href={withBasePath('/create-community-library')}>list of community libraries</a>
+        or learn how to create one.
+      </p>
       <div class="error-actions">
         <a href={withBasePath('/')} class="button"> Return to Home </a>
         <a href={withBasePath('/complete-catalog')} class="button button-secondary"> Browse Complete Catalog </a>
@@ -21,6 +26,14 @@ import { withBasePath } from '@lib/paths';
     </div>
   </div>
 </Layout>
+
+<script>
+  // Unknown community slugs are not generated at build time, so they land here.
+  if (window.location.pathname.includes('/communities/')) {
+    const note = document.getElementById('community-missing');
+    if (note) note.hidden = false;
+  }
+</script>
 
 <style>
   .error-container {

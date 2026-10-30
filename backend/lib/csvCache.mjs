@@ -84,8 +84,12 @@ async function downloadBytes(url) {
 }
 
 async function loadTabularData(downloadUrl) {
-  let raw = await downloadBytes(downloadUrl);
   const urlLower = downloadUrl.split("?")[0].toLowerCase();
+  // Reject Excel before downloading (saves time, especially inside a Netlify Function).
+  if (urlLower.endsWith(".xlsx") || urlLower.endsWith(".xls")) {
+    throw new Error("XLSX files are not supported in preview API v1");
+  }
+  let raw = await downloadBytes(downloadUrl);
 
   if (isZip(raw) && !isXlsx(raw)) {
     const extracted = pickFileFromZip(raw);
