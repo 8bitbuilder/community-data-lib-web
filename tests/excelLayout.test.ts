@@ -60,18 +60,18 @@ test('pandas-compatible names for blank and duplicate headers', () => {
 test('unknown sheet and out-of-range header row throw LayoutError', () => {
   assert.throws(
     () => readExcelTable(fx('clean.xlsx'), { visitor: { sheet: 'Nope' } }),
-    (e: any) => e instanceof LayoutError && e.code === 'UNKNOWN_SHEET' && e.sheets.includes('Sheet1'),
+    (e: unknown) => e instanceof LayoutError && e.code === 'UNKNOWN_SHEET' && e.sheets.includes('Sheet1'),
   );
   assert.throws(
     () => readExcelTable(fx('clean.xlsx'), { visitor: { headerRow: 99 } }),
-    (e: any) => e instanceof LayoutError && e.code === 'HEADER_OUT_OF_RANGE',
+    (e: unknown) => e instanceof LayoutError && e.code === 'HEADER_OUT_OF_RANGE',
   );
 });
 
 test('empty sheet throws NoDataError', () => {
   assert.throws(
     () => readExcelTable(fx('empty.xlsx')),
-    (e: any) => e instanceof LayoutError && e.code === 'NO_DATA',
+    (e: unknown) => e instanceof LayoutError && e.code === 'NO_DATA',
   );
 });
 
