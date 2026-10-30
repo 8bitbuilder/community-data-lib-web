@@ -15,15 +15,18 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
   description="Discover curated data science resources and contribute to our growing community library of datasets, tools, guides, and research papers."
 >
   <!-- ═══════════════════════════════════════════
-       HERO — Split layout: text left, visual right
+       HERO — asymmetric split, generous breathing room
   ═══════════════════════════════════════════ -->
   <section class="hero" aria-label="Introduction">
     <div class="hero-text">
       <div class="hero-kicker">
+        <span class="kicker-dot"></span>
         Open-Source · Community-Focused · Free Forever
       </div>
 
       <h1 class="hero-title">Community Data Libraries</h1>
+
+      <div class="hero-rule" aria-hidden="true"></div>
 
       <p class="hero-body">
         Community Data Libraries is an open-source resource to explore and locate
@@ -31,9 +34,9 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
       </p>
     </div>
 
-
     <!-- Hero visual — abstract data grid -->
     <div class="hero-visual" aria-hidden="true">
+      <div class="viz-glow"></div>
       <div class="viz-card">
         <div class="viz-header">
           <span class="viz-dot r"></span>
@@ -82,143 +85,90 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     </div>
   </section>
 
-  <!-- ═══════════════════════════════════════════
-       STATS STRIP
-  ═══════════════════════════════════════════ -->
-  <div class="stats-strip" aria-label="Platform statistics">
-    <div class="stat-item">
-      <span class="stat-n">{datasetCount}</span>
-      <span class="stat-l">Curated Datasets</span>
-    </div>
-    <div class="stat-sep" aria-hidden="true"></div>
-    <div class="stat-item">
-      <span class="stat-n">{communityResourceCount}</span>
-      <span class="stat-l">Community Libraries</span>
-    </div>
-    <div class="stat-sep" aria-hidden="true"></div>
-    <div class="stat-item">
-      <span class="stat-n">100%</span>
-      <span class="stat-l">Open Source</span>
-    </div>
-  </div>
+  <div class="section-divider" aria-hidden="true"></div>
 
   <!-- ═══════════════════════════════════════════
-       HOW IT WORKS  — editorial 3-column
+       DIRECTORY — numbered editorial cards
   ═══════════════════════════════════════════ -->
   <section class="directory-section" aria-labelledby="directory-heading">
-  <header class="section-header">
-    <p class="section-eyebrow">Explore the platform</p>
-    <h2 class="section-title" id="directory-heading">
-      Find the right place to start.
-    </h2>
-  </header>
+    <header class="section-header">
+      <p class="section-eyebrow">Explore the platform</p>
+      <h2 class="section-title" id="directory-heading">
+        Find the right place to start.
+      </h2>
+    </header>
 
-  <div class="directory-grid">
-    <article class="directory-card">
-      <h3 class="directory-title">
-        <a href={withBasePath('/complete-catalog')}>Complete Catalog</a>
-      </h3>
-      <p>
-        New to the platform? Start with the Complete Catalog. This is the master
-        collection of all datasets available across the platform, giving you
-        access to the full range of information that has been added to the
-        system.
-      </p>
-    </article>
-
-    <article class="directory-card">
-      <h3 class="directory-title">
-        <a href={withBasePath('/create-community-library')}>Community Library</a>
-      </h3>
-      <p>
-        Need data for a specific area? Create your own Community Library to
-        generate a curated collection of datasets tailored to a selected
-        community or region. Built from the Complete Catalog, it automatically
-        includes only datasets with information relevant to that area, making it
-        easier to discover local data and insights without searching through
-        the entire collection. You can view an example community library
-        <a href={withBasePath('/communities/knox-county/')}>here</a>.
-      </p>
-    </article>
-
-    <article class="directory-card">
-      <h3 class="directory-title">
-        <a href={withBasePath('/data-resources')}>Data Resources</a>
-      </h3>
-      <p>
-        The Data Resources section contains open-source educational and
-        community engagement materials developed by our team. These resources
-        are intended to support the use of the Community Data Library (CDL) in
-        a variety of settings, including classrooms and community workshops.
-        Planned resources include lesson plans, guided activities, and other
-        tools designed to help users explore, analyze, and discuss community
-        data.
-      </p>
-    </article>
-
-    <article class="directory-card">
-      <h3 class="directory-title">
-        <a href={withBasePath('/maps')}>Interactive Map</a>
-      </h3>
-      <p>
-        The Interactive Map provides an overview of the data available for
-        communities across the region before a user creates a Community Data
-        Library. Just place a pin on the map at the location of interest and
-        the system will then identify the surrounding community and display a
-        filtered catalog containing datasets relevant to that area. By
-        exploring the map, you can quickly determine what information is
-        currently available for a particular location.
-      </p>
-    </article>
-  </div>
-</section>
-
-  <!-- ═══════════════════════════════════════════
-       FEATURE CARDS — 3-up
-  ═══════════════════════════════════════════ -->
-  <!-- <section class="features-section" aria-label="Key sections">
-    <div class="feature-grid">
-
-      <article class="feature-card fc-1">
-        <div class="fc-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    <div class="directory-grid">
+      <article class="directory-card dc-1">
+        <div class="directory-head">
+          <h3 class="directory-title">
+            <a href={withBasePath('/complete-catalog')}>Complete Catalog</a>
+          </h3>
+          <span class="directory-index" aria-hidden="true">01</span>
         </div>
-        <div class="fc-index">01</div>
-        <h2 class="fc-title">Complete Catalog</h2>
-        <h2 class="fc-title">Master Library</h2>
-        <p class="fc-body">Expert-curated datasets, tools, guides, and research papers — organized by theme, difficulty, and audience role.</p>
-        <a href={withBasePath('/complete-catalog')} class="fc-link">
-          Explore the catalog
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </a>
+        <p>
+          New to the platform? Start with the Complete Catalog. This is the master
+          collection of all datasets available across the platform, giving you
+          access to the full range of information that has been added to the
+          system.
+        </p>
       </article>
 
-      <article class="feature-card fc-2">
-        <div class="fc-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <article class="directory-card dc-2">
+        <div class="directory-head">
+          <h3 class="directory-title">
+            <a href={withBasePath('/create-community-library')}>Community Library</a>
+          </h3>
+          <span class="directory-index" aria-hidden="true">02</span>
         </div>
-        <h2 class="fc-title">Community Library</h2>
-        <p class="fc-body">Resources discovered and shared by practitioners, researchers, and teachers from around the world.</p>
-        <a href={withBasePath('/community-library')} class="fc-link">
-          Browse community
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </a>
+        <p>
+          Need data for a specific area? Create your own Community Library to
+          generate a curated collection of datasets tailored to a selected
+          community or region. Built from the Complete Catalog, it automatically
+          includes only datasets with information relevant to that area, making it
+          easier to discover local data and insights without searching through
+          the entire collection. You can view an example community library
+          <a href={withBasePath('/communities/knox-county/')}>here</a>.
+        </p>
       </article>
 
-      <article class="feature-card fc-3">
-        <div class="fc-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/></svg>
+      <article class="directory-card dc-3">
+        <div class="directory-head">
+          <h3 class="directory-title">
+            <a href={withBasePath('/data-resources')}>Data Resources</a>
+          </h3>
+          <span class="directory-index" aria-hidden="true">03</span>
         </div>
-        <h2 class="fc-title">Interactive Map</h2>
-        <p class="fc-body">See which states and counties each dataset in the catalog covers, and find the datasets for any county.</p>
-        <a href={withBasePath('/maps')} class="fc-link">
-          Open map
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </a>
+        <p>
+          The Data Resources section contains open-source educational and
+          community engagement materials developed by our team. These resources
+          are intended to support the use of the Community Data Library (CDL) in
+          a variety of settings, including classrooms and community workshops.
+          Planned resources include lesson plans, guided activities, and other
+          tools designed to help users explore, analyze, and discuss community
+          data.
+        </p>
       </article>
 
+      <article class="directory-card dc-4">
+        <div class="directory-head">
+          <h3 class="directory-title">
+            <a href={withBasePath('/maps')}>Interactive Map</a>
+          </h3>
+          <span class="directory-index" aria-hidden="true">04</span>
+        </div>
+        <p>
+          The Interactive Map provides an overview of the data available for
+          communities across the region before a user creates a Community Data
+          Library. Just place a pin on the map at the location of interest and
+          the system will then identify the surrounding community and display a
+          filtered catalog containing datasets relevant to that area. By
+          exploring the map, you can quickly determine what information is
+          currently available for a particular location.
+        </p>
+      </article>
     </div>
-  </section> -->
+  </section>
 
   <!-- ═══════════════════════════════════════════
        CONTRIBUTE CTA BANNER
@@ -248,22 +198,24 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     display: grid;
     grid-template-columns: 1fr;
     gap: var(--space-12);
-    padding: var(--space-12) 0 var(--space-16);
+    padding: var(--space-16) 0 var(--space-16);
     align-items: center;
   }
 
   @media (min-width: 900px) {
     .hero {
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
       gap: var(--space-16);
-      min-height: 560px;
+      padding: var(--space-16) 0 var(--space-20, var(--space-16));
+      min-height: 600px;
     }
   }
 
-  /* Text side */
+  /* ── Text side ───────────────────────────── */
   .hero-text {
     display: grid;
     gap: var(--space-6);
+    justify-items: start;
     animation: fadeUp 0.7s ease both;
   }
 
@@ -277,6 +229,7 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     color: var(--color-primary);
     letter-spacing: 0.06em;
     text-transform: uppercase;
+    line-height: 1.3;
   }
 
   .kicker-dot {
@@ -285,6 +238,7 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     height: 7px;
     border-radius: 50%;
     background: var(--color-primary);
+    flex-shrink: 0;
     animation: pulse 2s ease-in-out infinite;
   }
 
@@ -301,18 +255,15 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     letter-spacing: -0.04em;
     color: var(--color-text);
     margin: 0;
+    max-width: 14ch;
   }
 
-  .hero-title em {
-    font-style: italic;
-  }
-
-  .word-about {
-    color: var(--color-primary);
-  }
-
-  .word-for {
-    color: var(--color-secondary);
+  .hero-rule {
+    width: 96px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--color-primary);
+    opacity: 0.85;
   }
 
   .hero-body {
@@ -320,116 +271,26 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     color: var(--color-text-muted);
     line-height: var(--line-height-relaxed);
     margin: 0;
-    max-width: 44ch;
-  }
-
-  .hero-actions {
-    display: flex;
-    gap: var(--space-3);
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .btn-primary {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-6);
-    background: var(--color-secondary);
-    color: #F8FAFC;
-    border: 1.5px solid var(--color-secondary);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    text-decoration: none;
-    transition: all 0.18s ease;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-
-  .btn-primary:hover {
-    background: #0F4A5E;
-    border-color: #0F4A5E;
-    box-shadow: var(--shadow-glow-secondary);
-    transform: translateY(-1px);
-    text-decoration: none;
-    color: #F8FAFC;
-  }
-
-  .btn-primary svg { transition: transform 0.18s ease; }
-  .btn-primary:hover svg { transform: translateX(3px); }
-
-  .btn-ghost {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-5);
-    background: var(--color-surface-raised);
-    color: var(--color-text-muted);
-    border: 1.5px solid var(--color-border);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    text-decoration: none;
-    transition: all 0.18s ease;
-    white-space: nowrap;
-  }
-
-  .btn-ghost:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background: var(--color-primary-glow);
-    text-decoration: none;
-    transform: translateY(-1px);
-  }
-
-  .btn-ghost svg { transition: transform 0.18s ease; }
-  .btn-ghost:hover svg { transform: translateX(3px); }
-
-  /* Role pills */
-  .hero-roles {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    flex-wrap: wrap;
-  }
-
-  .roles-label {
-    font-size: var(--font-size-xs);
-    font-weight: 600;
-    color: var(--color-text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-right: var(--space-1);
-  }
-
-  .role-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-1) var(--space-3);
-    background: var(--color-surface);
-    border: 1.5px solid var(--color-border);
-    border-radius: 999px;
-    font-size: var(--font-size-xs);
-    font-weight: 600;
-    color: var(--color-text-muted);
-    text-decoration: none;
-    transition: all 0.15s ease;
-  }
-
-  .role-pill:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background: var(--color-primary-glow);
-    text-decoration: none;
+    max-width: 46ch;
   }
 
   /* ── Visual side ──────────────────────────── */
   .hero-visual {
     position: relative;
+    isolation: isolate;
     animation: fadeUp 0.7s 0.15s ease both;
+  }
+
+  /* Soft halo behind the CSV card */
+  .viz-glow {
+    position: absolute;
+    inset: -12% -8%;
+    z-index: -1;
+    border-radius: 50%;
+    background: var(--color-primary-glow);
+    filter: blur(44px);
+    opacity: 0.75;
+    pointer-events: none;
   }
 
   .viz-card {
@@ -440,6 +301,12 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     box-shadow: var(--shadow-lg);
     font-family: var(--font-mono);
     font-size: 0.72rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .hero-visual:hover .viz-card {
+    transform: translateY(-4px);
+    box-shadow: 0 24px 60px -18px rgba(15, 118, 110, 0.25);
   }
 
   .viz-header {
@@ -475,7 +342,7 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     display: grid;
     grid-template-columns: 80px 100px 120px 1fr;
     gap: 0;
-    padding: var(--space-2) var(--space-4);
+    padding: var(--space-3) var(--space-4);
     background: var(--color-surface-raised);
     border-bottom: 1px solid var(--color-border);
     color: var(--color-primary);
@@ -489,7 +356,7 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     display: grid;
     grid-template-columns: 80px 100px 120px 1fr;
     gap: 0;
-    padding: var(--space-2) var(--space-4);
+    padding: var(--space-3) var(--space-4);
     border-bottom: 1px solid var(--color-border);
     color: var(--color-text-muted);
     font-size: 0.68rem;
@@ -512,7 +379,7 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
   }
 
   .viz-tag {
-    padding: 2px 8px;
+    padding: 3px 9px;
     background: var(--color-primary-glow);
     border: 1px solid rgba(15, 118, 110, 0.2);
     border-radius: var(--radius-sm);
@@ -535,7 +402,7 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     background: var(--color-surface);
     border: 1.5px solid var(--color-border);
     border-radius: var(--radius-lg);
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-3) var(--space-5);
     box-shadow: var(--shadow-md);
     display: flex;
     flex-direction: column;
@@ -561,14 +428,14 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
   }
 
   .badge-1 {
-    bottom: -24px;
-    left: -20px;
+    bottom: -28px;
+    left: -28px;
     animation-delay: 0s;
   }
 
   .badge-2 {
-    top: -20px;
-    right: -16px;
+    top: -28px;
+    right: -24px;
     animation-delay: 1.5s;
   }
 
@@ -577,73 +444,32 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     50% { transform: translateY(-6px); }
   }
 
+  @media (max-width: 1100px) {
+    .badge-1 { left: -8px; }
+    .badge-2 { right: -8px; }
+  }
+
   @media (max-width: 899px) {
     .badge { display: none; }
   }
 
   /* ══════════════════════════════════════════════
-     STATS STRIP
+     SECTION DIVIDER
   ══════════════════════════════════════════════ */
-  .stats-strip {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-6);
-    flex-wrap: wrap;
-    padding: var(--space-6) var(--space-8);
-    background: #FFFFFF;
-    border: 1.5px solid #EBF2F5;
-    border-radius: var(--radius-lg);
-    margin-bottom: var(--space-16);
-    box-shadow: var(--shadow-md);
-  }
-
-  .stat-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .stat-n {
-    font-family: var(--font-display);
-    font-size: var(--font-size-3xl);
-    font-weight: 900;
-    color: var(--color-primary);
-    line-height: 1;
-    letter-spacing: -0.04em;
-  }
-
-  .stat-l {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-weight: 600;
-  }
-
-  .stat-sep {
-    width: 1px;
-    height: 2rem;
-    background: #1F3349;
-    opacity: 0.25;
-    user-select: none;
-    display: none;
-  }
-
-  @media (min-width: 640px) {
-    .stat-sep { display: block; }
+  .section-divider {
+    height: 1.5px;
+    background: var(--color-border);
+    border: 0;
+    margin: 0 0 var(--space-16);
+    opacity: 0.9;
   }
 
   /* ══════════════════════════════════════════════
-     HOW IT WORKS
+     SECTION HEADER
   ══════════════════════════════════════════════ */
-  .how-section {
-    margin-bottom: var(--space-16);
-  }
-
   .section-header {
     margin-bottom: var(--space-12);
+    max-width: 38ch;
   }
 
   .section-eyebrow {
@@ -653,7 +479,7 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     color: var(--color-primary);
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    margin-bottom: var(--space-3);
+    margin: 0 0 var(--space-3);
   }
 
   .section-title {
@@ -666,195 +492,173 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     margin: 0;
   }
 
-  .section-title-accent {
-    color: var(--color-secondary);
-  }
-
-  .how-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0;
-    border: 1.5px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    background: var(--color-border);
-  }
-
-  @media (min-width: 768px) {
-    .how-grid { grid-template-columns: repeat(3, 1fr); }
-  }
-
-  .how-step {
-    background: var(--color-surface);
-    padding: var(--space-8) var(--space-6);
-    display: grid;
-    gap: var(--space-3);
-    align-content: start;
-    transition: background 0.15s ease;
-  }
-
-  .how-step:hover { background: var(--color-surface-raised); }
-
-  .how-num {
-    font-family: var(--font-display);
-    font-size: 3.5rem;
-    font-weight: 900;
-    color: var(--color-border);
-    line-height: 1;
-    letter-spacing: -0.05em;
-    margin-bottom: var(--space-2);
-  }
-
-  .how-step h3 {
-    font-family: var(--font-display);
-    font-size: var(--font-size-xl);
-    font-weight: 700;
-    color: var(--color-text);
-    margin: 0;
-    letter-spacing: -0.02em;
-  }
-
-  .how-step p {
-    margin: 0;
-    font-size: var(--font-size-sm);
-    color: var(--color-text-muted);
-    line-height: var(--line-height-relaxed);
-  }
-
   /* ══════════════════════════════════════════════
-     FEATURE CARDS
+     DIRECTORY CARDS
   ══════════════════════════════════════════════ */
-  .features-section {
+  .directory-section {
     margin-bottom: var(--space-16);
   }
 
-  .feature-grid {
+  .directory-grid {
     display: grid;
     grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+
+  @media (min-width: 768px) {
+    .directory-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-6);
+    }
+  }
+
+  @media (min-width: 1100px) {
+    .directory-grid { gap: var(--space-8); }
+  }
+
+  .directory-card {
+    position: relative;
+    display: grid;
+    align-content: start;
     gap: var(--space-4);
-  }
-
-  @media (min-width: 640px) {
-    .feature-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-  @media (min-width: 900px) {
-    .feature-grid { grid-template-columns: repeat(3, 1fr); }
-  }
-
-  .feature-card {
+    padding: var(--space-8);
     background: var(--color-surface);
     border: 1.5px solid var(--color-border);
     border-radius: var(--radius-lg);
-    padding: var(--space-8) var(--space-6);
-    display: grid;
-    gap: var(--space-3);
-    align-content: start;
-    position: relative;
     overflow: hidden;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
   }
 
-  .feature-card:hover {
+  /* Top accent band, revealed on hover */
+  .directory-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.28s ease;
+  }
+
+  .dc-1::before { background: var(--color-primary); }
+  .dc-2::before { background: var(--color-secondary); }
+  .dc-3::before { background: var(--color-accent); }
+  .dc-4::before { background: var(--color-primary); }
+
+  .directory-card:hover,
+  .directory-card:focus-within {
     transform: translateY(-4px);
+    box-shadow: 0 16px 44px -14px rgba(15, 118, 110, 0.18);
+    border-color: rgba(15, 118, 110, 0.3);
   }
 
-  /* Top colored band on each card */
-  .fc-1::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--color-primary); }
-  .fc-2::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--color-secondary); }
-  .fc-3::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--color-accent); }
+  .directory-card:hover::before,
+  .directory-card:focus-within::before {
+    transform: scaleX(1);
+  }
 
-  .fc-1:hover { border-color: rgba(15, 118, 110, 0.35); box-shadow: 0 12px 40px -8px rgba(15, 118, 110, 0.18); }
-  .fc-2:hover { border-color: rgba(29, 78, 216, 0.35); box-shadow: 0 12px 40px -8px rgba(29, 78, 216, 0.15); }
-  .fc-3:hover { border-color: rgba(180, 83, 9, 0.35); box-shadow: 0 12px 40px -8px rgba(180, 83, 9, 0.15); }
-
-  .fc-icon {
-    width: 44px; height: 44px;
+  /* Title + number share a baseline-aligned row */
+  .directory-head {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-md);
-    margin-bottom: var(--space-2);
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-4);
   }
 
-  .fc-1 .fc-icon { background: var(--color-primary-glow); color: var(--color-primary); }
-  .fc-2 .fc-icon { background: var(--color-secondary-glow); color: var(--color-secondary); }
-  .fc-3 .fc-icon { background: var(--color-accent-glow); color: var(--color-accent); }
-
-  .fc-index {
+  .directory-index {
+    flex-shrink: 0;
     font-family: var(--font-mono);
     font-size: var(--font-size-xs);
     font-weight: 600;
     color: var(--color-text-dim);
-    letter-spacing: 0.06em;
-    position: absolute;
-    top: var(--space-5);
-    right: var(--space-5);
+    letter-spacing: 0.1em;
+    line-height: 1;
   }
 
-  .fc-title {
+  .directory-card p {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-relaxed);
+    max-width: 60ch;
+  }
+
+  .directory-title {
+    margin: 0;
     font-family: var(--font-display);
     font-size: var(--font-size-2xl);
     font-weight: 700;
-    color: var(--color-text);
-    margin: 0;
+    line-height: 1.25;
     letter-spacing: -0.03em;
   }
 
-  .fc-body {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-muted);
-    line-height: var(--line-height-relaxed);
-    margin: 0;
-  }
-
-  .fc-link {
+  .directory-title a {
     display: inline-flex;
-    align-items: center;
+    align-items: baseline;
     gap: var(--space-2);
-    font-size: var(--font-size-sm);
-    font-weight: 700;
+    color: var(--color-text);
     text-decoration: none;
-    margin-top: var(--space-4);
-    transition: gap 0.18s ease;
+    transition: color 0.18s ease;
   }
 
-  .fc-1 .fc-link { color: var(--color-primary); }
-  .fc-2 .fc-link { color: var(--color-secondary); }
-  .fc-3 .fc-link { color: var(--color-accent); }
+  .directory-title a::after {
+    content: "→";
+    color: var(--color-primary);
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
 
-  .fc-link:hover { gap: var(--space-3); text-decoration: none; }
+  .directory-title a:hover,
+  .directory-title a:focus-visible {
+    color: var(--color-primary);
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+  }
+
+  .directory-title a:hover::after,
+  .directory-title a:focus-visible::after {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .directory-title a:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 4px;
+    border-radius: 2px;
+  }
 
   /* ══════════════════════════════════════════════
      CTA BANNER
   ══════════════════════════════════════════════ */
   .cta-banner {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--space-8);
-    padding: var(--space-12) var(--space-16);
+    gap: var(--space-10);
+    padding: var(--space-12) var(--space-10);
     background: var(--color-surface-raised);
     border: 1.5px solid var(--color-border);
     border-radius: var(--radius-xl);
     position: relative;
     overflow: hidden;
-    flex-wrap: wrap;
-    margin-bottom: var(--space-8);
+    margin-bottom: var(--space-16);
   }
 
-  /* Decorative tilted rule */
-  .cta-banner::before {
-    content: '';
-    position: absolute;
-    top: 0; bottom: 0;
-    left: 40%;
-    width: 1.5px;
-    background: var(--color-border);
-    transform: rotate(8deg) scaleY(1.5);
-    opacity: 0.4;
+  @media (min-width: 900px) {
+    .cta-banner {
+      grid-template-columns: minmax(0, 1.4fr) auto;
+      padding: var(--space-16);
+      gap: var(--space-16);
+    }
   }
 
-  .cta-text { flex: 1; min-width: 260px; position: relative; z-index: 1; }
+  .cta-text {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    gap: var(--space-3);
+  }
 
   .cta-eyebrow {
     font-family: var(--font-mono);
@@ -863,7 +667,7 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     color: var(--color-primary);
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    margin-bottom: var(--space-2);
+    margin: 0;
   }
 
   .cta-title {
@@ -871,8 +675,10 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     font-size: var(--font-size-3xl);
     font-weight: 900;
     color: var(--color-text);
-    margin: 0 0 var(--space-3);
+    margin: 0;
+    line-height: 1.15;
     letter-spacing: -0.03em;
+    max-width: 24ch;
   }
 
   .cta-body {
@@ -880,16 +686,45 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     font-size: var(--font-size-base);
     color: var(--color-text-muted);
     line-height: var(--line-height-relaxed);
-    max-width: 44ch;
+    max-width: 48ch;
   }
 
   .cta-actions {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
+    gap: var(--space-4);
     flex-shrink: 0;
     position: relative;
     z-index: 1;
+    align-items: stretch;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-6);
+    background: var(--color-secondary);
+    color: #F8FAFC;
+    border: 1.5px solid var(--color-secondary);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    transition: all 0.18s ease;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .btn-primary:hover {
+    background: #0F4A5E;
+    border-color: #0F4A5E;
+    box-shadow: var(--shadow-glow-secondary);
+    transform: translateY(-1px);
+    text-decoration: none;
+    color: #F8FAFC;
   }
 
   .btn-large {
@@ -917,83 +752,27 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     border-color: var(--color-text);
     color: var(--color-text);
     text-decoration: none;
+    transform: translateY(-1px);
   }
 
-  .directory-section {
-  margin-bottom: var(--space-16);
-}
-
-.directory-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-4);
-}
-
-@media (min-width: 768px) {
-  .directory-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* ══════════════════════════════════════════════
+     MOTION
+  ══════════════════════════════════════════════ */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
-}
 
-.directory-card {
-  display: grid;
-  align-content: start;
-  gap: var(--space-3);
-  padding: var(--space-8) var(--space-6);
-  background: var(--color-surface);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-lg);
-}
+  @media (prefers-reduced-motion: reduce) {
+    .hero-text,
+    .hero-visual,
+    .badge,
+    .kicker-dot { animation: none; }
 
-.directory-card p {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-relaxed);
-}
-
-.directory-title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--font-size-2xl);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-}
-
-.directory-title a {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  color: var(--color-text);
-  text-decoration: none;
-  transition: color 0.18s ease;
-}
-
-.directory-title a::after {
-  content: "→";
-  color: var(--color-primary);
-  opacity: 0;
-  transform: translateX(-4px);
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-
-.directory-title a:hover,
-.directory-title a:focus-visible {
-  color: var(--color-primary);
-  text-decoration: underline;
-  text-underline-offset: 0.18em;
-}
-
-.directory-title a:hover::after,
-.directory-title a:focus-visible::after {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-.directory-title a:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 4px;
-  border-radius: 2px;
-}
-
+    .directory-card,
+    .viz-card,
+    .btn-primary,
+    .cta-github { transition: none; }
+  }
 </style>
+
