@@ -1,13 +1,9 @@
 // Pure form-state -> CleaningAction logic for the guided cleaning menu.
 // No DOM, no runtime imports.
 import type { CleaningAction, Condition, Op } from './codegen';
+import type { DfInfo } from './usePyodide';
 
-export interface ColumnInfo {
-  name: string;
-  dtype: string;
-  numeric: boolean;
-  missing: number;
-}
+export type ColumnInfo = DfInfo['columns'][number];
 export type ActionKind = CleaningAction['kind'];
 export type Strategy = 'mean' | 'median' | 'mode' | 'value';
 
@@ -64,7 +60,7 @@ export function emptyForm(): FormState {
 }
 
 const PLAIN_DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
-const isNumber = (s: string) => PLAIN_DECIMAL.test(s.trim()) && Number.isFinite(Number(s.trim()));
+export const isNumber = (s: string) => PLAIN_DECIMAL.test(s.trim()) && Number.isFinite(Number(s.trim()));
 
 function find(columns: ColumnInfo[], name: string): ColumnInfo | undefined {
   return columns.find((c) => c.name === name);
@@ -90,12 +86,35 @@ export function allowedStrategies(
   return { strategies, modeHint };
 }
 
+/** Whether a condition on the chosen column compares numbers (contains is always text). */
+export function conditionIsNumeric(f: FormState, columns: ColumnInfo[]): boolean {
+  return !!find(columns, f.column)?.numeric && f.op !== 'contains';
+}
+
+/** Whether every chosen column holds numbers. */
+export function allChosenNumeric(chosen: string[], columns: ColumnInfo[]): boolean {
+  return chosen.length > 0 && chosen.every((n) => find(columns, n)?.numeric);
+}
+
+/**
+ * The form as it applies to the current columns: selections that no longer exist
+ * are dropped and a fill strategy that is no longer allowed falls back to 'value'.
+ * Used by both the UI and buildAction so they cannot disagree.
+ */
+export function effectiveForm(f: FormState, columns: ColumnInfo[], rows: number): FormState {
+  const chosen = f.columns.filter((n) => find(columns, n));
+  const strategy = allowedStrategies(chosen, columns, rows).strategies.includes(f.strategy)
+    ? f.strategy
+    : 'value';
+  return { ...f, columns: chosen, column: find(columns, f.column) ? f.column : '', strategy };
+}
+
 function condition(f: FormState, columns: ColumnInfo[]): Condition | null {
   const col = find(columns, f.column);
   if (!col || f.value === '') return null;
-  const numeric = col.numeric && f.op !== 'contains';
+  const numeric = conditionIsNumeric(f, columns);
   if (numeric && !isNumber(f.value)) return null;
-  return { column: f.column, op: f.op, value: f.value, numeric };
+  return { column: f.column, op: f.op, value: numeric ? f.value.trim() : f.value, numeric };
 }
 
 const WHOLE = /^\d+$/;
@@ -103,14 +122,14 @@ const WHOLE = /^\d+$/;
 /** The action for the current form, or null while the form is not valid. */
 export function buildAction(
   kind: ActionKind,
-  f: FormState,
+  raw: FormState,
   columns: ColumnInfo[],
   rows: number,
 ): CleaningAction | null {
-  const known = (names: string[]) => names.every((n) => find(columns, n));
+  const f = effectiveForm(raw, columns, rows);
   switch (kind) {
     case 'dropColumns':
-      return f.columns.length > 0 && known(f.columns) ? { kind, columns: f.columns } : null;
+      return f.columns.length > 0 ? { kind, columns: f.columns } : null;
     case 'dropRowsByPosition': {
       if (!WHOLE.test(f.start.trim()) || !WHOLE.test(f.end.trim())) return null;
       const start = Number(f.start);
@@ -123,14 +142,19 @@ export function buildAction(
       return c ? { kind, condition: c } : null;
     }
     case 'dropMissing':
-      return known(f.columns) ? { kind, columns: f.columns, how: f.how } : null;
+      return { kind, columns: f.columns, how: f.how };
     case 'fillMissing': {
-      if (f.columns.length === 0 || !known(f.columns)) return null;
-      if (!allowedStrategies(f.columns, columns, rows).strategies.includes(f.strategy)) return null;
+      if (f.columns.length === 0) return null;
       if (f.strategy !== 'value') return { kind, columns: f.columns, strategy: f.strategy };
-      const numeric = f.columns.every((n) => find(columns, n)!.numeric);
+      const numeric = allChosenNumeric(f.columns, columns);
       if (f.fillValue === '' || (numeric && !isNumber(f.fillValue))) return null;
-      return { kind, columns: f.columns, strategy: 'value', value: f.fillValue, numeric };
+      return {
+        kind,
+        columns: f.columns,
+        strategy: 'value',
+        value: numeric ? f.fillValue.trim() : f.fillValue,
+        numeric,
+      };
     }
     case 'rename': {
       const to = f.newName.trim();

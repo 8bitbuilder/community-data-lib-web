@@ -46,6 +46,7 @@ function CleaningStepSlot({ dfInfo, insertCellAndRun, disabled }: CleaningSlotPr
       columns={dfInfo?.columns ?? []}
       rows={dfInfo?.rows ?? 0}
       disabled={disabled || !dfInfo}
+      disabledReason={dfInfo ? 'Wait for Run all to finish' : 'Load the data first'}
       onInsert={insertCellAndRun}
     />
   );

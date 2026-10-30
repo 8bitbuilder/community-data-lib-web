@@ -7,6 +7,7 @@ import {
   allowedStrategies,
   buildAction,
   type FormState,
+  effectiveForm,
   type ColumnInfo,
 } from '../src/components/notebook/actionForms.ts';
 
@@ -155,4 +156,39 @@ test('changeType and dropDuplicates', () => {
   });
   assert.equal(build('changeType', { column: '', toType: 'text' }), null);
   assert.deepEqual(build('dropDuplicates', {}), { kind: 'dropDuplicates' });
+});
+
+test('a stale fill strategy falls back to value in both effectiveForm and buildAction', () => {
+  const f = form({ columns: ['POP', 'STNAME'], strategy: 'median', fillValue: 'n/a' });
+  assert.equal(effectiveForm(f, columns, ROWS).strategy, 'value');
+  assert.deepEqual(buildAction('fillMissing', f, columns, ROWS), {
+    kind: 'fillMissing',
+    columns: ['POP', 'STNAME'],
+    strategy: 'value',
+    value: 'n/a',
+    numeric: false,
+  });
+  assert.equal(effectiveForm(form({ columns: ['POP'], strategy: 'median' }), columns, ROWS).strategy, 'median');
+});
+
+test('names no longer in the table are ignored', () => {
+  const live = columns.filter((c) => c.name !== 'POP');
+  assert.deepEqual(buildAction('dropColumns', form({ columns: ['POP', 'AREA'] }), live, ROWS), {
+    kind: 'dropColumns',
+    columns: ['AREA'],
+  });
+  assert.equal(buildAction('dropColumns', form({ columns: ['POP'] }), live, ROWS), null);
+  assert.equal(buildAction('filterRows', form({ column: 'POP', value: '1' }), live, ROWS), null);
+  assert.equal(effectiveForm(form({ column: 'POP' }), live, ROWS).column, '');
+});
+
+test('numeric values are trimmed', () => {
+  assert.deepEqual(build('filterRows', { column: 'POP', op: '>', value: ' 100 ' }), {
+    kind: 'filterRows',
+    condition: { column: 'POP', op: '>', value: '100', numeric: true },
+  });
+  assert.equal(
+    (build('fillMissing', { columns: ['POP'], strategy: 'value', fillValue: ' 5 ' }) as { value: string }).value,
+    '5',
+  );
 });

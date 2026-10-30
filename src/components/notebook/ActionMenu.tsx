@@ -6,7 +6,10 @@ import {
   MENU_ITEMS,
   OPS,
   allowedStrategies,
+  allChosenNumeric,
   buildAction,
+  conditionIsNumeric,
+  effectiveForm,
   emptyForm,
   type ActionKind,
   type ColumnInfo,
@@ -18,6 +21,8 @@ interface Props {
   columns: ColumnInfo[];
   rows: number;
   disabled: boolean;
+  /** Tooltip explaining why the menu is disabled. */
+  disabledReason?: string;
   onInsert: (code: string) => void;
 }
 
@@ -28,13 +33,15 @@ const STRATEGY_LABEL: Record<Strategy, string> = {
   value: 'A value I type',
 };
 
-export default function ActionMenu({ columns, rows, disabled, onInsert }: Props) {
+export default function ActionMenu({ columns, rows, disabled, disabledReason, onInsert }: Props) {
   const uid = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<ActionKind | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const [rawForm, setForm] = useState<FormState>(emptyForm);
+  // Selections that vanished from the table (or a stale fill strategy) never reach the UI.
+  const form = effectiveForm(rawForm, columns, rows);
 
   const patch = (p: Partial<FormState>) => setForm((f) => ({ ...f, ...p }));
   const close = (refocus: boolean) => {
@@ -51,10 +58,26 @@ export default function ActionMenu({ columns, rows, disabled, onInsert }: Props)
     }
   }, [disabled]);
 
+  // Close the list when focus or a click lands outside the menu.
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: Event) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', away);
+    document.addEventListener('focusin', away);
+    return () => {
+      document.removeEventListener('mousedown', away);
+      document.removeEventListener('focusin', away);
+    };
+  }, [open]);
+
   // Focus the first field (or the first menu item) when something opens.
   useEffect(() => {
     const target = kind
-      ? rootRef.current?.querySelector<HTMLElement>('.nb-action-form input, .nb-action-form select')
+      ? rootRef.current?.querySelector<HTMLElement>(
+          '.nb-action-form input, .nb-action-form select, .nb-action-form button[type="submit"]',
+        )
       : open
         ? rootRef.current?.querySelector<HTMLElement>('.nb-action-list button')
         : null;
@@ -95,10 +118,9 @@ export default function ActionMenu({ columns, rows, disabled, onInsert }: Props)
     </label>
   );
 
-  const columnChecks = (legend: string, hint?: string) => (
+  const columnChecks = (legend: string) => (
     <fieldset className="nb-checks">
       <legend>{legend}</legend>
-      {hint && <p className="nb-hint">{hint}</p>}
       <div className="nb-check-list">
         {columns.map((c) => (
           <label key={c.name} className="nb-check">
@@ -121,8 +143,7 @@ export default function ActionMenu({ columns, rows, disabled, onInsert }: Props)
   );
 
   const conditionFields = () => {
-    const col = columns.find((c) => c.name === form.column);
-    const numericValue = !!col?.numeric && form.op !== 'contains';
+    const numericValue = conditionIsNumeric(form, columns);
     return (
       <>
         {columnSelect('Column')}
@@ -151,8 +172,8 @@ export default function ActionMenu({ columns, rows, disabled, onInsert }: Props)
   };
 
   const strat = allowedStrategies(form.columns, columns, rows);
-  const strategy = strat.strategies.includes(form.strategy) ? form.strategy : 'value';
-  const fillNumeric = form.columns.length > 0 && form.columns.every((n) => columns.find((c) => c.name === n)?.numeric);
+  const strategy = form.strategy;
+  const fillNumeric = allChosenNumeric(form.columns, columns);
 
   const fields = () => {
     switch (kind) {
@@ -264,11 +285,10 @@ export default function ActionMenu({ columns, rows, disabled, onInsert }: Props)
         ref={buttonRef}
         type="button"
         className="nb-btn"
-        aria-haspopup="true"
         aria-expanded={open}
-        aria-controls={`${uid}-list`}
+        aria-controls={open ? `${uid}-list` : undefined}
         disabled={disabled}
-        title={disabled ? 'Load the data first' : undefined}
+        title={disabled ? disabledReason : undefined}
         onClick={() => {
           setKind(null);
           setOpen((o) => !o);
