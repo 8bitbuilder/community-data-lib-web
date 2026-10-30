@@ -93,7 +93,11 @@ export function pandasColumnNames(rawHeaders) {
 
 function sheetGrid(ws) {
   if (!ws || !ws['!ref']) return [];
+  // Anchor at A1 so row/column numbers match what a person sees in Excel.
+  const r = XLSX.utils.decode_range(ws['!ref']);
+  const range = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: r.e });
   const raw = XLSX.utils.sheet_to_json(ws, {
+    range,
     header: 1,
     raw: false,
     defval: '',
@@ -187,7 +191,7 @@ export function readExcelTable(bytes, options = {}) {
 
   const { headerRow, headerIndex, end } = region(grid, headerOverride);
   const headers = pandasColumnNames(grid[headerIndex]);
-  const rows = grid.slice(headerIndex + 1, end).filter((r) => !isBlankRow(r));
+  const rows = grid.slice(headerIndex + 1, end); // interior blank rows are kept: pandas returns them as all-NaN rows
 
   return {
     headers,

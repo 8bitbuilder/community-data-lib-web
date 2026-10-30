@@ -44,6 +44,29 @@
     ],
     "rowCount": 2
   },
+  "offset-range.xlsx": {
+    "sheet": "Sheet1",
+    "headerRow": 3,
+    "dataRowCount": 3,
+    "headers": [
+      "Unnamed: 0",
+      "Unnamed: 1",
+      "Area",
+      "Pop",
+      "Rate"
+    ],
+    "rowCount": 3
+  },
+  "interior-blank.xlsx": {
+    "sheet": "Sheet1",
+    "headerRow": 1,
+    "dataRowCount": 4,
+    "headers": [
+      "A",
+      "B"
+    ],
+    "rowCount": 4
+  },
   "legacy.xls": {
     "sheet": "Sheet1",
     "headerRow": 1,

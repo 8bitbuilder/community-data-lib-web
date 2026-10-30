@@ -73,6 +73,29 @@ const files = {
       ],
     ]),
   },
+  'offset-range.xlsx': {
+    bookType: 'xlsx',
+    wb: (() => {
+      const ws = XLSX.utils.aoa_to_sheet(
+        [
+          ['Offset table'],
+          [],
+          ['Area', 'Pop', 'Rate'],
+          ['Knox', 1, 2],
+          ['Blount', 3, 4],
+          ['Sevier', 5, 6],
+        ],
+        { origin: 'C1' },
+      );
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+      return wb;
+    })(),
+  },
+  'interior-blank.xlsx': {
+    bookType: 'xlsx',
+    wb: book([['Sheet1', [['A', 'B'], ['1', '2'], [], ['3', '4'], ['5', '6']]]]),
+  },
   'empty.xlsx': { bookType: 'xlsx', wb: book([['Sheet1', []]]) },
   'legacy.xls': { wb: book([['Sheet1', cleanAoa]]), bookType: 'biff8' },
 };
