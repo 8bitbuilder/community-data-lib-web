@@ -18,6 +18,7 @@ import { useNotebookRunner } from './useNotebookRunner';
 import ActionMenu from './ActionMenu';
 import Cell from './Cell';
 import DataView from './DataView';
+import ExportMenu from './ExportMenu';
 import UploadZone, { UNSUPPORTED_FILE } from './UploadZone';
 
 export type { NotebookFile } from './notebookFiles';
@@ -49,15 +50,6 @@ function CleaningStepSlot({ dfInfo, insertCellAndRun, disabled }: CleaningSlotPr
       disabledReason={dfInfo ? 'Wait for Run all to finish' : 'Load the data first'}
       onInsert={insertCellAndRun}
     />
-  );
-}
-
-// Placeholder for Task 11, which replaces this with the export menu.
-function ExportSlot(_props: ExportSlotProps) {
-  return (
-    <button type="button" className="nb-btn" disabled title="Coming soon">
-      Export ▾
-    </button>
   );
 }
 
@@ -411,7 +403,7 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
           insertCellAndRun={insertCellAndRun}
           disabled={!hasCells || runningAll}
         />
-        <ExportSlot
+        <ExportMenu
           sourceId={sourceId}
           source={source}
           file={file}
