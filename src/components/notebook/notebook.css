@@ -483,3 +483,63 @@
   gap: var(--space-2);
   overflow-wrap: anywhere;
 }
+
+/* View tabs: cleaning steps vs. data preview */
+.cdl-notebook .nb-tabs,
+.cdl-notebook .nb-tabpanel {
+  min-width: 0;
+}
+
+.cdl-notebook .nb-tablist {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-4);
+  overflow-x: auto;
+}
+
+.cdl-notebook .nb-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cdl-notebook .nb-tab:hover {
+  color: var(--color-text);
+}
+
+.cdl-notebook .nb-tab--active {
+  color: var(--color-secondary);
+  border-bottom-color: var(--color-secondary);
+}
+
+.cdl-notebook .nb-tab:focus-visible {
+  outline: 2px solid var(--color-secondary);
+  outline-offset: 2px;
+}
+
+.cdl-notebook .nb-tab-badge {
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+}
+
+.cdl-notebook .nb-tab--active .nb-tab-badge {
+  border-color: var(--color-secondary);
+  color: var(--color-secondary);
+}

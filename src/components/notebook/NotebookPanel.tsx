@@ -19,6 +19,7 @@ import ActionMenu from './ActionMenu';
 import Cell from './Cell';
 import DataView from './DataView';
 import ExportMenu from './ExportMenu';
+import NotebookTabs, { type NotebookTab } from './NotebookTabs';
 import UploadZone, { UNSUPPORTED_FILE } from './UploadZone';
 
 export type { NotebookFile } from './notebookFiles';
@@ -83,6 +84,7 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
   const [pendingLayout, setPendingLayout] = useState<ExcelLayout | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
+  const [tab, setTab] = useState<NotebookTab>('steps');
 
   /** Puts a file into Python and makes the load cell read it, then runs the load cell. */
   const loadFile = useCallback(
@@ -252,6 +254,8 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
     const cell = newCell('');
     setCells((cs) => [...cs, cell]);
     setFocusId(cell.id);
+    // A new blank cell is for typing, so show it.
+    setTab('steps');
   }
 
   const insertAfter = runner.insertCellAndRun;
@@ -347,6 +351,10 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
   const statusText = [pyStatus, phase].filter(Boolean).join(' ');
   const hasCells = cells.length > 0;
   const anyRunning = cells.some((c) => c.status === 'running');
+  const errorCount = cells.filter((c) => c.status === 'error').length;
+  // Steps after the load cell; the error count is shown so a failed step isn't missed from the data tab.
+  const stepsBadge = errorCount > 0 ? `${errorCount} ${errorCount === 1 ? 'error' : 'errors'}` : String(Math.max(cells.length - 1, 0));
+  const dataBadge = dfInfo ? `${dfInfo.rows.toLocaleString()} × ${dfInfo.cols.toLocaleString()}` : undefined;
   const uploadLayout = file?.origin === 'upload' ? file.layout : undefined;
 
   return (
@@ -460,27 +468,39 @@ export default function NotebookPanel({ sourceId, source }: { sourceId: string; 
         <p className="nb-hint">Your saved cells are back. Click Run all to run them on the data.</p>
       )}
 
-      <DataView info={dfInfo} />
-
-      <div className="nb-cells">
-        {cells.map((cell, i) => (
-          <Cell
-            key={cell.id}
-            cell={cell}
-            index={i}
-            count={cells.length}
-            isLoad={i === 0}
-            autoFocus={cell.id === focusId}
-            runDisabled={runningAll}
-            onChange={(code) => changeCode(cell.id, code)}
-            onRun={() => runCell(cell.id)}
-            onMoveUp={() => moveCell(i, -1)}
-            onMoveDown={() => moveCell(i, 1)}
-            onDelete={() => deleteCell(i)}
-            onFocus={() => setActiveId(cell.id)}
-          />
-        ))}
-      </div>
+      <NotebookTabs
+        active={tab}
+        onChange={setTab}
+        tabs={[
+          {
+            id: 'steps',
+            label: 'Cleaning steps',
+            badge: hasCells ? stepsBadge : undefined,
+            panel: (
+              <div className="nb-cells">
+                {cells.map((cell, i) => (
+                  <Cell
+                    key={cell.id}
+                    cell={cell}
+                    index={i}
+                    count={cells.length}
+                    isLoad={i === 0}
+                    autoFocus={cell.id === focusId}
+                    runDisabled={runningAll}
+                    onChange={(code) => changeCode(cell.id, code)}
+                    onRun={() => runCell(cell.id)}
+                    onMoveUp={() => moveCell(i, -1)}
+                    onMoveDown={() => moveCell(i, 1)}
+                    onDelete={() => deleteCell(i)}
+                    onFocus={() => setActiveId(cell.id)}
+                  />
+                ))}
+              </div>
+            ),
+          },
+          { id: 'data', label: 'Data preview', badge: dataBadge, panel: <DataView info={dfInfo} /> },
+        ]}
+      />
     </div>
   );
 }
