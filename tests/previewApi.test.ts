@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import AdmZip from 'adm-zip';
 
 import { createApiHandler, nodeEngine } from '../backend/lib/apiHandler.mjs';
+import { getSourceTable, tableCacheSize } from '../backend/lib/csvCache.mjs';
 import { loadAllSources as loadExported } from '../backend/lib/exportStore.mjs';
 import previewFunction, { config as functionConfig } from '../netlify/functions/preview-api.mjs';
 
@@ -69,6 +70,7 @@ function sources() {
       title: 'Excel curated',
       download: { url: `${base}/fx/title-rows.xlsx`, header_row: 1 },
     },
+    { id: 'empty', title: 'Empty', download: { url: `${base}/fx/empty.xlsx` } },
     { id: 'zipped', title: 'Zipped', download: { url: `${base}/bundle.zip` } },
     { id: 'notes-first', title: 'Notes', download: { url: `${base}/fx/notes-first.xlsx` } },
     { id: 'portal', title: 'Portal only', provider: { url: 'https://example.gov' } },
@@ -93,7 +95,7 @@ test('health and source listing', async () => {
   assert.equal(health.status, 200);
   assert.equal(health.body.previewEngine, 'node');
   const list = await get('/api/sources');
-  assert.equal(list.body.count, 6);
+  assert.equal(list.body.count, 7);
   assert.equal((await get('/api/sources/counties')).body.title, 'Counties');
   assert.equal(list.headers.get('access-control-allow-origin'), '*');
 });
@@ -251,4 +253,27 @@ test('Excel sources skip a preferred pandas engine', async () => {
   assert.equal(res.status, 200);
   assert.equal(res.body.engine, 'node');
   assert.equal(res.body.pandasFallback, undefined);
+});
+
+test('invalid header_row values are 400, not ignored', async () => {
+  for (const bad of ['0', 'abc', '-1', '1.5']) {
+    const res = await get(`/api/sources/excel/preview?header_row=${bad}`);
+    assert.equal(res.status, 400, bad);
+    assert.equal(res.body.code, 'HEADER_OUT_OF_RANGE');
+    assert.equal(res.body.error, 'header_row must be a whole number of 1 or more');
+  }
+});
+
+test('a sheet with no data rows is 422 NO_DATA', async () => {
+  const res = await get('/api/sources/empty/preview');
+  assert.equal(res.status, 422);
+  assert.equal(res.body.code, 'NO_DATA');
+  assert.equal(res.body.error, 'This sheet has no data rows');
+});
+
+test('the parsed-table cache is bounded', async () => {
+  for (let i = 0; i < 60; i++) {
+    await getSourceTable({ id: `cap-${i}`, download: { url: `${base}/counties.csv` } });
+  }
+  assert.equal(tableCacheSize(), 50);
 });

@@ -5,6 +5,11 @@ import { readExcelTable } from "../../src/lib/data/excelLayout.mjs";
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const fileCache = new Map();
 const tableCache = new Map();
+const MAX_TABLE_ENTRIES = 50;
+
+export function tableCacheSize() {
+  return tableCache.size;
+}
 
 function isZip(data) {
   return data.length >= 4 && data[0] === 0x50 && data[1] === 0x4b && data[2] === 0x03 && data[3] === 0x04;
@@ -150,7 +155,12 @@ export async function getSourceTable(source, { sheet, headerRow } = {}) {
   } else {
     table = parseCsvBytes(file.bytes);
   }
-  tableCache.set(key, { table, fetchedAt: Date.now() });
+  const now = Date.now();
+  for (const [k, v] of tableCache) if (now - v.fetchedAt >= CACHE_TTL_MS) tableCache.delete(k);
+  tableCache.delete(key);
+  tableCache.set(key, { table, fetchedAt: now });
+  // Map iterates in insertion order, so the oldest entries go first.
+  while (tableCache.size > MAX_TABLE_ENTRIES) tableCache.delete(tableCache.keys().next().value);
   return table;
 }
 

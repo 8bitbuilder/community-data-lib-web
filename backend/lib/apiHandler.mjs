@@ -13,7 +13,7 @@
  *   GET /api/sources/:id/preview?state&county&limit&offset&columns&sheet&header_row
  *   GET /api/sources/:id/chart?variable&xVariable&plotType&state&county&limit&sheet&header_row
  *   GET /api/sources/:id/filters?type&state&sheet&header_row
- *   GET /api/sources/:id/file   raw (unzipped) source bytes; X-CDL-Filename/Format/Archive headers
+ *   GET /api/sources/:id/file   raw (unzipped) source bytes; X-CDL-Filename (URI-encoded)/Format/Archive headers
  */
 
 import { buildChart, buildPreview, listFilterOptions } from './dataPreview.mjs';
@@ -56,7 +56,12 @@ function tableParams(q) {
   const sheet = q.get('sheet');
   if (sheet !== null && sheet !== '') out.sheet = /^\d+$/.test(sheet) ? Number(sheet) : sheet;
   const row = q.get('header_row');
-  if (row !== null && /^\d+$/.test(row)) out.headerRow = Number(row);
+  if (row !== null) {
+    if (!/^\d+$/.test(row) || Number(row) < 1) {
+      throw new LayoutError('HEADER_OUT_OF_RANGE', 'header_row must be a whole number of 1 or more');
+    }
+    out.headerRow = Number(row);
+  }
   return out;
 }
 
