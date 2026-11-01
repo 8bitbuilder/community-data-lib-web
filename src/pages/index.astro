@@ -322,10 +322,15 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
 
   @media (max-width: 640px) {
     .hero {
-      padding-top: var(--space-4);
+      padding-top: 3.25rem;
+    }
+    /* Drop the spacer <br>s on phones so the illustration lands above the fold. */
+    .hero > br,
+    .hero-copy > br {
+      display: none;
     }
     .hero-art {
-      margin-top: var(--space-6);
+      margin-top: var(--space-4);
     }
     .hero-actions {
       flex-direction: column;
