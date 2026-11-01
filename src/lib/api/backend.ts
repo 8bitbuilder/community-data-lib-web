@@ -18,6 +18,8 @@ export interface SourceDownload {
   url?: string;
   description?: string;
   file_size?: string;
+  /** File type the URL returns: 'csv', 'xlsx', 'zip/csv', 'zip/accdb', … */
+  format?: string;
 }
 
 export interface SourceFilters {

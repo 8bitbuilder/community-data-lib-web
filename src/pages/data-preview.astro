@@ -13,6 +13,7 @@ import {
   normalizeDescriptionTags,
   type BackendSource,
 } from '@lib/api/backend';
+import { downloadFileType } from '@lib/data/fileType';
 import { previewUnavailableReason } from '@lib/data/previewSupport';
 import type { PreviewIndexEntry } from '@lib/data/staticPreview';
 import { buildDatasheet } from '../../backend/lib/datasheet.mjs';
@@ -52,6 +53,7 @@ const sources = Object.fromEntries(
           provider: source.provider?.name ? `${source.provider.name}${agency}` : '',
           providerUrl: source.provider?.url ?? '',
           downloadUrl: source.download?.url ?? '',
+          fileType: source.download?.url ? downloadFileType(source.download.format) : null,
           requiresAccount: Boolean(source.requires_account),
           description: buildCatalogDescription(source),
           topical: normalizeDescriptionTags(source.description_tags),
@@ -145,6 +147,10 @@ const pageData = {
           <div class="tag-group">
             <span class="tag-label">Geographic</span>
             <div class="tag-chips" id="geographic-tags"></div>
+          </div>
+          <div class="tag-group" id="file-type-group" hidden>
+            <span class="tag-label">File type</span>
+            <div class="tag-chips" id="file-type-tags"></div>
           </div>
         </div>
 
@@ -287,6 +293,7 @@ const pageData = {
       type PreviewVariable,
       type RowFile,
     } from '@lib/data/staticPreview';
+    import type { DownloadFileType } from '@lib/data/fileType';
 
     interface SourceModel {
       id: string;
@@ -294,6 +301,7 @@ const pageData = {
       provider: string;
       providerUrl: string;
       downloadUrl: string;
+      fileType: DownloadFileType | null;
       requiresAccount: boolean;
       description: string;
       topical: string[];
@@ -409,6 +417,18 @@ const pageData = {
       });
     }
 
+    // "CSV", "ZIP → ACCDB": what the Download button gets (web#43).
+    function renderFileType(fileType: DownloadFileType | null) {
+      $('file-type-group').hidden = !fileType;
+      if (!fileType) return;
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip tag-filled';
+      chip.textContent = fileType.label;
+      chip.title = fileType.description;
+      $('file-type-tags').replaceChildren(chip);
+      $('download-btn').setAttribute('aria-label', `Download: ${fileType.description}`);
+    }
+
     function initSourcePicker() {
       $('loading-state').hidden = true;
       $('source-picker').hidden = false;
@@ -449,6 +469,7 @@ const pageData = {
       renderTags('topical-tags', source.topical, true);
       renderTags('pedagogical-tags', source.pedagogical);
       renderTags('geographic-tags', source.geographic);
+      renderFileType(source.fileType);
       for (const key of ['who', 'how', 'where', 'why', 'when'] as const) {
         $(`ds-${key}`).textContent = source.datasheet[key];
       }
@@ -1402,6 +1423,7 @@ const pageData = {
     .chart-canvas-wrap[hidden],
     .chart-controls[hidden],
     .table-panel[hidden],
+    .tag-group[hidden],
     .btn-download[hidden] {
       display: none;
     }
