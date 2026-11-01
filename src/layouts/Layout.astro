@@ -1,6 +1,8 @@
 ---
 import Navigation from '@components/Navigation.astro';
+import { Image } from 'astro:assets';
 import { withBasePath } from '@lib/paths';
+import cdlEmblem from '../assets/brand/cdl-emblem-transparent.png';
 import '../styles/tailwind.css';
 
 interface Props {
@@ -83,28 +85,46 @@ const librarianPortalHref = withBasePath('/librarian/');
       <div class="footer-inner">
         <div class="footer-top">
           <div class="footer-brand">
-            <div class="footer-mark">CDL</div>
+            <Image src={cdlEmblem} alt="" class="footer-mark" widths={[72, 144, 216]} sizes="72px" />
             <div>
               <span class="footer-title">Community Data Libraries</span>
-              <p class="footer-tagline">Place-based open data catalog for schools and communities.</p>
+              <p class="footer-tagline">Data about your community, for your community</p>
             </div>
           </div>
           <nav class="footer-links" aria-label="Footer navigation">
             <a href={withBasePath('/complete-catalog')}>Complete Catalog</a>
-            <a href={withBasePath('/community-library')}>Community Library</a>
+            <a href={withBasePath('/communities/knox-county/')}>Example Community Library</a>
             <a href={withBasePath('/create-community-library')}>Create a Community Library</a>
-            <a href={withBasePath('/maps')}>Map</a>
-            <a href={withBasePath('/data-resources')}>Data Resources</a>
-            <a href={withBasePath('/submit')}>Submit</a>
-            <a href="https://github.com/community-data-libraries/web" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+            <a href={withBasePath('/submit')}>Suggest a Dataset</a>
           </nav>
         </div>
         <div class="footer-bottom">
-          <p class="footer-copy">&copy; {new Date().getFullYear()} Community Data Libraries. Open source under MIT.</p>
-          <p class="footer-tagline-bottom">Built with Astro · Hosted on Netlify · Created by <a href="https://opalslab.org" target="_blank" rel="noopener noreferrer">OPALS Lab</a></p>
+          <p class="footer-copy">&copy; {new Date().getFullYear()} Community Data Libraries. Open source under GPL-3.0-only.</p>
+          <p class="footer-tagline-bottom">
+            Created by <a href="https://opalslab.org" target="_blank" rel="noopener noreferrer">OPALS Lab</a>
+            <span aria-hidden="true">·</span>
+            <!-- Email link: the address is never in the HTML (reversed in data attributes and
+                 assembled by script only when used), which keeps simple scrapers from harvesting it. -->
+            <a href="#" class="footer-email" data-u="ofni" data-d="gro.seirarbilatadytinummoc" aria-label="Email us" title="Email us">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            </a>
+          </p>
         </div>
       </div>
     </footer>
+    <script>
+      // Build the mailto only on interaction so the address never sits in the page source.
+      const rev = (v: string | undefined) => (v ?? '').split('').reverse().join('');
+      document.querySelectorAll<HTMLAnchorElement>('a.footer-email').forEach((link) => {
+        const arm = () => {
+          link.href = `mailto:${rev(link.dataset.u)}@${rev(link.dataset.d)}`;
+        };
+        ['pointerenter', 'focus', 'touchstart'].forEach((evt) =>
+          link.addEventListener(evt, arm, { once: true, passive: true })
+        );
+        link.addEventListener('click', arm);
+      });
+    </script>
   </body>
 </html>
 
@@ -384,27 +404,34 @@ const librarianPortalHref = withBasePath('/librarian/');
     gap: var(--space-4);
   }
 
+  /* Same emblem art as the nav ribbon (transparent background), sitting on the footer navy */
   .footer-mark {
-    font-family: var(--font-display);
-    font-size: var(--font-size-xl);
-    font-weight: 900;
-    color: var(--color-primary-light);
-    letter-spacing: -0.04em;
-    line-height: 1;
-    padding: var(--space-2) var(--space-3);
-    border: 1.5px solid rgba(15, 118, 110, 0.4);
-    border-radius: var(--radius-sm);
+    display: block;
+    width: 72px;
+    height: 72px;
+    padding: 9px 7px 11px;
+    object-fit: contain;
+    border: 1px solid rgba(175, 229, 243, 0.35); /* nav-icon light blue (#AFE5F3), washed out */
+    border-radius: 50%;
+    /* Navy grosgrain ribs (same pattern as the nav ribbon's navy option) */
+    background: repeating-linear-gradient(
+      to bottom,
+      #3D5A80 0 1px,
+      #31496A 1px 2.5px,
+      #22374F 2.5px 3.5px
+    );
     flex-shrink: 0;
-    margin-top: 2px;
+    margin-top: -4px;
   }
 
+  /* Doto (round dots), matching the nav logo name */
   .footer-title {
     display: block;
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: var(--font-size-lg);
+    font-family: 'Doto', var(--font-mono);
+    font-variation-settings: 'ROND' 100;
+    font-weight: 800;
+    font-size: 1.125rem;
     color: #E2E8F0;
-    letter-spacing: -0.02em;
     margin-bottom: var(--space-1);
   }
 
@@ -412,8 +439,9 @@ const librarianPortalHref = withBasePath('/librarian/');
     margin: 0;
     font-size: var(--font-size-sm);
     color: #A0B4C4;
-    line-height: var(--line-height-relaxed);
+    line-height: 1.35;
     max-width: 30ch;
+    text-wrap: balance;
   }
 
   .footer-links {
@@ -467,6 +495,19 @@ const librarianPortalHref = withBasePath('/librarian/');
   .footer-tagline-bottom a:hover {
     color: #FFFFFF;
     text-decoration: underline;
+  }
+  .footer-tagline-bottom {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .footer-tagline-bottom .footer-email {
+    display: inline-flex;
+    color: #7CD3C4; /* nav-icon light teal */
+    text-decoration: none;
+  }
+  .footer-tagline-bottom .footer-email:hover {
+    color: #FFFFFF;
   }
 
   /* =============================================

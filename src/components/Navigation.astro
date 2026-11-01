@@ -19,11 +19,11 @@ const navItems = [
 ];
 
 // Small icon links on the right side of the nav.
-// TODO: replace the two placeholder URLs below with the real Buy Me a Coffee page and lab website.
+// TODO: replace the Buy Me a Coffee placeholder URL with the real page.
 const iconLinks = [
-  { href: 'https://github.com/community-data-libraries/web', label: 'Community Data Libraries on GitHub', icon: 'github' },
+  { href: 'https://github.com/community-data-libraries', label: 'Community Data Libraries on GitHub', icon: 'github' },
   { href: '#buy-me-a-coffee', label: 'Buy us a coffee', icon: 'coffee' },
-  { href: '#lab-website', label: 'Visit our lab website', icon: 'lab' },
+  { href: 'https://opalslab.org', label: 'OPALS Lab website', icon: 'lab' },
 ];
 
 const navItemsAfter = [
@@ -254,8 +254,8 @@ function isDataResourcesActive(path: string): boolean {
   .brand-name { transition: opacity 0.15s ease; }
   .brand-link:hover .brand-name { opacity: 0.8; }
 
-  /* Navy "bookmark" tab that hangs below the bar and holds the emblem.
-     The tab keeps the bar's 64px in the layout; its rounded bottom overhangs the page. */
+  /* "Bookmark" ribbon that hangs below the bar and holds the emblem.
+     The tab keeps the bar's 64px in the layout; the ribbon overhangs the page. */
   .brand-tab {
     position: relative;
     align-self: flex-start;
@@ -518,13 +518,13 @@ function isDataResourcesActive(path: string): boolean {
     width: 34px;
     height: 34px;
     border-radius: 50%;
-    color: #AFE5F3;
+    color: #7CD3C4; /* light teal */
     transition: background 0.15s ease, color 0.15s ease;
   }
 
   .nav-icon:hover,
   .nav-icon:focus-visible {
-    background: rgba(175, 229, 243, 0.14);
+    background: rgba(124, 211, 196, 0.14);
     color: #ffffff;
     text-decoration: none;
   }
