@@ -533,15 +533,13 @@ function isDataResourcesActive(path: string): boolean {
      The shadow is darker than on the page because it sits on the navy bar. */
   .nav-cta {
     display: none;
-    padding: 12px var(--space-5);
-    background: var(--color-secondary);
+    padding: 10px var(--space-5);
+    /* faint top-to-bottom gradient: a touch lighter mustard at the top */
+    background: linear-gradient(180deg, #e4b232 0%, var(--color-secondary) 100%) border-box;
     color: #23354B; /* nav navy: 5.25:1 on the mustard (white was 2.27:1) */
     border: 2px solid transparent;
     border-radius: 3px;
     box-shadow: 3px 4px 8px rgba(5, 12, 22, 0.55);
-    /* faint dashed pale-yellow stitching just inside the edge, like the page buttons */
-    outline: 1.5px dashed rgba(255, 240, 200, 0.75);
-    outline-offset: -6px;
     font-size: var(--font-size-sm);
     font-weight: 700;
     letter-spacing: 0.01em;
@@ -553,7 +551,7 @@ function isDataResourcesActive(path: string): boolean {
       background-color 0.18s ease;
   }
   .nav-cta:hover {
-    background: #E2AE22; /* a touch brighter mustard */
+    background: linear-gradient(180deg, #edbf45 0%, #e2ae22 100%) border-box; /* a touch brighter */
     color: #23354B;
     text-decoration: none;
     transform: translate(1px, 2px);

@@ -345,7 +345,7 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
   /* ══════════════════════════════════════════════
      BUTTONS
   ══════════════════════════════════════════════ */
-  /* Near-square corners, a soft navy offset shadow, faint dashed stitching inside the edge.
+  /* Near-square corners, a soft navy offset shadow, solid fills.
      Hover presses the button down into its shadow. */
   .btn {
     --btn-shadow: rgba(35, 53, 75, 0.32); /* soft navy */
@@ -382,40 +382,36 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
   }
 
   .btn-primary {
-    background-color: var(--color-primary);
-    border-color: var(--color-primary);
-    outline: 1.5px dashed rgba(143, 211, 211, 0.55); /* faint light-teal dashed stitching */
-    outline-offset: -7px;
+    background: var(--color-primary);
     color: #fff;
-  }
-
-  .btn-primary:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 3px;
   }
 
   .btn-primary:hover {
-    background-color: #0b6358;
-    border-color: #0b6358;
+    background: #0b6358;
     color: #fff;
   }
 
-  /* Faint dashed ring just inside the edge, like the nav's "Create A Community Library" button */
   .btn-secondary {
-    background: #eef8f8; /* very light teal */
+    /* faint grid-paper lines (echoing the gridded slogan font) on very light teal */
+    background:
+      linear-gradient(rgba(62, 168, 188, 0.09) 1px, transparent 1px) border-box,
+      linear-gradient(90deg, rgba(62, 168, 188, 0.09) 1px, transparent 1px) border-box,
+      #eef8f8 border-box;
+    background-size:
+      6px 6px,
+      6px 6px;
     border: 2px solid transparent;
-    outline: 1.5px dashed rgba(62, 168, 188, 0.6); /* faint dashed stitching, slogan teal-blue */
-    outline-offset: -7px;
     color: #23354b;
-  }
-
-  .btn-secondary:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 3px;
   }
 
   .btn-secondary:hover {
     color: var(--color-primary);
+  }
+
+  .btn-primary:focus-visible,
+  .btn-secondary:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
   }
 
   .btn-large {
