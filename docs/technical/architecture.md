@@ -81,7 +81,7 @@ Content/catalog pages:
 - `/community-member`, `/student`, `/teacher` — audience-specific views (via `extractThemes()`/`libraryAccess.ts`)
 - `/data-resources` — submission/lesson-plan links
 - `/data-preview` — dataset preview from static Tier 1 files (ApexCharts); `?community=<slug>` opens that county's rows. See [previews.md](previews.md)
-- `/submit` — resource submission form (Netlify Forms)
+- `/submit` — resource submission form (Netlify Forms). It asks for the smallest geographic unit in the data and blocks national-only suggestions with an explanation (`src/lib/submission/geography.mjs`); `submission-notify` flags them in Slack for review
 - `/maps` — county coverage map: counties shaded by how many datasets cover them, or one dataset's coverage
 - `/communities/<slug>/` and `/communities/<slug>/catalog/` — community library landing page and filtered catalog, one per approved library
 - `/librarian/`, `/librarian/login/`, `/librarian/register/`, `/librarian/<slug>/edit/` — librarian portal (one static edit page serves every library through a `netlify.toml` rewrite)

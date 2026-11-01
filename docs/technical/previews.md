@@ -28,7 +28,9 @@ For each source in `data/exports/catalog.json` with a `download.url`, it writes 
 | `summary.json` | per column over every row: count, missing, distinct; min, max, mean and median for numbers; most common values for text |
 | `county/<FIPS>.json` | every row for one county |
 
-`previews/index.json` records each source as previewed (`ok`) or not, with the reason.
+`previews/index.json` records each source as previewed (`ok`) or not, with the reason, and the
+`format` it detected in the download (`csv`, `xlsx`, `zip/csv`, `zip/accdb`). Each source declares
+the same value as `download.format` in its YAML, and a backend test checks they match.
 
 ### What it reads
 
@@ -50,11 +52,11 @@ For each source in `data/exports/catalog.json` with a `download.url`, it writes 
 
 ### Current output
 
-6,406 files, 23.8 MB.
+6,394 files, 23.7 MB. The three national-only sources were removed from the catalog (web#42).
 
 | Previewed | Not previewed |
 |---|---|
-| 9 sources: the six Census population tables (including the two Excel ones), County Health Rankings, TRI Tennessee, USDA milk | EPA AirToxScreen: its zip holds a Microsoft Access database |
+| 6 sources: the four Census state and county population tables (including the Excel one), County Health Rankings, TRI Tennessee | EPA AirToxScreen: its zip holds a Microsoft Access database (`zip/accdb`); the page marks it *Needs conversion* |
 | | The 12 sources that have no direct download link |
 
 ### Into the site
@@ -73,6 +75,7 @@ For each source in `data/exports/catalog.json` with a `download.url`, it writes 
 | Part | Detail |
 |---|---|
 | Dataset details | Built into the page from `backend/data/exports/catalog.json`: description, tags, datasheet, preview status |
+| File type | From `download.format` in the tag card: `CSV`, `XLSX`, `ZIP → CSV`, with a tooltip. An Access database (`ZIP → ACCDB`) also gets a *Needs conversion* chip and an info-only message saying to convert it to CSV. Sources without a direct download show none. Logic: `src/lib/data/fileType.ts` |
 | Loaded on open | manifest, variables and sample |
 | Loaded on demand | one county's rows when a county is picked; `summary.json` when its panel is opened |
 | County names | `/geo/county-names.json`, built from the vocabulary |

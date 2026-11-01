@@ -10,7 +10,12 @@ Every dataset records the places it covers, separately from how finely its rows 
 | Field | Meaning | Example |
 |---|---|---|
 | `coverage` | Which places the data is about | national CHR file: `nation`; TRI Tennessee: `state 47`; Knox County Schools: `county 47093` |
-| `geographic_granularity` | What one row describes | `nation`, `state`, `county`, `zip` or `point` |
+| `geographic_granularity` | What one row describes | `state`, `county`, `zip` or `point` |
+
+- **Local data only:** a dataset whose granularity is `nation` (only national totals) is out of
+  scope (web#42). The backend importer skips it and a backend test fails on it; `epa-tri-dioxin` is
+  the one exception, waiting on a decision. National *coverage* is fine (a county file for every
+  U.S. county), and community catalogs and map counts use coverage as before.
 
 - **Coverage is FIPS codes only.** It is a list of `{level: nation}`, `{level: state, fips: "47"}` or
   `{level: county, fips: "47093"}`. There is no geometry intersection.
