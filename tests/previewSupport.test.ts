@@ -20,6 +20,16 @@ test('a download the exporter could not read says which format', () => {
   assert.match(reason!, /a zip of \.accdb files/);
 });
 
+test('an Access database download asks visitors to convert it', () => {
+  const access = { download: { url: 'https://x.gov/air.zip', format: 'zip/accdb' } };
+  const unsupported = { status: 'none' as const, format: 'zip/accdb', reason: 'unsupported format: zip contains no CSV (.accdb)' };
+  for (const preview of [unsupported, undefined]) {
+    const reason = previewUnavailableReason(access, preview)!;
+    assert.match(reason, /downloads as a \.zip archive containing a Microsoft Access database \(\.accdb\), which/);
+    assert.match(reason, /convert the table you need to CSV/);
+  }
+});
+
 test('a build without preview files says so instead of failing', () => {
   assert.match(previewUnavailableReason(csv, undefined)!, /isn't available on this copy/);
   assert.match(previewUnavailableReason(csv, { status: 'none', reason: 'export failed' })!, /isn't available yet/);

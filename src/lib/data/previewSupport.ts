@@ -7,12 +7,16 @@
  * can't read, are shown as info only.
  */
 
+import { downloadFileType } from './fileType.ts';
+
 export interface PreviewableSource {
-  download?: { url?: string | null } | null;
+  download?: { url?: string | null; format?: string | null } | null;
 }
 
 export interface PreviewStatus {
   status: 'ok' | 'none';
+  /** The download's format as the exporter detected it, e.g. 'csv' or 'zip/accdb'. */
+  format?: string;
   reason?: string;
 }
 
@@ -26,10 +30,16 @@ export function previewUnavailableReason(source: PreviewableSource, preview?: Pr
   if (!url) {
     return "This dataset is hosted on the provider's website rather than as a downloadable file, so it can't be previewed here.";
   }
+  if (preview?.status === 'ok') return null;
+  // e.g. AirToxScreen, a zip holding a Microsoft Access database (web#44).
+  const fileType = downloadFileType(source.download?.format);
+  if (fileType?.needsConversion) {
+    const what = fileType.description.charAt(0).toLowerCase() + fileType.description.slice(1, -1);
+    return `This dataset downloads as ${what}, which the preview can't read. Download it and convert the table you need to CSV before opening it in a spreadsheet or notebook.`;
+  }
   if (!preview) {
     return "A preview of this dataset isn't available on this copy of the site. Use the download link to get the data.";
   }
-  if (preview.status === 'ok') return null;
   const format = preview.reason?.match(/^unsupported format: (.*)$/)?.[1];
   if (format) {
     return `This dataset's download is in a format the preview can't read (${format.replace(/^zip contains no CSV \((.*)\)$/, 'a zip of $1 files')}). Use the download link to get the data.`;

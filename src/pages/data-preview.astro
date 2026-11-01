@@ -426,6 +426,13 @@ const pageData = {
       chip.textContent = fileType.label;
       chip.title = fileType.description;
       $('file-type-tags').replaceChildren(chip);
+      if (fileType.needsConversion) {
+        const note = document.createElement('span');
+        note.className = 'tag-chip tag-warning';
+        note.textContent = 'Needs conversion';
+        note.title = 'Convert the download to CSV before using it in a spreadsheet or notebook.';
+        $('file-type-tags').appendChild(note);
+      }
       $('download-btn').setAttribute('aria-label', `Download: ${fileType.description}`);
     }
 
@@ -1026,6 +1033,11 @@ const pageData = {
     .tag-outline {
       background: rgba(35, 53, 75, 0.07);
       color: var(--color-text-muted);
+    }
+
+    .tag-warning {
+      background: rgba(217, 119, 6, 0.14);
+      color: #8a4b08;
     }
 
     .actions-panel {
