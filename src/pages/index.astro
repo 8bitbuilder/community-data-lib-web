@@ -319,6 +319,19 @@ const sampleDatasets = FEATURED.flatMap(([id, theme, tone]) => {
     margin-bottom: var(--space-4);
   }
 
+  /* Big screens (taller and wider than a laptop): stretch the hero to roughly the window
+     height and center its content, adding space above and below so the first feature row
+     starts just below the fold (only a ~40px sliver of its band peeks up).
+     150px ≈ nav (64) + main top padding (32) + hero bottom margin (16) + the 40px peek. */
+  @media (min-width: 1280px) and (min-height: 900px) {
+    .hero {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: calc(100svh - 150px);
+    }
+  }
+
   .hero-copy {
     display: grid;
     justify-items: center;
