@@ -423,7 +423,8 @@ const pageData = {
       if (!fileType) return;
       const chip = document.createElement('span');
       chip.className = 'tag-chip tag-filled';
-      chip.textContent = fileType.label;
+      // Keep the comma inside the chip, as renderTags() does.
+      chip.textContent = fileType.needsConversion ? `${fileType.label},` : fileType.label;
       chip.title = fileType.description;
       $('file-type-tags').replaceChildren(chip);
       if (fileType.needsConversion) {
@@ -1035,9 +1036,10 @@ const pageData = {
       color: var(--color-text-muted);
     }
 
-    .tag-warning {
-      background: rgba(217, 119, 6, 0.14);
+    /* Chips are created by the page script, so they don't carry Astro's scope attribute. */
+    .tag-chips :global(.tag-warning) {
       color: #8a4b08;
+      font-weight: 600;
     }
 
     .actions-panel {
