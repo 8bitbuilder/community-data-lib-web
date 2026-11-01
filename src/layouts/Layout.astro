@@ -45,7 +45,13 @@ const librarianPortalHref = withBasePath('/librarian/');
     <!-- Nunito font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap" rel="stylesheet">   
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap" rel="stylesheet">
+
+    <!-- Micro 5 Charted: gridded pixel font for the homepage tagline -->
+    <link href="https://fonts.googleapis.com/css2?family=Micro+5+Charted&display=swap" rel="stylesheet">
+
+    <!-- Doto: dot-matrix font (round-dot ROND axis) for the nav "Community Data Libraries" name -->
+    <link href="https://fonts.googleapis.com/css2?family=Doto:ROND,wght@0..100,100..900&display=swap" rel="stylesheet">
 
     <title>{siteTitle}</title>
     <!-- is:inline keeps this a classic script; Astro would otherwise bundle it as a
@@ -221,12 +227,8 @@ const librarianPortalHref = withBasePath('/librarian/');
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    /* Plain white so it matches the white background of the homepage illustration. */
     background-color: var(--color-background);
-    /* Subtle warm vignette */
-    background-image:
-      radial-gradient(ellipse 80% 60% at 50% 0%, rgba(14, 114, 101, 0.05) 0%, transparent 70%),
-      radial-gradient(ellipse 60% 40% at 100% 20%, rgba(21, 94, 117, 0.04) 0%, transparent 60%),
-      radial-gradient(ellipse 50% 50% at 0% 80%, rgba(26, 107, 69, 0.03) 0%, transparent 60%);
   }
 
   main {
