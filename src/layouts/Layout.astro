@@ -3,6 +3,9 @@ import Navigation from '@components/Navigation.astro';
 import { Image } from 'astro:assets';
 import { withBasePath } from '@lib/paths';
 import cdlEmblem from '../assets/brand/cdl-emblem-transparent.png';
+// Lower-48 county (fainter) + state outlines from Census cb_2024 1:20m, Albers projection.
+// Strokes are baked into the SVG; loaded as a cached file rather than inlined on every page.
+import usCountiesUrl from '../assets/footer/us-counties.svg?url';
 import '../styles/tailwind.css';
 
 interface Props {
@@ -82,6 +85,7 @@ const librarianPortalHref = withBasePath('/librarian/');
       <slot />
     </main>
     <footer>
+      <img src={usCountiesUrl} alt="" class="footer-map" aria-hidden="true" loading="lazy" decoding="async" />
       <div class="footer-inner">
         <div class="footer-top">
           <div class="footer-brand">
@@ -365,19 +369,18 @@ const librarianPortalHref = withBasePath('/librarian/');
   }
 
   /* Decorative large CDL watermark */
-  footer::after {
-    content: 'CDL';
+  /* Very faint U.S. county and state outlines as a background texture.
+     Zoomed in so only inland counties show (no coastline); centered near East Tennessee.
+     The footer's overflow:hidden crops the rest. */
+  .footer-map {
     position: absolute;
-    right: -0.02em;
-    bottom: -0.15em;
-    font-family: var(--font-display);
-    font-size: 18rem;
-    font-weight: 900;
-    color: rgba(255,255,255,0.03);
-    line-height: 1;
+    left: 50%;
+    top: 50%;
+    translate: -64% -58%;
+    width: max(250%, 2600px);
+    max-width: none;
+    height: auto;
     pointer-events: none;
-    user-select: none;
-    letter-spacing: -0.05em;
   }
 
   .footer-inner {
@@ -393,8 +396,7 @@ const librarianPortalHref = withBasePath('/librarian/');
     align-items: flex-start;
     gap: var(--space-8);
     flex-wrap: wrap;
-    padding-bottom: var(--space-8);
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding-bottom: var(--space-6);
     margin-bottom: var(--space-6);
   }
 
