@@ -1,5 +1,7 @@
 ---
+import { Image } from 'astro:assets';
 import { withBasePath } from '@lib/paths';
+import cdlEmblem from '../assets/brand/cdl-emblem-transparent.png'; // teal background keyed out so the art sits on the ribbon
 
 const currentPath = Astro.url.pathname;
 
@@ -14,6 +16,14 @@ const createCommunityHref = withBasePath('/create-community-library');
 const navItems = [
   { href: homeHref, label: 'Home' },
   { href: catalogHref, label: 'Complete Catalog' },
+];
+
+// Small icon links on the right side of the nav.
+// TODO: replace the Buy Me a Coffee placeholder URL with the real page.
+const iconLinks = [
+  { href: 'https://github.com/community-data-libraries', label: 'Community Data Libraries on GitHub', icon: 'github' },
+  { href: '#buy-me-a-coffee', label: 'Buy us a coffee', icon: 'coffee' },
+  { href: 'https://opalslab.org', label: 'OPALS Lab website', icon: 'lab' },
 ];
 
 const navItemsAfter = [
@@ -42,9 +52,18 @@ function isDataResourcesActive(path: string): boolean {
 
     <!-- Brand -->
     <div class="nav-brand">
-      <a href={homeHref} class="brand-link">
-        <span class="brand-mark">CDL</span>
-        <span class="brand-name">Community<br/>Data Libraries</span>
+      <a href={homeHref} class="brand-link" aria-label="Community Data Libraries home">
+        <span class="brand-tab">
+          <Image
+            src={cdlEmblem}
+            alt=""
+            class="brand-mark"
+            widths={[58, 116, 174]}
+            sizes="58px"
+            loading="eager"
+          />
+        </span>
+        <span class="brand-name">Community<br />Data Libraries</span>
       </a>
     </div>
 
@@ -93,6 +112,30 @@ function isDataResourcesActive(path: string): boolean {
 
     <!-- CTA + hamburger -->
     <div class="nav-actions">
+      <ul class="nav-icons">
+        {iconLinks.map((link) => (
+          <li>
+            <a
+              href={link.href}
+              class="nav-icon"
+              aria-label={link.label}
+              title={link.label}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {link.icon === 'github' && (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/></svg>
+              )}
+              {link.icon === 'coffee' && (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="7" y1="2" x2="7" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="13" y1="2" x2="13" y2="4"/></svg>
+              )}
+              {link.icon === 'lab' && (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2v7.31"/><path d="M14 9.3V2"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/><path d="M5.52 16h12.96"/></svg>
+              )}
+            </a>
+          </li>
+        ))}
+      </ul>
       <a href={createCommunityHref} class="nav-cta">Create A Community Library</a>
       <button
         class="mobile-menu-button"
@@ -175,6 +218,7 @@ function isDataResourcesActive(path: string): boolean {
 <style>
   /* ── Navbar shell ─────────────────────────────── */
   .navbar {
+    font-family: var(--font-nav); /* links, dropdown, mobile menu and CTA; the logo name stays Doto */
     background: #23354B;
     border-bottom: 2px solid rgba(31, 51, 73, 0.4);
     box-shadow: var(--shadow-md);
@@ -193,7 +237,7 @@ function isDataResourcesActive(path: string): boolean {
     justify-content: space-between;
     align-items: center;
     gap: var(--space-4);
-    height: 64px;
+    height: 76px;
   }
 
   /* ── Brand ────────────────────────────────────── */
@@ -204,32 +248,121 @@ function isDataResourcesActive(path: string): boolean {
     align-items: center;
     gap: var(--space-3);
     text-decoration: none;
-    transition: opacity 0.15s ease;
   }
 
-  .brand-link:hover { opacity: 0.8; text-decoration: none; }
+  /* Fade only the name on hover; the ribbon stays fully opaque. */
+  .brand-link:hover { text-decoration: none; }
+  .brand-name { transition: opacity 0.15s ease; }
+  .brand-link:hover .brand-name { opacity: 0.8; }
+
+  /* "Bookmark" ribbon that hangs below the bar and holds the emblem.
+     The tab keeps the bar's 76px in the layout; the ribbon overhangs the page. */
+  .brand-tab {
+    position: relative;
+    align-self: flex-start;
+    width: 76px;
+    height: 76px;
+    flex-shrink: 0;
+    /* drop-shadow follows the clipped ribbon shape (box-shadow would be clipped away) */
+    filter: drop-shadow(0 4px 5px rgba(15, 25, 40, 0.3));
+  }
+
+  /* Ribbon bookmark: straight sides, V-notch (two prongs) at the bottom, below the emblem.
+     ::before is the thin mustard edge (full ribbon shape); ::after is the grosgrain face,
+     inset 1.5px on the sides and along the notch so the mustard shows as a border. */
+  .brand-tab::before,
+  .brand-tab::after {
+    content: '';
+    position: absolute;
+    /* Starts 24px above the bar so the bounce on drop never shows a gap at the top */
+    top: -24px;
+  }
+
+  .brand-tab::before {
+    left: 0;
+    right: 0;
+    height: 170px;
+    background: var(--color-secondary);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 18px), 0 100%);
+  }
+
+  /* Inset geometry keeps the notch slope (18/38), so the border is an even 1.5px all round. */
+  .brand-tab::after {
+    left: 1.5px;
+    right: 1.5px;
+    height: 167.6px;
+    /* Grosgrain: horizontal ribs (highlight, body, groove in shades of the brand teal #0E7265). */
+    /* Navy version: swap this in for the teal background below.
+    background: repeating-linear-gradient(
+        to bottom,
+        #3D5A80 0 1px,
+        #31496A 1px 2.5px,
+        #22374F 2.5px 3.5px
+      );
+    */
+    background: repeating-linear-gradient(
+        to bottom,
+        #1C8A7B 0 1px,
+        #0E7265 1px 2.5px,
+        #08544A 2.5px 3.5px
+      );
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 17.3px), 0 100%);
+  }
+
+  /* Retracted at rest: the ribbon is pulled up so its prongs end at the bar's bottom edge
+     and the emblem sits inside the bar. On hover/focus it drops down (emblem moves less,
+     so it lands on the lower part of the ribbon). */
+  .brand-tab::before,
+  .brand-tab::after,
+  .brand-mark {
+    transition: translate 0.6s cubic-bezier(0.34, 1.25, 0.64, 1);
+  }
+
+  .brand-tab::before,
+  .brand-tab::after {
+    translate: 0 -70px;
+  }
 
   .brand-mark {
-    font-family: var(--font-display);
-    font-weight: 900;
-    font-size: 1.1rem;
-    letter-spacing: -0.04em;
-    color: #F8FAFC;
-    background: var(--color-primary);
-    padding: 0.2em 0.45em 0.18em;
-    border-radius: var(--radius-sm);
-    line-height: 1;
-    flex-shrink: 0;
+    translate: 0 -50px;
   }
 
+  .brand-link:hover .brand-tab::before,
+  .brand-link:hover .brand-tab::after,
+  .brand-link:hover .brand-mark,
+  .brand-link:focus-visible .brand-tab::before,
+  .brand-link:focus-visible .brand-tab::after,
+  .brand-link:focus-visible .brand-mark {
+    translate: 0 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .brand-tab::before,
+    .brand-tab::after,
+    .brand-mark {
+      transition: none;
+    }
+  }
+
+  /* Emblem art (transparent background) sitting on the lower part of the ribbon. */
+  .brand-mark {
+    position: absolute;
+    z-index: 1; /* above the ribbon face (::after) */
+    top: 69px;
+    left: 9px;
+    display: block;
+    width: 58px;
+    height: auto;
+  }
+
+  /* Site name in Doto (round dots), white on the teal badge. */
   .brand-name {
-    font-family: var(--font-display);
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-family: 'Doto', var(--font-mono);
+    font-variation-settings: 'ROND' 100;
+    font-size: 0.875rem;
+    font-weight: 800;
     color: #ffffff;
-    letter-spacing: 0.02em;
-    line-height: 1.3;
-    text-transform: uppercase;
+    line-height: 1.05;
   }
 
   /* ── Desktop nav links ────────────────────────── */
@@ -255,29 +388,34 @@ function isDataResourcesActive(path: string): boolean {
     position: relative;
   }
 
-  .nav-summary {
+  /* .nav-link.nav-summary so this beats the .nav-link padding defined further down */
+  .nav-link.nav-summary {
     list-style: none;
     cursor: pointer;
-    padding-right: calc(var(--space-3) + 1rem);
+    padding-right: calc(var(--space-3) + 0.9rem);
   }
 
   .nav-summary::-webkit-details-marker {
     display: none;
   }
 
+  /* Small chevron drawn with two borders; flips up when the menu is open */
   .nav-summary::after {
-    content: '▾';
+    content: '';
     position: absolute;
-    right: var(--space-3);
+    right: calc(var(--space-3) + 1px);
     top: 50%;
-    transform: translateY(-50%);
-    font-size: 0.7em;
-    color: currentColor;
-    opacity: 0.8;
+    width: 6px;
+    height: 6px;
+    border-right: 1.75px solid currentColor;
+    border-bottom: 1.75px solid currentColor;
+    transform: translateY(-70%) rotate(45deg);
+    opacity: 0.85;
+    transition: transform 0.15s ease;
   }
 
   .nav-dropdown-details[open] .nav-summary::after {
-    content: '▴';
+    transform: translateY(-20%) rotate(-135deg);
   }
 
   .nav-dropdown-panel {
@@ -322,8 +460,8 @@ function isDataResourcesActive(path: string): boolean {
     display: inline-flex;
     align-items: center;
     padding: var(--space-2) var(--space-3);
-    font-family: var(--font-sans);
-    font-size: var(--font-size-sm);
+    font-family: var(--font-nav);
+    font-size: 0.95rem;
     font-weight: 500;
     color: #ffffff;
     border-radius: var(--radius-md);
@@ -333,16 +471,26 @@ function isDataResourcesActive(path: string): boolean {
     position: relative;
   }
 
+  /* No tinted pill: the current page gets an underline; hover shows a fainter one */
   .nav-link:hover {
-    background: var(--color-primary-glow);
     color: #ffffff;
     text-decoration: none;
+  }
+
+  .nav-link:not(.nav-summary):hover::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: var(--space-3);
+    right: var(--space-3);
+    height: 2px;
+    background: rgba(124, 211, 196, 0.45);
+    border-radius: 1px;
   }
 
   .nav-link.active {
     color: #ffffff;
     font-weight: 600;
-    background: var(--color-primary-glow);
   }
 
   .nav-link.active:not(.nav-summary)::after {
@@ -352,7 +500,7 @@ function isDataResourcesActive(path: string): boolean {
     left: var(--space-3);
     right: var(--space-3);
     height: 2px;
-    background: var(--color-primary);
+    background: #7cd3c4; /* light teal, same as the nav icons */
     border-radius: 1px;
   }
 
@@ -364,27 +512,74 @@ function isDataResourcesActive(path: string): boolean {
     flex-shrink: 0;
   }
 
-  .nav-cta {
+  /* GitHub / coffee / lab icon links, in the light blue of the emblem's network nodes. */
+  .nav-icons {
     display: none;
-    padding: var(--space-2) var(--space-4);
-    background: var(--color-secondary);
-    color: #F8FAFC;
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    text-decoration: none;
-    transition: all 0.18s ease;
-    white-space: nowrap;
-    border: 1.5px solid var(--color-secondary);
+    align-items: center;
+    gap: var(--space-1);
+    list-style: none;
+    margin: 0;
+    padding: 0;
   }
 
-  .nav-cta:hover {
-    background: #0F4A5E;
-    border-color: #0F4A5E;
-    box-shadow: var(--shadow-glow-secondary);
-    transform: translateY(-1px);
+  /* The bar is already full on mid-size screens, so the icons only appear where there's room. */
+  @media (min-width: 1360px) {
+    .nav-icons { display: flex; }
+    .nav-container { max-width: 1320px; }
+  }
+
+  .nav-icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    color: #7CD3C4; /* light teal */
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .nav-icon:hover,
+  .nav-icon:focus-visible {
+    background: rgba(124, 211, 196, 0.14);
+    color: #ffffff;
     text-decoration: none;
-    color: #F8FAFC;
+  }
+
+  /* Matches the homepage buttons: near-square corners, soft offset shadow, press-down hover.
+     The shadow is darker than on the page because it sits on the navy bar. */
+  .nav-cta {
+    display: none;
+    padding: 10px var(--space-5);
+    /* faint top-to-bottom gradient: a touch lighter mustard at the top */
+    background: linear-gradient(180deg, #e4b232 0%, var(--color-secondary) 100%) border-box;
+    color: #23354B; /* nav navy: 5.25:1 on the mustard (white was 2.27:1) */
+    border: 2px solid transparent;
+    border-radius: 3px;
+    box-shadow: 3px 4px 8px rgba(5, 12, 22, 0.55);
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    white-space: nowrap;
+    transition:
+      transform 0.12s ease,
+      box-shadow 0.12s ease,
+      background-color 0.18s ease;
+  }
+  .nav-cta:hover {
+    background: linear-gradient(180deg, #edbf45 0%, #e2ae22 100%) border-box; /* a touch brighter */
+    color: #23354B;
+    text-decoration: none;
+    transform: translate(1px, 2px);
+    box-shadow: 2px 2px 4px rgba(5, 12, 22, 0.55);
+  }
+  .nav-cta:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 3px;
+  }
+  .nav-cta:active {
+    transform: translate(2px, 3px);
+    box-shadow: 0 0 1px rgba(5, 12, 22, 0.55);
   }
 
   @media (min-width: 640px) {

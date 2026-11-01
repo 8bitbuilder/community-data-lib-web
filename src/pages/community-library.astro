@@ -422,7 +422,7 @@ const categoryIcons: Record<string, string> = {
     }
 
     .stat-n {
-      font-family: var(--font-mono);
+      font-family: var(--font-sans); font-variant-numeric: tabular-nums;
       font-size: var(--font-size-2xl);
       font-weight: 500;
       color: var(--color-secondary);
@@ -633,7 +633,7 @@ const categoryIcons: Record<string, string> = {
     }
 
     .type-panel li strong {
-      font-family: var(--font-mono);
+      font-family: var(--font-sans); font-variant-numeric: tabular-nums;
       font-size: var(--font-size-xs);
       color: var(--color-secondary);
     }
@@ -669,27 +669,29 @@ const categoryIcons: Record<string, string> = {
     /* ── Chips ──────────────────────── */
     .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
+    /* Borderless tinted pills in Barlow Semi Condensed (site-wide tag style) */
     .chip {
       display: inline-flex;
       align-items: center;
-      padding: 2px var(--space-2);
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--color-border);
-      font-size: var(--font-size-xs);
-      font-weight: 500;
+      padding: 2px 10px;
+      border: 0;
+      border-radius: 999px;
+      font-family: var(--font-tag);
+      font-size: 0.875rem;
+      font-weight: 400;
+      line-height: 1.35;
       color: var(--color-text-muted);
-      background: var(--color-surface-raised);
+      background: rgba(35, 53, 75, 0.07);
     }
 
     .chip-theme {
-      border-color: rgba(99, 102, 241, 0.3);
-      color: var(--color-secondary);
-      background: rgba(99, 102, 241, 0.07);
+      color: #1f5b6e;
+      background: rgba(62, 168, 188, 0.15);
     }
 
-    .chip-green { border-color: rgba(16, 185, 129, 0.3); color: var(--color-primary); background: rgba(16, 185, 129, 0.07); }
-    .chip-yellow { border-color: rgba(245, 158, 11, 0.3); color: var(--color-accent); background: rgba(245, 158, 11, 0.07); }
-    .chip-red { border-color: rgba(239, 68, 68, 0.3); color: #f87171; background: rgba(239, 68, 68, 0.07); }
+    .chip-green { color: var(--color-primary); background: var(--color-primary-glow); }
+    .chip-yellow { color: #8a6a0c; background: rgba(212, 160, 23, 0.16); }
+    .chip-red { color: #b42318; background: rgba(239, 68, 68, 0.1); }
 
     /* ── Section labels ─────────────── */
     .section-label {
@@ -778,7 +780,7 @@ const categoryIcons: Record<string, string> = {
       gap: var(--space-1);
       font-size: var(--font-size-xs);
       color: var(--color-text-dim);
-      font-family: var(--font-mono);
+      font-family: var(--font-sans); font-variant-numeric: tabular-nums;
     }
 
     /* ── Result cards ───────────────── */
@@ -839,7 +841,7 @@ const categoryIcons: Record<string, string> = {
     .side-value {
       font-size: var(--font-size-xs);
       color: var(--color-text-muted);
-      font-family: var(--font-mono);
+      font-family: var(--font-sans); font-variant-numeric: tabular-nums;
     }
 
     .visit-btn {
