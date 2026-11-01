@@ -236,7 +236,7 @@ function isDataResourcesActive(path: string): boolean {
     justify-content: space-between;
     align-items: center;
     gap: var(--space-4);
-    height: 64px;
+    height: 76px;
   }
 
   /* ── Brand ────────────────────────────────────── */
@@ -255,12 +255,12 @@ function isDataResourcesActive(path: string): boolean {
   .brand-link:hover .brand-name { opacity: 0.8; }
 
   /* "Bookmark" ribbon that hangs below the bar and holds the emblem.
-     The tab keeps the bar's 64px in the layout; the ribbon overhangs the page. */
+     The tab keeps the bar's 76px in the layout; the ribbon overhangs the page. */
   .brand-tab {
     position: relative;
     align-self: flex-start;
     width: 76px;
-    height: 64px;
+    height: 76px;
     flex-shrink: 0;
     /* drop-shadow follows the clipped ribbon shape (box-shadow would be clipped away) */
     filter: drop-shadow(0 4px 5px rgba(15, 25, 40, 0.3));
@@ -280,7 +280,7 @@ function isDataResourcesActive(path: string): boolean {
   .brand-tab::before {
     left: 0;
     right: 0;
-    height: 158px;
+    height: 170px;
     background: var(--color-secondary);
     clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 18px), 0 100%);
   }
@@ -289,7 +289,7 @@ function isDataResourcesActive(path: string): boolean {
   .brand-tab::after {
     left: 1.5px;
     right: 1.5px;
-    height: 155.6px;
+    height: 167.6px;
     /* Grosgrain: horizontal ribs (highlight, body, groove in shades of the brand teal #0E7265). */
     /* Navy version: swap this in for the teal background below.
     background: repeating-linear-gradient(
@@ -323,7 +323,7 @@ function isDataResourcesActive(path: string): boolean {
   }
 
   .brand-mark {
-    translate: 0 -51px;
+    translate: 0 -50px;
   }
 
   .brand-link:hover .brand-tab::before,
@@ -347,7 +347,7 @@ function isDataResourcesActive(path: string): boolean {
   .brand-mark {
     position: absolute;
     z-index: 1; /* above the ribbon face (::after) */
-    top: 57px;
+    top: 69px;
     left: 9px;
     display: block;
     width: 58px;
@@ -529,27 +529,43 @@ function isDataResourcesActive(path: string): boolean {
     text-decoration: none;
   }
 
+  /* Matches the homepage buttons: near-square corners, soft offset shadow, press-down hover.
+     The shadow is darker than on the page because it sits on the navy bar. */
   .nav-cta {
     display: none;
-    padding: var(--space-2) var(--space-4);
+    padding: 12px var(--space-5);
     background: var(--color-secondary);
     color: #23354B; /* nav navy: 5.25:1 on the mustard (white was 2.27:1) */
-    border-radius: var(--radius-md);
+    border: 2px solid transparent;
+    border-radius: 3px;
+    box-shadow: 3px 4px 8px rgba(5, 12, 22, 0.55);
+    /* faint dashed pale-yellow stitching just inside the edge, like the page buttons */
+    outline: 1.5px dashed rgba(255, 240, 200, 0.75);
+    outline-offset: -6px;
     font-size: var(--font-size-sm);
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: 0.01em;
     text-decoration: none;
-    transition: all 0.18s ease;
     white-space: nowrap;
-    border: 1.5px solid var(--color-secondary);
+    transition:
+      transform 0.12s ease,
+      box-shadow 0.12s ease,
+      background-color 0.18s ease;
   }
-
   .nav-cta:hover {
-    background: #0F4A5E;
-    border-color: #0F4A5E;
-    box-shadow: var(--shadow-glow-secondary);
-    transform: translateY(-1px);
+    background: #E2AE22; /* a touch brighter mustard */
+    color: #23354B;
     text-decoration: none;
-    color: #F8FAFC;
+    transform: translate(1px, 2px);
+    box-shadow: 2px 2px 4px rgba(5, 12, 22, 0.55);
+  }
+  .nav-cta:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 3px;
+  }
+  .nav-cta:active {
+    transform: translate(2px, 3px);
+    box-shadow: 0 0 1px rgba(5, 12, 22, 0.55);
   }
 
   @media (min-width: 640px) {

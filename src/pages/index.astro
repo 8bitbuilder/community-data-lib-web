@@ -1,25 +1,14 @@
 ---
 import Layout from '@layouts/Layout.astro';
 import { Picture } from 'astro:assets';
-import { getCollection } from 'astro:content';
 import { withBasePath } from '@lib/paths';
 import heroCityscape from '../assets/home/hero-cityscape.png';
 
-const catalogResources = await getCollection('master-library');
-const datasets = catalogResources.filter((entry) => entry.data.category === 'dataset');
-
-// Four real catalog entries for the Complete Catalog mock-up: short names, four different topics.
-// [sourceId, topic tag to show, chip color]
-const FEATURED: [string, string, string][] = [
-  ['census-county-estimates-all-2025', 'Population Data', 'teal'],
-  ['chr-analytic-data-2025', 'Health & Social Services', 'gold'],
-  ['ebird-observation-dataset', 'Wildlife & Nature', 'green'],
-  ['epa-airtoxscreen-county', 'Energy & Environment', 'blue'],
-];
-const sampleDatasets = FEATURED.flatMap(([id, theme, tone]) => {
-  const entry = datasets.find((d) => d.data.sourceId === id);
-  return entry ? [{ title: entry.data.title, author: entry.data.author, theme, tone }] : [];
-});
+// Pointillist feature illustrations, drawn in the hero cityscape's palette
+// (generated with a Python script; the Knox map uses Census TIGER/Line 2025 county outlines).
+import artCatalog from '../assets/home/art-catalog.svg?url';
+import artCommunity from '../assets/home/art-community.svg?url';
+import artDotplot from '../assets/home/art-dotplot.svg?url';
 ---
 
 <Layout
@@ -78,68 +67,24 @@ const sampleDatasets = FEATURED.flatMap(([id, theme, tone]) => {
         <p class="feature-eyebrow">Complete Catalog</p>
         <h2 class="feature-title">View all available datasets.</h2>
         <p>
-          The Complete Catalog is the master list of all datasets we have curated so far (and that
-          are used to populate the local community data libraries). Are we missing a great one?
-          <a href={withBasePath('/submit')}>Suggest it to us</a>.
+          The Complete Catalog is the list of all datasets we have in our master library so far (and
+          that are used to populate the local community data libraries). Are we missing a great one?
+          <a href={withBasePath('/submit')}>Suggest it</a>.
         </p>
         <a class="feature-link" href={withBasePath('/complete-catalog')}
           >Browse the complete catalog</a
         >
       </div>
-      <div class="feature-visual" aria-hidden="true">
-        <div class="mock-card catalog-card">
-          <div class="lib-head">
-            <span class="lib-pin">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path
-                  d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"></path><path
-                  d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"></path></svg
-              >
-            </span>
-            <div>
-              <strong>Complete Catalog</strong>
-              <span>Curated open datasets</span>
-            </div>
-          </div>
-          <div class="cat-search">
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.4"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              ><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg
-            >
-            Search the catalog…
-          </div>
-          <ul class="lib-list">
-            {
-              sampleDatasets.map((d) => (
-                <li>
-                  <span class="lib-title">{d.title}</span>
-                  <span class="lib-meta">
-                    {d.author}
-                    <span class={`chip chip-${d.tone}`}>{d.theme}</span>
-                  </span>
-                </li>
-              ))
-            }
-          </ul>
-          <div class="mock-foot">
-            <span class="mock-more">and many more…</span>
-          </div>
-        </div>
+      <div class="feature-visual">
+        <img
+          class="dot-art"
+          src={artCatalog}
+          alt="A tall bookshelf full of books, drawn in dots"
+          width="480"
+          height="370"
+          loading="lazy"
+          decoding="async"
+        />
       </div>
     </article>
 
@@ -157,58 +102,16 @@ const sampleDatasets = FEATURED.flatMap(([id, theme, tone]) => {
           >See an example library (Knoxville, TN)</a
         >
       </div>
-      <div class="feature-visual" aria-hidden="true">
-        <div class="mock-card map-card">
-          <!-- Knox County, TN and its 8 bordering counties, from Census TIGER/Line 2025 (simplified). -->
-          <svg viewBox="0 0 320 220" class="map-svg">
-            <g class="county">
-              <path
-                d="M129.0 99.9 L128.2 103.6 L124.9 104.4 L124.0 107.2 L125.0 110.2 L123.9 110.5 L120.8 108.5 L119.9 108.7 L119.8 109.8 L121.0 110.6 L121.2 113.9 L119.8 113.8 L117.5 111.4 L115.2 111.3 L115.0 112.5 L117.8 114.2 L118.5 116.3 L115.2 118.1 L106.9 100.7 L103.1 88.6 L96.7 78.6 L93.7 76.5 L89.5 75.8 L87.9 70.8 L85.8 70.1 L85.7 69.1 L84.6 69.2 L84.5 66.7 L86.0 65.8 L86.0 64.1 L90.4 63.1 L92.7 61.4 L92.5 59.3 L94.6 57.1 L94.5 55.7 L97.8 52.7 L99.0 53.6 L102.3 53.1 L105.0 54.6 L110.3 51.9 L115.0 56.2 L116.4 58.8 L117.5 58.5 L120.4 61.1 L122.6 59.3 L121.7 54.5 L123.1 52.6 L122.4 51.0 L122.8 46.7 L137.9 49.1 L143.0 49.1 L144.1 49.5 L144.4 51.1 L146.1 51.5 L146.3 50.1 L149.5 50.3 L150.1 49.1 L149.1 45.8 L149.7 45.2 L151.2 46.3 L152.1 45.8 L152.3 43.0 L154.9 40.2 L154.9 38.6 L156.4 36.6 L155.6 35.0 L156.7 34.7 L158.2 40.7 L161.3 41.3 L160.4 41.3 L167.4 54.1 L172.1 59.2 L168.4 61.6 L167.3 63.2 L166.2 63.1 L166.3 64.2 L162.1 68.2 L162.2 69.1 L159.4 70.1 L159.4 71.4 L157.1 72.8 L156.8 74.3 L154.5 75.2 L154.1 76.8 L150.3 80.5 L146.0 83.3 L145.9 84.3 L152.0 91.2 L148.9 94.7 L144.2 96.4 L142.4 99.0 L141.4 98.8 L136.5 101.8 Z"
-                ><title>Anderson County</title></path
-              >
-              <path
-                d="M199.3 129.5 L201.9 131.5 L201.4 131.9 L205.2 139.7 L207.2 139.2 L205.7 141.9 L208.4 149.0 L209.4 149.5 L208.7 151.4 L210.6 152.8 L211.0 156.7 L213.6 158.8 L212.9 160.6 L214.6 161.3 L216.9 160.8 L217.4 165.3 L218.3 166.0 L220.3 164.9 L220.2 190.8 L214.5 190.6 L209.9 192.3 L207.6 191.6 L205.8 192.7 L204.4 191.8 L201.5 192.5 L200.0 194.8 L196.1 196.7 L193.1 200.1 L188.1 201.6 L186.7 201.0 L182.8 201.5 L179.1 206.3 L177.3 210.7 L173.0 211.7 L170.2 214.0 L168.3 213.0 L168.1 211.7 L171.8 209.7 L172.5 207.9 L169.2 207.7 L166.5 205.3 L164.6 208.4 L163.6 205.9 L160.2 202.9 L160.9 201.0 L163.2 199.7 L162.8 194.3 L161.1 193.9 L159.9 195.6 L155.1 196.6 L150.3 195.7 L147.3 196.8 L145.7 194.2 L146.9 192.8 L145.5 191.1 L145.5 189.5 L143.7 189.9 L142.8 189.2 L142.7 186.9 L139.5 189.3 L137.9 187.8 L136.4 187.7 L136.4 186.1 L130.7 184.5 L129.6 182.0 L135.9 178.4 L137.1 175.4 L138.9 174.2 L138.4 171.8 L139.1 171.3 L135.5 168.5 L134.1 165.6 L134.4 163.9 L132.3 160.2 L133.1 154.1 L135.9 150.7 L131.1 148.3 L132.5 145.0 L132.2 141.0 L133.4 140.5 L134.5 142.6 L135.8 142.9 L138.0 141.6 L137.5 136.9 L138.9 134.3 L136.7 132.0 L136.9 131.0 L139.5 130.8 L140.9 132.3 L140.2 134.0 L140.9 135.0 L144.3 132.2 L148.0 130.7 L150.0 132.2 L150.4 134.9 L152.0 135.8 L153.4 134.6 L153.0 131.7 L153.9 130.5 L156.2 130.2 L157.9 132.9 L159.7 132.9 L160.9 131.2 L160.7 129.1 L157.2 125.4 L160.8 125.5 L162.7 123.7 L166.5 128.0 L168.9 125.9 L171.3 125.3 L172.6 127.2 L173.4 126.9 L178.2 130.0 L178.0 131.7 L180.0 131.3 L187.4 132.8 L194.6 124.9 L197.6 123.0 L199.3 124.7 L200.1 129.0 Z"
-                ><title>Blount County</title></path
-              >
-              <path
-                d="M268.8 42.3 L263.1 47.1 L261.9 49.5 L262.8 52.2 L261.4 53.6 L259.3 54.0 L258.4 51.4 L257.2 52.3 L257.5 57.9 L253.8 59.0 L254.2 61.1 L253.1 62.3 L249.6 63.5 L245.2 60.9 L243.4 64.3 L242.3 63.1 L242.0 60.4 L238.4 60.7 L237.1 58.1 L237.2 63.5 L234.2 63.2 L233.9 66.1 L232.8 65.5 L232.8 63.5 L231.5 63.9 L231.0 69.2 L228.9 69.1 L229.8 71.1 L228.1 68.5 L226.2 69.4 L224.6 68.2 L224.4 71.5 L226.3 72.7 L225.7 77.6 L223.6 78.3 L222.0 77.3 L222.8 74.9 L222.2 72.2 L220.8 72.0 L220.7 73.1 L219.6 73.0 L219.6 71.9 L218.4 72.2 L218.1 74.0 L220.8 79.8 L220.0 81.6 L218.0 78.0 L216.1 77.1 L216.0 75.0 L213.9 75.6 L215.3 72.9 L213.2 73.2 L212.7 71.6 L209.8 69.6 L209.9 66.6 L208.2 63.9 L211.3 61.9 L208.7 59.2 L211.2 58.0 L210.6 56.6 L213.8 54.8 L215.0 48.3 L214.6 44.7 L213.1 45.6 L213.4 40.7 L215.7 39.4 L216.9 36.7 L216.8 35.6 L215.7 35.8 L218.1 29.4 L216.9 28.2 L218.2 27.0 L218.9 27.4 L218.4 26.7 L219.5 25.5 L220.6 28.1 L221.7 27.9 L222.3 26.6 L225.0 27.0 L231.6 22.8 L232.3 20.4 L236.0 21.4 L237.2 19.5 L238.6 21.8 L239.6 20.4 L242.4 23.8 L242.8 21.0 L245.1 22.9 L245.4 21.8 L244.2 21.1 L245.7 21.0 L246.7 19.4 L248.3 21.7 L249.2 21.6 L248.9 18.1 L251.8 18.0 L254.2 20.2 L257.1 19.1 L255.2 15.5 L255.8 15.1 L256.2 16.7 L257.1 15.6 L255.4 13.4 L255.9 13.0 L257.3 14.3 L258.5 13.2 L258.6 11.0 L260.7 11.9 L260.6 9.8 L262.7 11.2 L262.8 9.4 L264.9 9.7 L267.9 10.9 L267.4 11.9 L273.9 9.4 L275.8 11.9 L278.1 11.6 L280.2 13.9 L281.4 13.7 L282.1 16.1 L286.3 14.9 L287.4 16.9 L284.8 18.2 L285.8 19.7 L287.5 20.0 L288.9 24.1 L288.8 29.0 L287.4 30.9 L290.6 37.3 L288.5 38.1 L288.5 40.5 L286.6 40.1 L286.0 43.1 L284.3 42.7 L283.8 39.6 L282.1 41.7 L281.3 41.5 L279.6 38.9 L279.6 36.8 L278.2 35.7 L276.9 38.6 L275.5 39.4 L272.8 38.8 L271.8 40.1 L272.1 41.9 Z"
-                ><title>Grainger County</title></path
-              >
-              <path
-                d="M286.9 97.3 L285.7 105.8 L284.5 106.2 L285.6 106.5 L283.9 118.1 L282.4 120.8 L281.9 120.2 L281.0 121.2 L278.9 118.7 L273.7 116.1 L267.6 117.3 L267.5 114.3 L266.5 113.2 L264.8 114.2 L262.8 113.2 L259.4 115.2 L258.0 114.1 L257.4 115.4 L256.9 113.9 L255.2 115.4 L254.8 113.9 L254.2 115.2 L252.7 115.4 L252.3 113.8 L250.2 114.4 L250.4 112.8 L247.0 112.0 L244.6 106.9 L229.8 95.6 L228.7 96.1 L221.5 89.8 L221.4 91.6 L218.3 90.7 L218.8 87.6 L214.8 86.5 L215.2 85.6 L212.1 79.3 L214.7 78.5 L218.2 81.5 L220.4 81.4 L220.7 79.5 L218.0 73.8 L218.3 72.3 L219.5 71.9 L220.2 73.1 L220.8 72.0 L222.2 72.3 L222.8 74.9 L221.7 76.2 L222.2 77.6 L223.6 78.3 L225.7 77.6 L226.3 72.7 L224.4 71.5 L224.6 68.2 L226.2 69.4 L228.1 68.5 L229.8 71.1 L228.9 69.1 L231.0 69.2 L231.5 63.9 L232.8 63.5 L232.8 65.5 L233.9 66.1 L234.2 63.2 L237.2 63.5 L237.1 58.1 L238.4 60.7 L242.0 60.4 L242.3 63.1 L243.4 64.3 L245.2 60.9 L249.6 63.5 L254.0 61.7 L255.5 65.8 L266.7 65.9 L268.0 68.6 L268.3 67.6 L269.3 67.6 L267.6 66.2 L270.3 66.2 L284.0 69.5 L289.9 73.2 L294.1 80.8 L292.5 80.0 L290.9 81.3 L293.3 87.2 L292.5 88.8 L290.3 89.5 L289.5 91.7 L289.7 99.3 L288.2 99.2 Z"
-                ><title>Jefferson County</title></path
-              >
-              <path
-                d="M100.8 175.5 L101.8 174.8 L102.9 176.5 L101.7 177.2 Z M68.8 180.1 L71.9 180.3 L71.9 182.6 L71.4 181.7 L68.8 181.8 Z M67.4 168.6 L68.2 167.9 L68.9 167.9 L68.9 169.2 Z M131.1 148.3 L135.9 150.7 L133.1 154.1 L132.3 160.2 L134.4 163.9 L134.1 165.6 L135.5 168.5 L139.1 171.3 L138.4 171.8 L138.9 174.2 L137.1 175.4 L135.9 178.4 L130.1 181.9 L128.8 180.4 L123.9 181.0 L122.5 179.5 L118.5 180.5 L118.3 178.7 L119.4 177.1 L118.8 176.4 L117.8 177.5 L113.5 176.7 L113.4 175.4 L110.7 175.1 L111.9 172.5 L107.3 171.5 L107.3 168.9 L105.8 168.9 L105.7 170.4 L100.4 170.4 L101.1 172.7 L99.6 172.6 L99.6 174.2 L95.6 175.8 L93.4 175.7 L93.4 173.4 L91.9 173.3 L92.7 172.6 L91.9 170.3 L90.6 170.4 L90.9 169.8 L90.3 171.0 L88.8 171.2 L88.8 168.9 L86.6 169.1 L86.9 170.2 L83.2 170.2 L83.0 171.7 L78.0 172.4 L76.6 172.4 L75.1 170.2 L75.0 173.4 L72.0 173.3 L71.9 174.9 L74.2 175.3 L73.4 176.4 L74.3 176.4 L74.3 178.0 L75.8 178.0 L75.0 180.1 L71.3 179.1 L67.6 175.4 L67.3 176.4 L65.8 176.4 L65.8 177.9 L61.3 177.2 L61.2 173.3 L62.8 173.2 L62.8 171.7 L66.6 171.7 L67.4 170.2 L70.5 169.2 L70.5 167.9 L72.0 167.9 L72.0 166.4 L70.3 166.3 L70.3 165.6 L72.0 164.0 L72.9 160.4 L74.0 159.4 L76.8 159.4 L84.7 150.3 L87.3 152.6 L88.6 151.6 L89.1 148.0 L90.2 146.6 L92.3 146.6 L95.0 148.4 L96.4 146.3 L95.0 145.3 L97.0 143.6 L96.2 142.3 L96.6 137.9 L98.0 136.1 L102.9 134.8 L103.7 133.4 L104.5 125.2 L103.7 125.1 L104.6 124.7 L105.1 121.8 L106.4 123.1 L110.7 123.5 L113.1 125.6 L114.0 124.6 L113.0 120.1 L113.9 119.7 L116.1 121.5 L117.0 121.2 L133.5 140.2 L132.2 141.0 L132.5 145.0 Z"
-                ><title>Loudon County</title></path
-              >
-              <path
-                d="M84.9 150.3 L76.8 159.4 L74.0 159.4 L72.9 160.4 L72.0 164.0 L70.3 165.6 L70.3 166.3 L72.0 166.4 L72.0 167.9 L70.5 167.9 L70.5 169.2 L67.4 170.2 L66.6 171.7 L62.8 171.7 L62.8 173.2 L61.2 173.3 L61.2 174.8 L55.1 174.7 L55.1 171.7 L53.7 171.0 L53.7 165.0 L55.2 164.0 L54.5 163.0 L55.3 161.3 L52.3 157.8 L50.8 157.7 L50.7 159.3 L49.2 159.2 L49.2 160.8 L47.6 160.8 L47.6 162.3 L46.1 162.3 L45.3 159.2 L41.5 159.1 L41.6 154.0 L38.9 154.0 L37.2 151.7 L35.6 152.6 L31.5 150.8 L32.2 147.5 L34.7 146.4 L34.1 143.7 L30.1 141.8 L28.9 139.9 L25.9 138.3 L27.0 137.7 L26.7 136.5 L30.3 134.4 L30.1 133.4 L31.9 132.6 L32.7 131.1 L34.6 130.7 L36.3 129.1 L40.2 121.1 L43.9 119.6 L46.0 116.7 L47.9 116.9 L49.7 114.2 L53.6 113.8 L53.9 112.9 L55.1 113.4 L55.8 111.6 L57.5 110.8 L57.9 108.8 L59.2 110.3 L59.7 109.5 L60.6 110.2 L61.8 109.3 L66.3 109.5 L66.5 106.5 L68.6 105.3 L76.8 102.3 L85.1 101.9 L95.2 94.5 L99.6 89.8 L102.9 88.4 L106.9 100.7 L116.6 121.1 L115.7 121.4 L113.9 119.7 L113.0 120.1 L114.0 124.6 L113.1 125.6 L110.7 123.5 L106.4 123.1 L105.1 121.8 L104.6 124.7 L103.7 125.1 L104.5 125.2 L103.7 133.4 L102.9 134.8 L98.0 136.1 L96.6 137.9 L96.2 142.3 L97.0 143.6 L95.0 145.3 L96.4 146.3 L95.0 148.4 L92.3 146.6 L90.2 146.6 L89.1 148.0 L88.6 151.6 L87.3 152.6 Z"
-                ><title>Roane County</title></path
-              >
-              <path
-                d="M279.6 119.4 L281.0 121.2 L280.0 122.4 L281.6 123.1 L281.4 126.3 L284.6 126.9 L283.9 130.0 L285.0 130.2 L285.6 133.4 L288.0 134.6 L287.8 136.0 L289.5 136.2 L289.1 137.6 L287.5 138.5 L286.5 136.7 L286.6 140.2 L285.0 142.6 L285.3 145.8 L287.1 146.2 L286.2 152.3 L286.9 160.0 L290.6 159.7 L291.2 161.0 L290.2 161.8 L290.8 163.9 L289.9 164.9 L284.5 168.6 L283.2 172.0 L280.8 172.6 L279.1 170.8 L275.8 170.5 L273.8 171.7 L271.2 176.2 L267.6 177.1 L266.3 179.4 L261.8 181.9 L257.7 181.8 L255.8 184.9 L252.0 187.8 L250.9 191.0 L248.6 192.2 L237.1 191.5 L233.8 192.2 L231.8 189.6 L229.7 188.5 L226.1 191.0 L225.3 190.5 L223.3 191.5 L220.2 190.8 L220.3 164.9 L218.3 166.0 L217.4 165.3 L216.9 160.8 L214.6 161.3 L212.9 160.6 L213.6 158.8 L211.0 156.7 L210.6 152.8 L208.7 151.4 L209.4 149.5 L208.4 149.0 L205.7 141.9 L207.2 139.2 L205.2 139.7 L204.0 137.9 L201.4 131.9 L201.9 131.5 L199.3 129.5 L200.1 129.0 L199.3 124.7 L197.6 123.0 L202.8 117.5 L206.4 115.8 L207.2 116.7 L208.0 116.2 L215.0 110.7 L216.7 112.4 L216.2 109.6 L221.7 104.9 L220.8 102.0 L222.3 101.9 L222.2 101.2 L220.4 100.8 L219.0 95.0 L217.8 93.5 L218.5 90.7 L221.4 91.6 L221.5 89.8 L228.7 96.1 L229.8 95.6 L244.6 106.9 L247.0 112.0 L250.5 112.9 L250.2 114.4 L252.3 113.8 L252.7 115.4 L253.6 115.4 L254.8 113.9 L255.7 115.5 L256.9 113.9 L257.4 115.4 L258.0 114.1 L259.4 115.2 L262.8 113.2 L264.8 114.2 L266.5 113.2 L267.5 114.3 L267.6 117.3 L273.7 116.1 Z"
-                ><title>Sevier County</title></path
-              >
-              <path
-                d="M208.3 63.9 L178.7 62.9 L179.3 63.9 L178.4 64.6 L177.7 64.3 L178.3 62.9 L175.4 62.8 L167.4 54.1 L160.4 41.3 L162.0 41.0 L162.5 38.7 L165.4 38.2 L165.0 37.3 L166.6 35.3 L165.9 33.8 L166.7 33.1 L167.0 25.9 L167.3 25.1 L168.7 25.0 L167.5 23.3 L169.5 22.7 L168.1 21.7 L169.8 21.7 L170.7 20.3 L169.3 18.1 L170.3 13.7 L175.7 16.2 L178.9 12.5 L177.5 10.8 L178.8 9.8 L177.9 9.4 L180.4 9.5 L181.0 7.0 L182.0 9.1 L183.4 7.1 L186.0 6.3 L187.6 7.7 L189.8 7.4 L190.8 9.5 L195.6 6.0 L196.8 7.3 L195.2 8.9 L195.6 10.1 L197.7 8.6 L197.3 10.8 L202.7 13.9 L203.8 17.1 L206.5 20.4 L206.0 23.5 L208.1 25.4 L211.7 25.4 L214.4 21.0 L219.5 25.5 L218.4 26.7 L218.9 27.4 L218.2 27.0 L216.9 28.2 L218.1 29.4 L215.7 35.8 L216.8 35.6 L216.9 36.7 L215.7 39.4 L213.4 40.7 L213.1 45.6 L214.6 44.7 L215.0 48.3 L213.8 54.8 L210.6 56.6 L211.2 58.0 L208.7 59.2 L211.3 62.0 Z"
-                ><title>Union County</title></path
-              >
-            </g>
-            <path
-              class="county-active"
-              d="M166.5 128.1 L162.8 123.7 L160.7 125.5 L157.3 125.2 L157.5 126.5 L160.3 127.9 L160.9 131.3 L158.8 133.3 L156.2 130.2 L153.5 130.7 L153.4 134.4 L152.6 135.7 L150.5 135.1 L150.0 132.2 L148.5 130.8 L144.3 132.2 L140.9 135.0 L140.2 134.0 L140.9 132.3 L139.5 130.8 L136.9 131.0 L136.7 132.0 L138.9 134.3 L137.5 137.3 L138.4 140.0 L137.4 142.3 L135.3 142.9 L115.8 119.7 L115.4 117.7 L118.5 116.3 L117.8 114.2 L114.9 111.9 L116.4 111.0 L121.1 114.0 L121.0 110.6 L119.8 109.8 L119.9 108.7 L120.8 108.5 L123.9 110.5 L125.0 110.2 L124.0 107.2 L124.9 104.4 L128.2 103.6 L128.7 100.0 L136.5 101.8 L141.4 98.8 L142.4 99.0 L144.2 96.4 L148.9 94.7 L152.0 91.2 L145.9 84.3 L146.0 83.3 L150.3 80.5 L154.1 76.8 L154.5 75.2 L156.1 74.9 L157.1 72.8 L159.4 71.4 L159.4 70.1 L162.2 69.1 L162.1 68.2 L166.3 64.2 L166.2 63.1 L167.3 63.2 L171.7 59.2 L175.4 62.8 L178.3 62.9 L177.7 64.3 L178.4 64.6 L179.3 63.9 L178.7 62.9 L208.2 63.9 L209.9 66.6 L209.8 69.6 L212.7 71.6 L213.2 73.2 L215.3 72.9 L213.9 75.6 L216.0 75.0 L216.1 77.1 L218.0 78.0 L219.5 80.6 L219.5 81.8 L218.2 81.5 L214.7 78.5 L212.1 79.4 L215.2 85.6 L214.8 86.5 L218.8 87.6 L217.8 93.5 L219.0 95.0 L220.4 100.8 L222.2 101.2 L222.3 101.9 L220.8 102.0 L221.7 104.9 L216.1 109.8 L216.7 112.3 L215.0 110.7 L208.0 116.2 L207.2 116.7 L206.4 115.8 L202.2 117.8 L200.0 121.3 L194.7 124.7 L187.6 132.8 L180.0 131.3 L178.0 131.7 L178.2 130.0 L173.4 126.9 L172.6 127.2 L171.3 125.3 L168.9 125.9 Z"
-            ></path>
-            <circle class="pin-pulse" cx="172.9" cy="92.4" r="30"></circle>
-            <path class="pin" d="M172.9 100.4s14-12.4 14-24a14 14 0 1 0-28 0c0 11.6 14 24 14 24z"
-            ></path>
-            <circle cx="172.9" cy="76.4" r="5" fill="#fff"></circle>
-          </svg>
-          <div class="map-caption">
-            <span class="chip">Knox County, TN</span>
-            <span class="mock-more">Knoxville, TN Community Data Library</span>
-          </div>
-        </div>
+      <div class="feature-visual">
+        <img
+          class="dot-art"
+          src={artCommunity}
+          alt="Dot-density map of Knox County, Tennessee, and its eight neighboring counties, linked by a network"
+          width="480"
+          height="330"
+          loading="lazy"
+          decoding="async"
+        />
       </div>
     </article>
 
@@ -218,10 +121,10 @@ const sampleDatasets = FEATURED.flatMap(([id, theme, tone]) => {
         <p class="feature-eyebrow">K-12 Data Science & Statistics Tags</p>
         <h2 class="feature-title">Data matched to the content you're teaching.</h2>
         <p>
-          Datasets are tagged with the K-12 statistical and data science content they can support,
-          from distributional characteristics, to significance testing, and more. We provide these
-          to make lesson planning easier, but they are still in beta. Please provide suggestions for
-          their improvement!
+          Datasets are tagged with the K-12 statistical and data science content their variables can
+          support, from distributional characteristics, to significance testing, and more. We
+          provide these to make lesson planning easier, but they are still in beta. Please provide
+          suggestions for their improvement!
         </p>
         <!-- <p class="feature-note">
           Our team also shares lesson plans and workshop materials in
@@ -233,55 +136,31 @@ const sampleDatasets = FEATURED.flatMap(([id, theme, tone]) => {
           >Use "Teacher View" to see K-12 tags in an example CDL</a
         >
       </div>
-      <div class="feature-visual" aria-hidden="true">
-        <!-- Tags shown are real pedagogical tags from usda-milk-production.md, reworded for display. -->
-        <div class="mock-card catalog-card stats-card">
-          <div class="lib-head">
-            <span class="lib-pin">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><path d="M3 3v18h18"></path><path d="M7 15l4-4 3 3 5-6"></path></svg
-              >
-            </span>
-            <div>
-              <strong>U.S. Milk Production and Related Data</strong>
-              <span>USDA Economic Research Service</span>
-            </div>
-          </div>
-          <div class="tag-group">
-            <span class="tag-label">Statistical tests</span>
-            <div class="tag-row">
-              <span class="chip chip-gold">One-way ANOVA</span>
-              <span class="chip chip-gold">Chi-square independence</span>
-              <span class="chip chip-gold">Paired t-test</span>
-              <span class="chip chip-gold">One-sample t-test</span>
-            </div>
-          </div>
-          <div class="tag-group">
-            <span class="tag-label">Patterns to explore</span>
-            <div class="tag-row">
-              <span class="chip">Positive correlation</span>
-              <span class="chip">Right-skewed distribution</span>
-              <span class="chip">Outliers</span>
-              <span class="chip">Group differences</span>
-            </div>
-          </div>
-          <div class="tag-group">
-            <span class="tag-label">Big ideas</span>
-            <div class="tag-row">
-              <span class="chip chip-green">Central Limit Theorem</span>
-              <span class="chip chip-green">Data transformation</span>
-              <span class="chip chip-green">Multivariate data</span>
-            </div>
-          </div>
-        </div>
+      <div class="feature-visual">
+        <!-- Callouts use real pedagogical tags from the catalog ("has mode", "right skewed
+             distribution", "contains outliers", "mean median different"), reworded for display.
+             Positions match the leader-line ends drawn in art-dotplot.svg (% of its viewBox). -->
+        <figure class="plot-figure">
+          <img
+            class="dot-art"
+            src={artDotplot}
+            alt="A dot plot of a right-skewed distribution with a dotted density curve, and markers at the mean and median"
+            width="480"
+            height="360"
+            loading="lazy"
+            decoding="async"
+          />
+          <span class="chip plot-tag tag-left" style="left: 25.3%; top: 9.7%">Has a mode</span>
+          <span class="chip plot-tag tag-above" style="left: 75.4%; top: 41.1%"
+            >Right-skewed distribution</span
+          >
+          <span class="chip chip-gold plot-tag tag-above" style="left: 81.9%; top: 55%"
+            >Contains outliers</span
+          >
+          <span class="chip chip-blue plot-tag tag-left" style="left: 31.8%; top: 90%"
+            >Mean ≠ median</span
+          >
+        </figure>
       </div>
     </article>
   </section>
@@ -322,13 +201,13 @@ const sampleDatasets = FEATURED.flatMap(([id, theme, tone]) => {
   /* Big screens (taller and wider than a laptop): stretch the hero to roughly the window
      height and center its content, adding space above and below so the first feature row
      starts just below the fold (only a ~40px sliver of its band peeks up).
-     150px ≈ nav (64) + main top padding (32) + hero bottom margin (16) + the 40px peek. */
+     162px ≈ nav (76) + main top padding (32) + hero bottom margin (16) + the 40px peek. */
   @media (min-width: 1280px) and (min-height: 900px) {
     .hero {
       display: flex;
       flex-direction: column;
       justify-content: center;
-      min-height: calc(100svh - 150px);
+      min-height: calc(100svh - 162px);
     }
   }
 
@@ -466,14 +345,18 @@ const sampleDatasets = FEATURED.flatMap(([id, theme, tone]) => {
   /* ══════════════════════════════════════════════
      BUTTONS
   ══════════════════════════════════════════════ */
+  /* Near-square corners, a soft navy offset shadow, faint dashed stitching inside the edge.
+     Hover presses the button down into its shadow. */
   .btn {
+    --btn-shadow: rgba(35, 53, 75, 0.32); /* soft navy */
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
     padding: var(--space-3) var(--space-6);
-    border: 1.5px solid transparent;
-    border-radius: var(--radius-md);
+    border: 2px solid transparent;
+    border-radius: 3px;
+    box-shadow: 3px 4px 8px var(--btn-shadow);
     font-size: var(--font-size-sm);
     font-weight: 700;
     letter-spacing: 0.01em;
@@ -481,37 +364,57 @@ const sampleDatasets = FEATURED.flatMap(([id, theme, tone]) => {
     white-space: nowrap;
     cursor: pointer;
     transition:
-      background 0.18s ease,
-      border-color 0.18s ease,
-      color 0.18s ease,
-      transform 0.18s ease;
+      transform 0.12s ease,
+      box-shadow 0.12s ease,
+      background-color 0.18s ease,
+      color 0.18s ease;
   }
 
   .btn:hover {
     text-decoration: none;
-    transform: translateY(-1px);
+    transform: translate(1px, 2px);
+    box-shadow: 2px 2px 4px var(--btn-shadow);
+  }
+
+  .btn:active {
+    transform: translate(2px, 3px);
+    box-shadow: 0 0 1px var(--btn-shadow);
   }
 
   .btn-primary {
-    background: var(--color-primary);
+    background-color: var(--color-primary);
     border-color: var(--color-primary);
+    outline: 1.5px dashed rgba(143, 211, 211, 0.55); /* faint light-teal dashed stitching */
+    outline-offset: -7px;
     color: #fff;
+  }
+
+  .btn-primary:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
   }
 
   .btn-primary:hover {
-    background: var(--color-primary-dark);
-    border-color: var(--color-primary-dark);
+    background-color: #0b6358;
+    border-color: #0b6358;
     color: #fff;
   }
 
+  /* Faint dashed ring just inside the edge, like the nav's "Create A Community Library" button */
   .btn-secondary {
-    background: var(--color-surface);
-    border-color: var(--color-border-highlight);
-    color: var(--color-text);
+    background: #eef8f8; /* very light teal */
+    border: 2px solid transparent;
+    outline: 1.5px dashed rgba(62, 168, 188, 0.6); /* faint dashed stitching, slogan teal-blue */
+    outline-offset: -7px;
+    color: #23354b;
+  }
+
+  .btn-secondary:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
   }
 
   .btn-secondary:hover {
-    border-color: var(--color-primary);
     color: var(--color-primary);
   }
 
@@ -632,6 +535,51 @@ const sampleDatasets = FEATURED.flatMap(([id, theme, tone]) => {
 
   .feature-visual {
     position: relative;
+  }
+
+  .dot-art {
+    display: block;
+    width: 100%;
+    max-width: 480px;
+    height: auto;
+    margin: 0 auto;
+  }
+
+  /* Dot plot with tag callouts laid over the leader-line ends */
+  .plot-figure {
+    position: relative;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  .plot-tag {
+    position: absolute;
+    /* opaque so the leader lines don't show through; tone tint layered on white */
+    background-image: linear-gradient(
+      var(--tag-tint, var(--color-primary-glow)),
+      var(--tag-tint, var(--color-primary-glow))
+    );
+    background-color: #fff;
+    border: 1px solid rgba(14, 114, 101, 0.22);
+    box-shadow: 0 2px 6px -3px rgba(11, 79, 120, 0.35);
+  }
+
+  .plot-tag.chip-gold {
+    --tag-tint: rgba(212, 160, 23, 0.16);
+    border-color: rgba(212, 160, 23, 0.4);
+  }
+
+  .plot-tag.chip-blue {
+    --tag-tint: rgba(62, 168, 188, 0.15);
+    border-color: rgba(62, 168, 188, 0.4);
+  }
+
+  .tag-left {
+    translate: calc(-100% - 2px) -50%;
+  }
+
+  .tag-above {
+    translate: -50% calc(-100% - 2px);
   }
 
   /* ── Shared mock card pieces ─────────────── */
