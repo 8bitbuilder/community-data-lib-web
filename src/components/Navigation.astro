@@ -218,6 +218,7 @@ function isDataResourcesActive(path: string): boolean {
 <style>
   /* ── Navbar shell ─────────────────────────────── */
   .navbar {
+    font-family: var(--font-nav); /* links, dropdown, mobile menu and CTA; the logo name stays Doto */
     background: #23354B;
     border-bottom: 2px solid rgba(31, 51, 73, 0.4);
     box-shadow: var(--shadow-md);
@@ -387,29 +388,34 @@ function isDataResourcesActive(path: string): boolean {
     position: relative;
   }
 
-  .nav-summary {
+  /* .nav-link.nav-summary so this beats the .nav-link padding defined further down */
+  .nav-link.nav-summary {
     list-style: none;
     cursor: pointer;
-    padding-right: calc(var(--space-3) + 1rem);
+    padding-right: calc(var(--space-3) + 0.9rem);
   }
 
   .nav-summary::-webkit-details-marker {
     display: none;
   }
 
+  /* Small chevron drawn with two borders; flips up when the menu is open */
   .nav-summary::after {
-    content: '▾';
+    content: '';
     position: absolute;
-    right: var(--space-3);
+    right: calc(var(--space-3) + 1px);
     top: 50%;
-    transform: translateY(-50%);
-    font-size: 0.7em;
-    color: currentColor;
-    opacity: 0.8;
+    width: 6px;
+    height: 6px;
+    border-right: 1.75px solid currentColor;
+    border-bottom: 1.75px solid currentColor;
+    transform: translateY(-70%) rotate(45deg);
+    opacity: 0.85;
+    transition: transform 0.15s ease;
   }
 
   .nav-dropdown-details[open] .nav-summary::after {
-    content: '▴';
+    transform: translateY(-20%) rotate(-135deg);
   }
 
   .nav-dropdown-panel {
@@ -454,8 +460,8 @@ function isDataResourcesActive(path: string): boolean {
     display: inline-flex;
     align-items: center;
     padding: var(--space-2) var(--space-3);
-    font-family: var(--font-sans);
-    font-size: var(--font-size-sm);
+    font-family: var(--font-nav);
+    font-size: 0.95rem;
     font-weight: 500;
     color: #ffffff;
     border-radius: var(--radius-md);
@@ -465,16 +471,26 @@ function isDataResourcesActive(path: string): boolean {
     position: relative;
   }
 
+  /* No tinted pill: the current page gets an underline; hover shows a fainter one */
   .nav-link:hover {
-    background: var(--color-primary-glow);
     color: #ffffff;
     text-decoration: none;
+  }
+
+  .nav-link:not(.nav-summary):hover::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: var(--space-3);
+    right: var(--space-3);
+    height: 2px;
+    background: rgba(124, 211, 196, 0.45);
+    border-radius: 1px;
   }
 
   .nav-link.active {
     color: #ffffff;
     font-weight: 600;
-    background: var(--color-primary-glow);
   }
 
   .nav-link.active:not(.nav-summary)::after {
@@ -484,7 +500,7 @@ function isDataResourcesActive(path: string): boolean {
     left: var(--space-3);
     right: var(--space-3);
     height: 2px;
-    background: var(--color-primary);
+    background: #7cd3c4; /* light teal, same as the nav icons */
     border-radius: 1px;
   }
 

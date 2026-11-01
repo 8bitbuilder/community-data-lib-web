@@ -123,8 +123,12 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
         <p>
           Datasets are tagged with the K-12 statistical and data science content their variables can
           support, from distributional characteristics, to significance testing, and more. We
-          provide these to make lesson planning easier, but they are still in beta. Please provide
-          suggestions for their improvement!
+          provide these to make lesson planning easier, but they are still in beta.
+          <!-- address assembled by the script in Layout.astro on interaction; not in the page source -->
+          Please
+          <a href="#" class="js-email" data-u="ofni" data-d="gro.seirarbilatadytinummoc"
+            >provide suggestions</a
+          > for their improvement!
         </p>
         <!-- <p class="feature-note">
           Our team also shares lesson plans and workshop materials in
@@ -170,7 +174,6 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
   ═══════════════════════════════════════════ -->
   <section class="cta-banner" aria-labelledby="cta-heading">
     <div class="cta-text">
-      <p class="feature-eyebrow">Community-Driven Catalog</p>
       <h2 class="cta-title" id="cta-heading">Know an open dataset containing community data?</h2>
       <p class="cta-body">
         Help expand the catalog by sharing datasets openly available on the web. The datasets should
@@ -221,7 +224,6 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
     /* Sit above the illustration, which slides up underneath the buttons. */
     position: relative;
     z-index: 1;
-    animation: fadeUp 0.7s ease both;
   }
 
   .hero-kicker {
@@ -270,7 +272,6 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
     /* Pull the art up so its empty sky (network lines, sun) tucks behind the buttons
        and the town is visible without scrolling on laptop screens. */
     margin-top: calc(-1 * min(10vw, 217px));
-    animation: fadeUp 0.7s 0.15s ease both;
   }
 
   .hero-art-frame {
@@ -548,26 +549,31 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
     margin: 0 auto;
   }
 
-  .plot-tag {
+  /* Chart labels: soft tinted pills in Barlow Semi Condensed, sentence case, no border or shadow.
+     Tint is layered on white so the leader lines don't show through. */
+  .plot-figure .plot-tag {
     position: absolute;
-    /* opaque so the leader lines don't show through; tone tint layered on white */
+    padding: 3px 11px;
+    border: 0;
+    border-radius: 999px;
+    background-color: #fff;
     background-image: linear-gradient(
       var(--tag-tint, var(--color-primary-glow)),
       var(--tag-tint, var(--color-primary-glow))
     );
-    background-color: #fff;
-    border: 1px solid rgba(14, 114, 101, 0.22);
-    box-shadow: 0 2px 6px -3px rgba(11, 79, 120, 0.35);
+    font-family: var(--font-tag);
+    font-weight: 400;
+    font-size: 0.95rem;
+    letter-spacing: 0;
+    text-transform: none;
   }
 
-  .plot-tag.chip-gold {
+  .plot-figure .plot-tag.chip-gold {
     --tag-tint: rgba(212, 160, 23, 0.16);
-    border-color: rgba(212, 160, 23, 0.4);
   }
 
-  .plot-tag.chip-blue {
+  .plot-figure .plot-tag.chip-blue {
     --tag-tint: rgba(62, 168, 188, 0.15);
-    border-color: rgba(62, 168, 188, 0.4);
   }
 
   .tag-left {
@@ -601,22 +607,22 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
     padding: var(--space-3) var(--space-4);
   }
 
+  /* Plain, readable labels: sentence case in the body font, small corner radius (like the buttons) */
   .chip {
     display: inline-block;
-    padding: 2px 9px;
-    border-radius: 999px;
+    padding: 3px 9px;
+    border-radius: 4px;
     background: var(--color-primary-glow);
     color: var(--color-primary);
-    font-size: 0.64rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.35;
     white-space: nowrap;
   }
 
   .mock-more {
     margin-left: auto;
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-size: 0.68rem;
     color: var(--color-text-dim);
   }
@@ -788,7 +794,7 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
   }
 
   .tag-label {
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-size: 0.62rem;
     font-weight: 600;
     letter-spacing: 0.08em;
@@ -819,11 +825,12 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
   /* ══════════════════════════════════════════════
      CTA BANNER
   ══════════════════════════════════════════════ */
+  /* A plain, centered closing line + one button (no label, no split layout) */
   .cta-banner {
     display: grid;
-    grid-template-columns: 1fr;
-    align-items: center;
-    gap: var(--space-8);
+    justify-items: center;
+    text-align: center;
+    gap: var(--space-6);
     position: relative;
     isolation: isolate;
     padding: var(--space-16) 0;
@@ -835,20 +842,19 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
 
   @media (min-width: 900px) {
     .cta-banner {
-      grid-template-columns: minmax(0, 1.4fr) auto;
-      gap: var(--space-16);
-      padding: var(--space-24) 0;
+      padding: var(--space-20, 5rem) 0;
     }
   }
 
   .cta-text {
     display: grid;
+    justify-items: center;
     gap: var(--space-3);
   }
 
   .cta-title {
     margin: 0;
-    max-width: 24ch;
+    max-width: 40ch;
     font-family: var(--font-display);
     font-size: clamp(1.7rem, 3vw, 2.2rem);
     font-weight: 700;
@@ -858,36 +864,21 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
 
   .cta-body {
     margin: 0;
-    max-width: 48ch;
+    max-width: 100ch;
+    text-wrap: balance;
     color: var(--color-text-muted);
     line-height: var(--line-height-relaxed);
   }
 
   .cta-actions {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    align-items: stretch;
+    justify-content: center;
   }
 
   /* ══════════════════════════════════════════════
      MOTION
   ══════════════════════════════════════════════ */
-  @keyframes fadeUp {
-    from {
-      opacity: 0;
-      transform: translateY(16px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
   @media (prefers-reduced-motion: reduce) {
-    .hero-copy,
-    .hero-art,
-    .pin-pulse,
     .sun-glow {
       animation: none;
     }
