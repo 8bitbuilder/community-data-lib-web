@@ -1,6 +1,7 @@
 ---
 import Layout from '@layouts/Layout.astro';
 import { withBasePath } from '@lib/paths';
+import { GEOGRAPHY_LEVELS } from '@lib/submission/geography.mjs';
 
 // Read search params to detect Netlify Forms success redirect
 const submitted = Astro.url.searchParams.get('submitted') === 'true';
@@ -124,8 +125,36 @@ const THEME_GROUPS = [
               autocomplete="off"
             />
             <span class="field-hint">
-              Link straight to the data file (CSV, TSV, or a .zip containing one), not to a web page about it.
+              Link straight to the data file (CSV, TSV, Excel .xlsx, or a .zip containing one), not to a web page about it.
             </span>
+          </div>
+
+          <fieldset class="field geography-field" aria-describedby="geography-hint">
+            <legend>Smallest geographic unit in the data <span class="required" aria-label="required">*</span></legend>
+            <span class="field-hint" id="geography-hint">
+              What does one row describe? We list data broken down to the state level or smaller.
+            </span>
+            <div class="radio-group">
+              {GEOGRAPHY_LEVELS.map((level) => (
+                <label class="radio-label">
+                  <input type="radio" name="geography_level" value={level.value} required />
+                  <span>{level.label}</span>
+                </label>
+              ))}
+            </div>
+            <p class="field-error" id="geography-error" role="alert"></p>
+          </fieldset>
+
+          <div class="field">
+            <label for="geography_variable">Column with that geography <span class="optional">(optional)</span></label>
+            <input
+              type="text"
+              id="geography_variable"
+              name="geography_variable"
+              maxlength="120"
+              placeholder="e.g., FIPS, county_name, zip_code"
+              autocomplete="off"
+            />
           </div>
 
           <!-- <div class="field-row">
@@ -319,9 +348,23 @@ const THEME_GROUPS = [
             <strong>A file we can preview</strong>
             <p>
               We list datasets we can open and preview, so the URL must download the data directly
-              without a login: a CSV or TSV file, or a .zip that contains one. We can't use yet:
-              Excel files (.xlsx/.xls), data portals or search pages you have to click through,
-              APIs, PDFs, or anything behind an account.
+              without a login: a CSV or TSV file, an Excel workbook (.xlsx), or a .zip that contains
+              one. We can't use yet: older Excel files (.xls), Microsoft Access databases, data
+              portals or search pages you have to click through, APIs, PDFs, or anything behind an
+              account.
+            </p>
+          </div>
+        </div>
+
+        <div class="guideline-item">
+          <div class="guideline-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div>
+            <strong>Local data</strong>
+            <p>
+              The data needs a geographic variable at the state level or smaller, such as a state,
+              county, city or ZIP code column. We can't list data that only has national totals.
             </p>
           </div>
         </div>
@@ -560,6 +603,64 @@ const THEME_GROUPS = [
     font-size: var(--font-size-xs);
     color: var(--color-text-dim);
     margin-top: calc(var(--space-1) * -1);
+  }
+
+  /* ── Geography question (radio group) ── */
+  .geography-field {
+    border: none;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+  }
+
+  .form-section .geography-field legend {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: var(--space-1);
+  }
+
+  .geography-field .field-hint {
+    margin-top: 0;
+  }
+
+  .radio-group {
+    display: grid;
+    gap: var(--space-2);
+    margin-top: var(--space-1);
+  }
+
+  .radio-label {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    cursor: pointer;
+    font-weight: 400;
+    color: var(--color-text-muted);
+  }
+
+  .radio-label input[type="radio"] {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin: 2px 0 0;
+    accent-color: var(--color-primary);
+  }
+
+  .field-error {
+    margin: var(--space-2) 0 0;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid rgba(245, 158, 11, 0.45);
+    border-radius: var(--radius-md);
+    background: rgba(245, 158, 11, 0.08);
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+  }
+
+  .field-error:empty {
+    display: none;
   }
 
   /* ── Checkboxes ──────────────────────── */
@@ -804,6 +905,39 @@ const THEME_GROUPS = [
 </style>
 
 <script>
+  import { geographyProblem } from '@lib/submission/geography.mjs';
+
+  // The form is novalidate (for its own styling), so check it here before Netlify Forms gets it.
+  const form = document.getElementById('submit-form') as HTMLFormElement | null;
+  const geographyError = document.getElementById('geography-error');
+
+  function geographyLevel() {
+    return form ? new FormData(form).get('geography_level') : null;
+  }
+
+  // Picking "national totals only" explains right away why it can't be listed.
+  form?.addEventListener('change', (event) => {
+    const target = event.target as HTMLInputElement;
+    if (target.name !== 'geography_level' || !geographyError) return;
+    geographyError.textContent = target.value === 'nation' ? geographyProblem('nation') ?? '' : '';
+  });
+
+  form?.addEventListener('submit', (event) => {
+    const problem = geographyProblem(geographyLevel());
+    if (problem) {
+      event.preventDefault();
+      if (geographyError) geographyError.textContent = problem;
+      const radio = form.querySelector<HTMLInputElement>('input[name="geography_level"]:checked')
+        ?? form.querySelector<HTMLInputElement>('input[name="geography_level"]');
+      radio?.focus();
+      return;
+    }
+    if (!form.checkValidity()) {
+      event.preventDefault();
+      form.reportValidity();
+    }
+  });
+
   const searchInput = document.getElementById('data-themes-search') as HTMLInputElement | null;
   const themeGroups = document.querySelectorAll<HTMLDetailsElement>('#data-themes-list [data-theme-group]');
 
