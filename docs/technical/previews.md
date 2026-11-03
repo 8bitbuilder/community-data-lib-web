@@ -58,7 +58,7 @@ the same value as `download.format` in its YAML, and a backend test checks they 
 | Previewed | Not previewed |
 |---|---|
 | 6 sources: the four Census state and county population tables (including the Excel one), County Health Rankings, TRI Tennessee | EPA AirToxScreen: its zip holds a Microsoft Access database (`zip/accdb`); the page marks it *Needs conversion* |
-| | The 12 sources that have no direct download link |
+| | The 16 sources that have no direct download link |
 
 ### Into the site
 
