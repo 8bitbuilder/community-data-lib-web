@@ -19,8 +19,9 @@ import {
   getWebExportsDir,
   getWebSourcesDir,
 } from './backend-paths.mjs';
+import { checkCatalogScope, isNationalLevel } from '../backend/lib/catalogScope.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname =path.dirname(fileURLToPath(import.meta.url));
 const outputDir = path.resolve(__dirname, '../src/content/master-library/datasets');
 
 async function resolveSourcesDir() {
@@ -74,6 +75,7 @@ export async function loadCatalogSources() {
       ...analysis,
       ...rest,
     }));
+    assertCatalogInScope(sources);
     return { sources, origin: `SQLite export ${file}` };
   }
 
@@ -81,9 +83,30 @@ export async function loadCatalogSources() {
   console.warn('WARNING: no SQLite export found; reading YAML directly. Run export_catalog.py.');
   const sources = [];
   for (const file of await listSourceFiles(sourcesDir)) {
-    sources.push(YAML.parse(await readFile(path.join(sourcesDir, file), 'utf8')));
+    const source = YAML.parse(await readFile(path.join(sourcesDir, file), 'utf8'));
+    // The YAML keeps national-level sources; only the export leaves them out.
+    if (isNationalLevel(source.filters)) continue;
+    if (!source.filters) console.warn(`WARNING: ${source.id} has no filters (web#42)`);
+    sources.push(source);
   }
   return { sources, origin: `YAML ${sourcesDir}` };
+}
+
+/**
+ * The backend's export should already follow the local-data rule (web#42). Stop the
+ * build if it doesn't, rather than publish a national-level or unchecked dataset.
+ */
+export function assertCatalogInScope(sources) {
+  const { national, missingFilters, pendingReview } = checkCatalogScope(sources);
+  const problems = [];
+  if (national.length) problems.push(`national-level: ${national.join(', ')}`);
+  if (missingFilters.length) problems.push(`no filters: ${missingFilters.join(', ')}`);
+  if (problems.length) {
+    throw new Error(`Catalog export breaks the local-data rule (web#42): ${problems.join('; ')}. Fix the YAML in the backend repo.`);
+  }
+  if (pendingReview.length) {
+    console.warn(`WARNING: no filters yet, pending review (web#42): ${pendingReview.join(', ')}`);
+  }
 }
 
 // All active analysis tags: the catalog's pedagogical filter needs every one, and
