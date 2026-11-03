@@ -36,8 +36,9 @@ the same value as `download.format` in its YAML, and a backend test checks they 
 
 - **Formats:**
   - CSV (UTF-8 or cp1252, with an optional second header row of codes)
-  - a zip with a CSV inside
-  - Census-style `.xlsx` tables (merged multi-row headers are joined, footnotes dropped)
+  - a zip with a CSV or `.xlsx` inside
+  - `.xlsx` workbooks, first sheet (Census-style merged multi-row headers are joined, footnotes dropped)
+  - Legacy `.xls` is recognized and reported as `xls`, but not read
 - **County detection:**
   1. a 5-digit FIPS column
   2. Census `STATE` + `COUNTY` code columns

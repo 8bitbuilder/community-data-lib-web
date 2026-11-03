@@ -1,7 +1,9 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import AdmZip from 'adm-zip';
 
 import { createApiHandler, nodeEngine } from '../backend/lib/apiHandler.mjs';
 
@@ -13,6 +15,22 @@ const CSV = [
   '37,183,North Carolina,Wake County,1200000',
 ].join('\n');
 
+const WORKBOOK = readFileSync('tests/fixtures/preview-table.xlsx');
+const XLS = Buffer.concat([Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]), Buffer.alloc(64)]);
+
+function zipOf(name: string, content: Buffer): Buffer {
+  const zip = new AdmZip();
+  zip.addFile(name, content);
+  return zip.toBuffer();
+}
+
+const FILES: Record<string, Buffer> = {
+  '/file.xlsx': WORKBOOK,
+  '/workbook.zip': zipOf('table.xlsx', WORKBOOK),
+  '/old.xls': XLS,
+  '/access.zip': zipOf('database.accdb', Buffer.from('not a table')),
+};
+
 let server: http.Server;
 let base = '';
 
@@ -21,6 +39,9 @@ before(async () => {
     if (req.url === '/counties.csv') {
       res.writeHead(200, { 'Content-Type': 'text/csv' });
       res.end(CSV);
+    } else if (FILES[req.url ?? '']) {
+      res.writeHead(200);
+      res.end(FILES[req.url ?? '']);
     } else {
       res.writeHead(404);
       res.end();
@@ -41,6 +62,9 @@ function sources() {
       variables: ['CTYNAME', 'POPESTIMATE2025'],
     },
     { id: 'excel', title: 'Excel', download: { url: `${base}/file.xlsx` } },
+    { id: 'zipped-excel', title: 'Zipped Excel', download: { url: `${base}/workbook.zip` } },
+    { id: 'old-excel', title: 'Old Excel', download: { url: `${base}/old.xls` } },
+    { id: 'access', title: 'Access', download: { url: `${base}/access.zip` } },
     { id: 'portal', title: 'Portal only', provider: { url: 'https://example.gov' } },
   ];
 }
@@ -63,7 +87,7 @@ test('health and source listing', async () => {
   assert.equal(health.status, 200);
   assert.equal(health.body.previewEngine, 'node');
   const list = await get('/api/sources');
-  assert.equal(list.body.count, 3);
+  assert.equal(list.body.count, sources().length);
   assert.equal((await get('/api/sources/counties')).body.title, 'Counties');
   assert.equal(list.headers.get('access-control-allow-origin'), '*');
 });
@@ -94,10 +118,26 @@ test('chart and filter options', async () => {
   assert.ok(Array.isArray(states.body.options) && states.body.options.length === 2);
 });
 
+test('an xlsx previews like a CSV, zipped or not', async () => {
+  for (const id of ['excel', 'zipped-excel']) {
+    const preview = await get(`/api/sources/${id}/preview`);
+    assert.equal(preview.status, 200, id);
+    assert.deepEqual(preview.body.columns, ['Area', 'Estimate / 2024', 'Estimate / 2025', 'Percent']);
+    assert.deepEqual(preview.body.rows[1], ['Knox County', '494574', '500123', '80.5']);
+    assert.equal(preview.body.total, 2);
+  }
+  const chart = await get('/api/sources/excel/chart?variable=Percent');
+  assert.equal(chart.status, 200);
+  assert.deepEqual(chart.body.series.map((point: { value: number }) => point.value), [80.5, 78.9]);
+});
+
 test('datasets that cannot be previewed get a clear 422, not a crash', async () => {
-  const excel = await get('/api/sources/excel/preview');
-  assert.equal(excel.status, 422);
-  assert.match(excel.body.details, /XLSX/);
+  const old = await get('/api/sources/old-excel/preview');
+  assert.equal(old.status, 422);
+  assert.match(old.body.details, /XLS files are not supported/);
+  const access = await get('/api/sources/access/preview');
+  assert.equal(access.status, 422);
+  assert.match(access.body.details, /no CSV, TSV or XLSX files \(accdb\)/);
   const portal = await get('/api/sources/portal/preview');
   assert.equal(portal.status, 422);
   assert.match(portal.body.details, /no download URL/);

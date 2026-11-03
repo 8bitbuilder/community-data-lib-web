@@ -29,9 +29,9 @@ const CORS_HEADERS = {
 
 /** Errors that mean "this dataset can't be previewed", not "the server broke". */
 const UNPREVIEWABLE = [
-  /XLSX files are not supported/i,
+  /XLS files are not supported/i,
   /has no download URL/i,
-  /no CSV or TSV files/i,
+  /contains no CSV, TSV or XLSX files/i,
 ];
 
 function json(status, payload) {
