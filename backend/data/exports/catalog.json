@@ -1,6 +1,11 @@
 {
   "exportVersion": 1,
   "sourceCount": 19,
+  "excludedNationalLevel": [
+    "census-annual-pop-by-age-sex-2025",
+    "census-annual-pop-selected-age-groups-2024",
+    "usda-milk-production"
+  ],
   "sources": [
     {
       "id": "census-county-estimates-all-2025",
@@ -33,6 +38,12 @@
         "latitude": 38.8468,
         "longitude": -76.9296,
         "label": "U.S. Census Bureau headquarters, Suitland, MD (approximate)"
+      },
+      "filters": {
+        "year": false,
+        "state": true,
+        "county": true,
+        "zipcode": false
       },
       "variables": [
         "SUMLEV",
@@ -146,6 +157,12 @@
         "latitude": 38.8468,
         "longitude": -76.9296,
         "label": "U.S. Census Bureau headquarters, Suitland, MD (approximate)"
+      },
+      "filters": {
+        "year": false,
+        "state": true,
+        "county": false,
+        "zipcode": false
       },
       "variables": [
         "Geographic Area",
@@ -295,6 +312,12 @@
         "latitude": 38.8468,
         "longitude": -76.9296,
         "label": "U.S. Census Bureau headquarters, Suitland, MD (approximate)"
+      },
+      "filters": {
+        "year": false,
+        "state": true,
+        "county": false,
+        "zipcode": false
       },
       "variables": [
         "SUMLEV",
@@ -464,6 +487,12 @@
         "longitude": -76.9296,
         "label": "U.S. Census Bureau headquarters, Suitland, MD (approximate)"
       },
+      "filters": {
+        "year": false,
+        "state": true,
+        "county": false,
+        "zipcode": false
+      },
       "variables": [
         "SUMLEV",
         "REGION",
@@ -622,8 +651,8 @@
       ],
       "filters": {
         "year": false,
-        "state": false,
-        "county": false,
+        "state": true,
+        "county": true,
         "zipcode": false
       },
       "variables": [
@@ -1731,9 +1760,9 @@
       ],
       "filters": {
         "year": false,
-        "state": false,
-        "county": false,
-        "zipcode": false
+        "state": true,
+        "county": true,
+        "zipcode": true
       },
       "variables": [
         "1. YEAR",
@@ -1986,7 +2015,7 @@
       "sensitive": false,
       "pipeline_ready": false,
       "student_suitability": "unreviewed",
-      "geographic_granularity": "nation",
+      "geographic_granularity": "point",
       "coverage": [
         {
           "level": "nation",
@@ -2000,8 +2029,8 @@
       },
       "filters": {
         "year": true,
-        "state": false,
-        "county": false,
+        "state": true,
+        "county": true,
         "zipcode": false
       },
       "description_tags": [
@@ -2173,6 +2202,7 @@
         "longitude": -83.9375,
         "label": "Knox County, TN (approximate center)"
       },
+      "filters_pending_review": true,
       "description_tags": [
         "Health & Social Services",
         "Population Data"
@@ -2213,6 +2243,7 @@
         "longitude": -83.9187,
         "label": "City County Building, 400 Main St, Knoxville, TN (approximate)"
       },
+      "filters_pending_review": true,
       "description_tags": [
         "Housing & Buildings",
         "Government Administration"
@@ -2252,6 +2283,7 @@
         "longitude": -83.9375,
         "label": "Knox County, TN (approximate center)"
       },
+      "filters_pending_review": true,
       "description_tags": [
         "PreK-12 Education",
         "Children & Families"
@@ -2292,6 +2324,7 @@
         "longitude": -83.9187,
         "label": "City County Building, 400 Main St, Knoxville, TN (approximate)"
       },
+      "filters_pending_review": true,
       "description_tags": [
         "Government Administration",
         "Law & Public Safety"

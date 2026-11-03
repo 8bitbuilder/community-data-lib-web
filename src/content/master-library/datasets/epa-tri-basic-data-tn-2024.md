@@ -8,6 +8,8 @@ syncedFromBackend: true
 tags:
   - "Energy & Environment"
   - "Government Administration"
+  - "state"
+  - "county"
 dataThemes:
   - "Energy & Environment"
   - "Government Administration"

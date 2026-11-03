@@ -11,6 +11,8 @@ tags:
   - "Higher Education"
   - "Population Data"
   - "Transportation"
+  - "state"
+  - "county"
 dataThemes:
   - "Business & Economy"
   - "Health & Social Services"
