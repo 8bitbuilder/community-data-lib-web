@@ -106,9 +106,13 @@ export function getAvailableFilters(headers, source) {
   };
 }
 
+function tableOptions({ sheet, headerRow } = {}) {
+  return { sheet, headerRow };
+}
+
 export async function buildPreview(source, options = {}) {
   const { state, county, limit = 25, offset = 0, columns: columnsOverride } = options;
-  const { headers, rows } = await getSourceTable(source);
+  const { headers, rows, layout } = await getSourceTable(source, tableOptions(options));
 
   const filtered = filterRows(headers, rows, { state, county });
   const columns = selectPreviewColumns(
@@ -129,6 +133,7 @@ export async function buildPreview(source, options = {}) {
     total: filtered.length,
     filters: { state: state ?? null, county: county ?? null },
     availableFilters: getAvailableFilters(headers, source),
+    ...(layout ? { layout } : {}),
   };
 }
 
@@ -136,7 +141,7 @@ const TEMPORAL_COLUMNS = ["YEAR", "DATE", "PERIOD", "TIMEPERIOD_NAME"];
 
 export async function buildChart(source, options = {}) {
   const { variable, state, county, limit = 50, xVariable, plotType = "bar" } = options;
-  const { headers, rows } = await getSourceTable(source);
+  const { headers, rows } = await getSourceTable(source, tableOptions(options));
 
   const focalVariable = variable || defaultFocalVariable(source, headers);
   if (!focalVariable || !headers.includes(focalVariable)) {
@@ -217,8 +222,8 @@ export async function buildChart(source, options = {}) {
   };
 }
 
-export async function listFilterOptions(source, filterType, parentFilter = {}) {
-  const { headers, rows } = await getSourceTable(source);
+export async function listFilterOptions(source, filterType, parentFilter = {}, tableOpts = {}) {
+  const { headers, rows } = await getSourceTable(source, tableOptions(tableOpts));
   const { state } = parentFilter;
 
   if (filterType === "state") {

@@ -16,7 +16,13 @@ export function diffFields(original, edited) {
       );
       if (Object.keys(changed).length) out.provider = changed;
     } else if (field === 'download') {
-      if (text(value.url) !== text(original.download?.url)) out.download = { url: value.url };
+      const changed = {};
+      if ('url' in value && text(value.url) !== text(original.download?.url)) changed.url = value.url;
+      for (const key of ['sheet', 'header_row']) {
+        if (!(key in value)) continue;
+        if (String(text(value[key])) !== String(text(original.download?.[key]))) changed[key] = text(value[key]) === '' ? null : value[key];
+      }
+      if (Object.keys(changed).length) out.download = changed;
     } else if (typeof value === 'string') {
       if (value !== text(original[field])) out[field] = value;
     } else if (!same(value, original[field])) {

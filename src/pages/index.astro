@@ -26,8 +26,7 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
         &nbsp;&nbsp;&nbsp;Data about your community, for your community&nbsp;&nbsp;&nbsp;
       </p>
       <p class="hero-body">
-        A free, open-source tool to explore, locate, and access data about the U.S. community near
-        you.
+        A free, open-source tool to locate and explore data about the U.S. community near you.
       </p>
       <div class="hero-actions">
         <a href={withBasePath('/complete-catalog')} class="btn btn-primary btn-large">
@@ -71,7 +70,7 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
           that are used to populate the local community data libraries). Are we missing a great one?
           <a href={withBasePath('/submit')}>Suggest it</a>.
         </p>
-        <a class="feature-link" href={withBasePath('/complete-catalog')}
+        <a class="btn btn-secondary feature-link" href={withBasePath('/complete-catalog')}
           >Browse the complete catalog</a
         >
       </div>
@@ -98,7 +97,7 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
           CDL will show only datasets with data about your community. To build your CDL, simply
           <a href={withBasePath('/create-community-library')}>fill out our form</a>.
         </p>
-        <a class="feature-link" href={withBasePath('/communities/knox-county/')}
+        <a class="btn btn-secondary feature-link" href={withBasePath('/communities/knox-county/')}
           >See an example library (Knoxville, TN)</a
         >
       </div>
@@ -119,11 +118,12 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
     <article class="feature">
       <div class="feature-text">
         <p class="feature-eyebrow">K-12 Data Science & Statistics Tags</p>
-        <h2 class="feature-title">Data matched to the content you're teaching.</h2>
+        <h2 class="feature-title">Find data for the content you're teaching.</h2>
         <p>
           Datasets are tagged with the K-12 statistical and data science content their variables can
           support, from distributional characteristics, to significance testing, and more. We
-          provide these to make lesson planning easier, but they are still in beta.
+          provide these in "Teacher View" to make lesson planning easier, but they are still in
+          beta.
           <!-- address assembled by the script in Layout.astro on interaction; not in the page source -->
           Please
           <a href="#" class="js-email" data-u="ofni" data-d="gro.seirarbilatadytinummoc"
@@ -135,9 +135,9 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
           <a href={withBasePath('/data-resources')}>Data Resources</a>.
         </p> -->
         <a
-          class="feature-link"
+          class="btn btn-secondary feature-link"
           href={withBasePath('communities/knox-county/catalog/?audience=teacher')}
-          >Use "Teacher View" to see K-12 tags in an example CDL</a
+          >See K-12 tags in an example CDL</a
         >
       </div>
       <div class="feature-visual">
@@ -322,10 +322,15 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
 
   @media (max-width: 640px) {
     .hero {
-      padding-top: var(--space-4);
+      padding-top: 3.25rem;
+    }
+    /* Drop the spacer <br>s on phones so the illustration lands above the fold. */
+    .hero > br,
+    .hero-copy > br {
+      display: none;
     }
     .hero-art {
-      margin-top: var(--space-6);
+      margin-top: var(--space-4);
     }
     .hero-actions {
       flex-direction: column;
@@ -448,6 +453,20 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
     background: var(--band-bg, transparent);
   }
 
+  /* Pastel speckles (the Knoxville map's palette) over the contribute band, faded out
+     behind the text so it stays clean. */
+  .cta-banner::after {
+    content: '';
+    position: absolute;
+    inset: 0 calc(50% - 50vw);
+    z-index: -1;
+    background: url('../assets/home/speckle-tile.svg') 0 0 / 260px 260px repeat;
+    opacity: 1;
+    -webkit-mask-image: radial-gradient(ellipse 60% 70% at 50% 50%, transparent 35%, #000 100%);
+    mask-image: radial-gradient(ellipse 60% 70% at 50% 50%, transparent 35%, #000 100%);
+    pointer-events: none;
+  }
+
   .feature:nth-child(odd) {
     --band-bg: #f4f8f7;
   }
@@ -515,19 +534,15 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
     color: var(--color-text-muted);
   }
 
+  /* Pill-shaped light-teal button (builds on .btn-secondary, minus the grid paper). */
   .feature-link {
-    font-weight: 700;
-    color: var(--color-primary);
-  }
-
-  .feature-link::after {
-    content: ' →';
-    display: inline-block;
-    transition: transform 0.18s ease;
-  }
-
-  .feature-link:hover::after {
-    transform: translateX(3px);
+    background: #eef8f8; /* solid light teal, no grid lines */
+    border-radius: 999px;
+    margin-top: var(--space-2);
+    padding: var(--space-3) var(--space-6);
+    /* long labels wrap on narrow phones instead of overflowing */
+    white-space: normal;
+    text-align: center;
   }
 
   .feature-visual {
@@ -882,8 +897,7 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
     .sun-glow {
       animation: none;
     }
-    .btn,
-    .feature-link::after {
+    .btn {
       transition: none;
     }
   }

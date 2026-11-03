@@ -1,11 +1,12 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { readFileSync } from 'node:fs';
 import AdmZip from 'adm-zip';
 
 import { createApiHandler, nodeEngine } from '../backend/lib/apiHandler.mjs';
+import { getSourceTable, tableCacheSize } from '../backend/lib/csvCache.mjs';
 
 // A tiny local "data provider" so tests never touch the network.
 const CSV = [
@@ -15,21 +16,17 @@ const CSV = [
   '37,183,North Carolina,Wake County,1200000',
 ].join('\n');
 
-const WORKBOOK = readFileSync('tests/fixtures/preview-table.xlsx');
-const XLS = Buffer.concat([Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]), Buffer.alloc(64)]);
-
-function zipOf(name: string, content: Buffer): Buffer {
+const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url));
+const ZIP = (() => {
   const zip = new AdmZip();
-  zip.addFile(name, content);
+  zip.addFile('title-rows.xlsx', fixture('title-rows.xlsx'));
   return zip.toBuffer();
-}
-
-const FILES: Record<string, Buffer> = {
-  '/file.xlsx': WORKBOOK,
-  '/workbook.zip': zipOf('table.xlsx', WORKBOOK),
-  '/old.xls': XLS,
-  '/access.zip': zipOf('database.accdb', Buffer.from('not a table')),
-};
+})();
+const ACCESS = (() => {
+  const zip = new AdmZip();
+  zip.addFile('database.accdb', Buffer.from('not a table'));
+  return zip.toBuffer();
+})();
 
 let server: http.Server;
 let base = '';
@@ -39,9 +36,21 @@ before(async () => {
     if (req.url === '/counties.csv') {
       res.writeHead(200, { 'Content-Type': 'text/csv' });
       res.end(CSV);
-    } else if (FILES[req.url ?? '']) {
-      res.writeHead(200);
-      res.end(FILES[req.url ?? '']);
+    } else if (req.url === '/access.zip') {
+      res.writeHead(200, { 'Content-Type': 'application/zip' });
+      res.end(ACCESS);
+    } else if (req.url === '/bundle.zip') {
+      res.writeHead(200, { 'Content-Type': 'application/zip' });
+      res.end(ZIP);
+    } else if (req.url?.startsWith('/fx/')) {
+      try {
+        const body = fixture(req.url.slice(4));
+        res.writeHead(200);
+        res.end(body);
+      } catch {
+        res.writeHead(404);
+        res.end();
+      }
     } else {
       res.writeHead(404);
       res.end();
@@ -61,9 +70,17 @@ function sources() {
       download: { url: `${base}/counties.csv` },
       variables: ['CTYNAME', 'POPESTIMATE2025'],
     },
-    { id: 'excel', title: 'Excel', download: { url: `${base}/file.xlsx` } },
-    { id: 'zipped-excel', title: 'Zipped Excel', download: { url: `${base}/workbook.zip` } },
-    { id: 'old-excel', title: 'Old Excel', download: { url: `${base}/old.xls` } },
+    { id: 'excel', title: 'Excel', download: { url: `${base}/fx/title-rows.xlsx` } },
+    {
+      id: 'excel-curated',
+      title: 'Excel curated',
+      download: { url: `${base}/fx/title-rows.xlsx`, header_row: 1 },
+    },
+    { id: 'empty', title: 'Empty', download: { url: `${base}/fx/empty.xlsx` } },
+    { id: 'zipped', title: 'Zipped', download: { url: `${base}/bundle.zip` } },
+    { id: 'notes-first', title: 'Notes', download: { url: `${base}/fx/notes-first.xlsx` } },
+    { id: 'numeric-sheets', title: 'Years', download: { url: `${base}/fx/numeric-sheets.xlsx` } },
+    { id: 'old-excel', title: 'Old Excel', download: { url: `${base}/fx/legacy.xls` } },
     { id: 'access', title: 'Access', download: { url: `${base}/access.zip` } },
     { id: 'portal', title: 'Portal only', provider: { url: 'https://example.gov' } },
   ];
@@ -118,26 +135,17 @@ test('chart and filter options', async () => {
   assert.ok(Array.isArray(states.body.options) && states.body.options.length === 2);
 });
 
-test('an xlsx previews like a CSV, zipped or not', async () => {
-  for (const id of ['excel', 'zipped-excel']) {
-    const preview = await get(`/api/sources/${id}/preview`);
-    assert.equal(preview.status, 200, id);
-    assert.deepEqual(preview.body.columns, ['Area', 'Estimate / 2024', 'Estimate / 2025', 'Percent']);
-    assert.deepEqual(preview.body.rows[1], ['Knox County', '494574', '500123', '80.5']);
-    assert.equal(preview.body.total, 2);
-  }
-  const chart = await get('/api/sources/excel/chart?variable=Percent');
-  assert.equal(chart.status, 200);
-  assert.deepEqual(chart.body.series.map((point: { value: number }) => point.value), [80.5, 78.9]);
+test('a real .xls file previews through the API', async () => {
+  const preview = await get('/api/sources/old-excel/preview');
+  assert.equal(preview.status, 200);
+  assert.equal(preview.body.layout.format, 'xls');
+  assert.ok(preview.body.total > 0);
 });
 
 test('datasets that cannot be previewed get a clear 422, not a crash', async () => {
-  const old = await get('/api/sources/old-excel/preview');
-  assert.equal(old.status, 422);
-  assert.match(old.body.details, /XLS files are not supported/);
   const access = await get('/api/sources/access/preview');
   assert.equal(access.status, 422);
-  assert.match(access.body.details, /no CSV, TSV or XLSX files \(accdb\)/);
+  assert.match(access.body.details, /no CSV, TSV or Excel files/);
   const portal = await get('/api/sources/portal/preview');
   assert.equal(portal.status, 422);
   assert.match(portal.body.details, /no download URL/);
@@ -154,4 +162,107 @@ test('an unreachable data provider returns 502', async () => {
   });
   const res = await get('/api/sources/gone/preview', handle);
   assert.equal(res.status, 502);
+});
+
+test('the site never serves raw dataset files (visitors download from the provider)', async () => {
+  const res = await get('/api/sources/counties/file');
+  assert.equal(res.status, 404);
+});
+
+test('Excel preview returns rows and layout', async () => {
+  const res = await get('/api/sources/excel/preview');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.layout.headerRow, 4);
+  assert.equal(res.body.total, 5);
+});
+
+test('zipped Excel previews too', async () => {
+  const res = await get('/api/sources/zipped/preview');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.layout.headerRow, 4);
+});
+
+test('curator header_row is honored and visitor param overrides it', async () => {
+  const curated = await get('/api/sources/excel-curated/preview');
+  assert.equal(curated.status, 200);
+  assert.equal(curated.body.layout.headerRow, 1);
+  assert.equal(curated.body.layout.origin.headerRow, 'curator');
+  const visitor = await get('/api/sources/excel-curated/preview?header_row=4');
+  assert.equal(visitor.body.layout.headerRow, 4);
+  assert.equal(visitor.body.layout.origin.headerRow, 'visitor');
+});
+
+test('sheet param selects a sheet (digits are an index)', async () => {
+  const byName = await get('/api/sources/notes-first/preview?sheet=Data');
+  assert.equal(byName.status, 200);
+  assert.equal(byName.body.layout.sheet, 'Data');
+  const byIndex = await get('/api/sources/notes-first/preview?sheet=1');
+  assert.equal(byIndex.body.layout.sheet, 'Data');
+});
+
+test('sheets named like numbers are chosen by index, never read as positions', async () => {
+  const auto = await get('/api/sources/numeric-sheets/preview');
+  assert.equal(auto.status, 200);
+  assert.deepEqual(auto.body.layout.sheets, ['Notes', '2023', '2024']);
+  assert.equal(auto.body.layout.sheet, '2023');
+  // The page sends layout.sheets.indexOf("2024") === 2.
+  const y2024 = await get('/api/sources/numeric-sheets/preview?sheet=2');
+  assert.equal(y2024.status, 200);
+  assert.equal(y2024.body.layout.sheet, '2024');
+  assert.deepEqual(y2024.body.columns, ['County', 'Pop', 'Change']);
+  assert.equal(y2024.body.total, 3);
+  // "1" is the second sheet ("2023"), not a sheet named "1"; "2024" is out of range.
+  const one = await get('/api/sources/numeric-sheets/preview?sheet=1');
+  assert.equal(one.body.layout.sheet, '2023');
+  const asName = await get('/api/sources/numeric-sheets/preview?sheet=2024');
+  assert.equal(asName.status, 400);
+  assert.equal(asName.body.code, 'UNKNOWN_SHEET');
+});
+
+test('unknown sheet and out-of-range header row are 400 with sheet list', async () => {
+  const bad = await get('/api/sources/excel/preview?sheet=Nope');
+  assert.equal(bad.status, 400);
+  assert.ok(Array.isArray(bad.body.sheets) && bad.body.sheets.length > 0);
+  assert.equal(bad.body.code, 'UNKNOWN_SHEET');
+  const hdr = await get('/api/sources/excel/preview?header_row=99');
+  assert.equal(hdr.status, 400);
+  assert.equal(hdr.body.code, 'HEADER_OUT_OF_RANGE');
+});
+
+test('Excel sources skip a preferred pandas engine', async () => {
+  const boom = () => {
+    throw new Error('pandas must not be called');
+  };
+  const handle = createApiHandler({
+    loadAllSources: async () => sources(),
+    loadSourceById: async (id: string) => sources().find((s) => s.id === id) ?? null,
+    engine: { name: 'pandas', buildPreview: boom, buildChart: boom, listFilterOptions: boom },
+  });
+  const res = await get('/api/sources/excel/preview', handle);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.engine, 'node');
+  assert.equal(res.body.pandasFallback, undefined);
+});
+
+test('invalid header_row values are 400, not ignored', async () => {
+  for (const bad of ['0', 'abc', '-1', '1.5']) {
+    const res = await get(`/api/sources/excel/preview?header_row=${bad}`);
+    assert.equal(res.status, 400, bad);
+    assert.equal(res.body.code, 'HEADER_OUT_OF_RANGE');
+    assert.equal(res.body.error, 'header_row must be a whole number of 1 or more');
+  }
+});
+
+test('a sheet with no data rows is 422 NO_DATA', async () => {
+  const res = await get('/api/sources/empty/preview');
+  assert.equal(res.status, 422);
+  assert.equal(res.body.code, 'NO_DATA');
+  assert.equal(res.body.error, 'This sheet has no data rows');
+});
+
+test('the parsed-table cache is bounded', async () => {
+  for (let i = 0; i < 60; i++) {
+    await getSourceTable({ id: `cap-${i}`, download: { url: `${base}/counties.csv` } });
+  }
+  assert.equal(tableCacheSize(), 50);
 });

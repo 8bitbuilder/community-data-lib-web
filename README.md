@@ -22,6 +22,18 @@ npm run backend:dev   # preview API on http://localhost:4323
 npm run dev           # Astro site on http://localhost:4321/web (proxies /api/sources to it)
 ```
 
+## Clean this data (notebook for teachers)
+
+The Data Preview page (`/web/data-preview`) has a **Clean this data** notebook under the preview. It runs Python (pandas) right in the browser with [Pyodide](https://pyodide.org), so there is nothing to install and nothing is sent to a server.
+
+- **Get the data yourself.** The notebook never downloads datasets for you. Open it, follow the link to the original provider, download the file there (so you use it under the provider's terms), then upload it into the notebook. It becomes a table called `df`; the first cell is the load step, and for Excel files it uses the curator's sheet and header row when the workbook matches, otherwise it detects them, and you can change either one in the notebook.
+- **+ Cleaning step** adds common steps without typing code (drop columns or rows, drop or fill missing values, rename a column, change a column's type, keep only matching rows, remove duplicates). Each step becomes a short, commented Python cell that students can read and edit.
+- Uploads can be CSV, TSV, TXT, XLSX or XLS. **Use a different file** swaps in another one; the file stays in your browser and is never sent to a server.
+- **Export** downloads the cleaned table (CSV or Excel) or the whole notebook as a `.ipynb` file that opens in Jupyter or Google Colab; put the downloaded data file next to it.
+- Cells are saved in your browser, so they come back when you return to the same dataset. **Reset** starts over; **Stop** restarts Python if a cell runs too long.
+
+The first open downloads Python into the browser, so it can take a little while. The site itself never serves dataset files; the preview table and chart above only show a sample of rows.
+
 ## Coverage Map
 
 `/maps` shades U.S. counties by how many catalog datasets cover them, from each dataset's canonical `coverage` (nation, state FIPS or county FIPS, from the backend). Click a county to list its datasets. The boundaries are one TopoJSON file built from the Census cartographic boundary files (2025, 1:20m) and committed. The same county file produces `src/data/geo-vocabulary.json`, the site's list of valid state and county codes:
