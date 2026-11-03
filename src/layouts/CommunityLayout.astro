@@ -69,6 +69,10 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
   <body>
     <div class="paper-grain" aria-hidden="true"></div>
 
+    <div class="network-bar">
+      <a href={cdlHref} class="network-link"><span aria-hidden="true">←</span> Back to Community Data Libraries</a>
+    </div>
+
     <nav class="navbar" role="navigation" aria-label="Community navigation">
       <div class="nav-container">
 
@@ -96,9 +100,6 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
 
         <!-- Actions -->
         <div class="nav-actions">
-          <a href={cdlHref} class="nav-cdl" title="Community Data Libraries network">
-            <span class="cdl-badge">CDL</span>
-          </a>
           <button
             class="mobile-menu-button"
             aria-label="Toggle navigation menu"
@@ -366,6 +367,17 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
 </style>
 
 <style>
+  /* ── Link back to the main site (web#40) ─────── */
+  .network-bar { background: var(--color-secondary); }
+  .network-link {
+    display: flex; align-items: center; gap: var(--space-2);
+    max-width: 1200px; min-height: 44px; margin: 0 auto; padding: 0 var(--space-6);
+    color: #F8FAFC; font-size: var(--font-size-sm); font-weight: 600; text-decoration: none;
+  }
+  .network-link:hover { color: #F8FAFC; text-decoration: underline; }
+  .network-link:focus-visible { outline-color: #F8FAFC; outline-offset: -4px; }
+  @media (min-width: 768px) { .network-link { min-height: 36px; } }
+
   /* ── Navbar ──────────────────────────────────── */
   .navbar {
     background: rgba(245,248,250,0.92); border-bottom: 1px solid var(--color-border);
@@ -424,17 +436,6 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
     box-shadow: var(--shadow-glow-secondary); transform: translateY(-1px); text-decoration: none; color: #F8FAFC;
   }
   @media (min-width: 640px) { .nav-cta { display: inline-flex; align-items: center; } }
-
-  .nav-cdl {
-    display: flex; align-items: center; text-decoration: none;
-    padding: var(--space-1) var(--space-2); border-radius: var(--radius-md); transition: background 0.15s ease;
-  }
-  .nav-cdl:hover { background: var(--color-primary-glow); text-decoration: none; }
-  .cdl-badge {
-    font-family: var(--font-display); font-weight: 900; font-size: 0.65rem; letter-spacing: -0.04em;
-    color: var(--color-primary); background: var(--color-primary-glow); border: 1px solid rgba(14,114,101,0.25);
-    padding: 0.15em 0.4em 0.1em; border-radius: var(--radius-sm); line-height: 1;
-  }
 
   /* Hamburger */
   .mobile-menu-button {
