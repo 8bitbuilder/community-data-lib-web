@@ -1,6 +1,11 @@
 ---
 import Navigation from '@components/Navigation.astro';
+import { Image } from 'astro:assets';
 import { withBasePath } from '@lib/paths';
+import cdlEmblem from '../assets/brand/cdl-emblem-transparent.png';
+// Lower-48 county (fainter) + state outlines from Census cb_2024 1:20m, Albers projection.
+// Strokes are baked into the SVG; loaded as a cached file rather than inlined on every page.
+import usCountiesUrl from '../assets/footer/us-counties.svg?url';
 import '../styles/tailwind.css';
 
 interface Props {
@@ -34,8 +39,29 @@ const librarianPortalHref = withBasePath('/librarian/');
     <link rel="icon" type="image/svg+xml" href={withBasePath('/favicon.svg')} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Fraunces: expressive serif for display — Outfit: clean geometric sans for body — JetBrains Mono -->
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,400;1,9..144,700&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <!-- Outfit: used only by the Data Preview chart labels -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    
+    <!-- Philosopher font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Philosopher:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    
+    <!-- Barlow: body text (400) with 500/600/700 for nav, buttons and links -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <!-- Zen Maru Gothic: softly rounded sans for the nav bar -->
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
+
+    <!-- Micro 5 Charted: gridded pixel font for the homepage tagline -->
+    <link href="https://fonts.googleapis.com/css2?family=Micro+5+Charted&display=swap" rel="stylesheet">
+
+    <!-- Doto: dot-matrix font (round-dot ROND axis) for the nav "Community Data Libraries" name -->
+    <link href="https://fonts.googleapis.com/css2?family=Doto:ROND,wght@0..100,100..900&display=swap" rel="stylesheet">
+    <!-- Barlow Semi Condensed: clean, narrow sans for tags/chips site-wide -->
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500&display=swap" rel="stylesheet">
+
     <title>{siteTitle}</title>
     <!-- is:inline keeps this a classic script; Astro would otherwise bundle it as a
          cross-origin module import, which identity.netlify.com's CORS headers block. -->
@@ -63,31 +89,50 @@ const librarianPortalHref = withBasePath('/librarian/');
       <slot />
     </main>
     <footer>
+      <img src={usCountiesUrl} alt="" class="footer-map" aria-hidden="true" loading="lazy" decoding="async" />
       <div class="footer-inner">
         <div class="footer-top">
           <div class="footer-brand">
-            <div class="footer-mark">CDL</div>
+            <Image src={cdlEmblem} alt="" class="footer-mark" widths={[72, 144, 216]} sizes="72px" />
             <div>
               <span class="footer-title">Community Data Libraries</span>
-              <p class="footer-tagline">Place-based open data catalog for schools and communities.</p>
+              <p class="footer-tagline">Data about your community, for your community</p>
             </div>
           </div>
           <nav class="footer-links" aria-label="Footer navigation">
             <a href={withBasePath('/complete-catalog')}>Complete Catalog</a>
-            <a href={withBasePath('/community-library')}>Community Library</a>
+            <a href={withBasePath('/communities/knox-county/')}>Example Community Library</a>
             <a href={withBasePath('/create-community-library')}>Create a Community Library</a>
-            <a href={withBasePath('/maps')}>Map</a>
-            <a href={withBasePath('/data-resources')}>Data Resources</a>
-            <a href={withBasePath('/submit')}>Submit</a>
-            <a href="https://github.com/community-data-libraries/web" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+            <a href={withBasePath('/submit')}>Suggest a Dataset</a>
           </nav>
         </div>
         <div class="footer-bottom">
-          <p class="footer-copy">&copy; {new Date().getFullYear()} Community Data Libraries. Open source under MIT.</p>
-          <p class="footer-tagline-bottom">Built with Astro · Hosted on Netlify · Created by <a href="https://opalslab.org" target="_blank" rel="noopener noreferrer">OPALS Lab</a></p>
+          <p class="footer-copy">&copy; {new Date().getFullYear()} Community Data Libraries. Open source under GPL-3.0-only.</p>
+          <p class="footer-tagline-bottom">
+            Created by <a href="https://opalslab.org" target="_blank" rel="noopener noreferrer">OPALS Lab</a>
+            <span aria-hidden="true">·</span>
+            <!-- Email link: the address is never in the HTML (reversed in data attributes and
+                 assembled by script only when used), which keeps simple scrapers from harvesting it. -->
+            <a href="#" class="footer-email js-email" data-u="ofni" data-d="gro.seirarbilatadytinummoc" aria-label="Email us" title="Email us">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            </a>
+          </p>
         </div>
       </div>
     </footer>
+    <script>
+      // Build the mailto only on interaction so the address never sits in the page source.
+      const rev = (v: string | undefined) => (v ?? '').split('').reverse().join('');
+      document.querySelectorAll<HTMLAnchorElement>('a.js-email').forEach((link) => {
+        const arm = () => {
+          link.href = `mailto:${rev(link.dataset.u)}@${rev(link.dataset.d)}`;
+        };
+        ['pointerenter', 'focus', 'touchstart'].forEach((evt) =>
+          link.addEventListener(evt, arm, { once: true, passive: true })
+        );
+        link.addEventListener('click', arm);
+      });
+    </script>
   </body>
 </html>
 
@@ -106,9 +151,9 @@ const librarianPortalHref = withBasePath('/librarian/');
   ============================================= */
   :root {
     /* Cool editorial palette */
-    --color-background: #F5F8FA;
+    --color-background: #FFFFFF;
     --color-surface: #FFFFFF;
-    --color-surface-raised: #EDF4F7;
+    --color-surface-raised: #FFFFFF;
     --color-border: #D2DEE6;
     --color-border-highlight: #AFC4D2;
 
@@ -119,7 +164,7 @@ const librarianPortalHref = withBasePath('/librarian/');
     --color-primary-glow: rgba(14, 114, 101, 0.10);
 
     /* Secondary — dark teal-navy (leftmost logo color) */
-    --color-secondary: #155E75;
+    --color-secondary: #D4A017;
     --color-secondary-light: #1A7A96;
     --color-secondary-glow: rgba(21, 94, 117, 0.10);
 
@@ -129,14 +174,19 @@ const librarianPortalHref = withBasePath('/librarian/');
     --color-accent-glow: rgba(26, 107, 69, 0.10);
 
     /* Text */
-    --color-text: #0F172A;
-    --color-text-muted: #52606D;
+    --color-text: #4A3526;
+    --color-text-muted: #4A3526;
     --color-text-dim: #556470;
 
     /* Typography */
-    --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
-    --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-mono: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    --font-display: 'Philosopher', Georgia, 'Times New Roman', serif;
+    --font-sans: 'Barlow', -apple-system, BlinkMacSystemFont, sans-serif;
+    /* Nav bar: softly rounded */
+    --font-nav: 'Zen Maru Gothic', 'Barlow', -apple-system, BlinkMacSystemFont, sans-serif;
+    /* only for code snippets: system monospace (no web font download) */
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+    /* Tags/chips site-wide: borderless tinted pills */
+    --font-tag: 'Barlow Semi Condensed', -apple-system, BlinkMacSystemFont, sans-serif;
 
     --font-size-xs: 0.75rem;
     --font-size-sm: 0.875rem;
@@ -210,12 +260,8 @@ const librarianPortalHref = withBasePath('/librarian/');
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    /* Plain white so it matches the white background of the homepage illustration. */
     background-color: var(--color-background);
-    /* Subtle warm vignette */
-    background-image:
-      radial-gradient(ellipse 80% 60% at 50% 0%, rgba(14, 114, 101, 0.05) 0%, transparent 70%),
-      radial-gradient(ellipse 60% 40% at 100% 20%, rgba(21, 94, 117, 0.04) 0%, transparent 60%),
-      radial-gradient(ellipse 50% 50% at 0% 80%, rgba(26, 107, 69, 0.03) 0%, transparent 60%);
   }
 
   main {
@@ -332,19 +378,18 @@ const librarianPortalHref = withBasePath('/librarian/');
   }
 
   /* Decorative large CDL watermark */
-  footer::after {
-    content: 'CDL';
+  /* Very faint U.S. county and state outlines as a background texture.
+     Zoomed in so only inland counties show (no coastline); centered near East Tennessee.
+     The footer's overflow:hidden crops the rest. */
+  .footer-map {
     position: absolute;
-    right: -0.02em;
-    bottom: -0.15em;
-    font-family: var(--font-display);
-    font-size: 18rem;
-    font-weight: 900;
-    color: rgba(255,255,255,0.03);
-    line-height: 1;
+    left: 50%;
+    top: 50%;
+    translate: -64% -58%;
+    width: max(250%, 2600px);
+    max-width: none;
+    height: auto;
     pointer-events: none;
-    user-select: none;
-    letter-spacing: -0.05em;
   }
 
   .footer-inner {
@@ -360,8 +405,7 @@ const librarianPortalHref = withBasePath('/librarian/');
     align-items: flex-start;
     gap: var(--space-8);
     flex-wrap: wrap;
-    padding-bottom: var(--space-8);
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding-bottom: var(--space-6);
     margin-bottom: var(--space-6);
   }
 
@@ -371,27 +415,34 @@ const librarianPortalHref = withBasePath('/librarian/');
     gap: var(--space-4);
   }
 
+  /* Same emblem art as the nav ribbon (transparent background), sitting on the footer navy */
   .footer-mark {
-    font-family: var(--font-display);
-    font-size: var(--font-size-xl);
-    font-weight: 900;
-    color: var(--color-primary-light);
-    letter-spacing: -0.04em;
-    line-height: 1;
-    padding: var(--space-2) var(--space-3);
-    border: 1.5px solid rgba(15, 118, 110, 0.4);
-    border-radius: var(--radius-sm);
+    display: block;
+    width: 72px;
+    height: 72px;
+    padding: 9px 7px 11px;
+    object-fit: contain;
+    border: 1px solid rgba(175, 229, 243, 0.35); /* nav-icon light blue (#AFE5F3), washed out */
+    border-radius: 50%;
+    /* Navy grosgrain ribs (same pattern as the nav ribbon's navy option) */
+    background: repeating-linear-gradient(
+      to bottom,
+      #3D5A80 0 1px,
+      #31496A 1px 2.5px,
+      #22374F 2.5px 3.5px
+    );
     flex-shrink: 0;
-    margin-top: 2px;
+    margin-top: -4px;
   }
 
+  /* Doto (round dots), matching the nav logo name */
   .footer-title {
     display: block;
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: var(--font-size-lg);
+    font-family: 'Doto', var(--font-mono);
+    font-variation-settings: 'ROND' 100;
+    font-weight: 800;
+    font-size: 1.125rem;
     color: #E2E8F0;
-    letter-spacing: -0.02em;
     margin-bottom: var(--space-1);
   }
 
@@ -399,8 +450,9 @@ const librarianPortalHref = withBasePath('/librarian/');
     margin: 0;
     font-size: var(--font-size-sm);
     color: #A0B4C4;
-    line-height: var(--line-height-relaxed);
+    line-height: 1.35;
     max-width: 30ch;
+    text-wrap: balance;
   }
 
   .footer-links {
@@ -435,14 +487,14 @@ const librarianPortalHref = withBasePath('/librarian/');
     font-size: var(--font-size-xs);
     color: #8BA4B8;
     margin: 0;
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
   }
 
   .footer-tagline-bottom {
     font-size: var(--font-size-xs);
     color: #8BA4B8;
     margin: 0;
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
   }
 
   .footer-tagline-bottom a {
@@ -454,6 +506,19 @@ const librarianPortalHref = withBasePath('/librarian/');
   .footer-tagline-bottom a:hover {
     color: #FFFFFF;
     text-decoration: underline;
+  }
+  .footer-tagline-bottom {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .footer-tagline-bottom .footer-email {
+    display: inline-flex;
+    color: #7CD3C4; /* nav-icon light teal */
+    text-decoration: none;
+  }
+  .footer-tagline-bottom .footer-email:hover {
+    color: #FFFFFF;
   }
 
   /* =============================================

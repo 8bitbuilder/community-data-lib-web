@@ -38,7 +38,7 @@
     "react"
   ],
   "author": "Community Data Libraries",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "bugs": {
     "url": "https://github.com/community-data-libraries/web/issues"
   },
