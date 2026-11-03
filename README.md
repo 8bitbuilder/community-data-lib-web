@@ -13,7 +13,7 @@ npm run dev
 
 The Data Preview page (`/data-preview?source=<id>`) reads static preview files that the backend exports (`python pythonscripts/export_previews.py` writes `data/exports/previews/`). `npm run sync:previews` copies them into the gitignored `public/previews/` during `prebuild`. Every file stays under 250 KB. Netlify Functions never read or filter datasets. `?community=<slug>` opens the preview on that library's county. The tag card shows each download's file type (`CSV`, `XLSX`, `ZIP → CSV`) from the backend's `download.format`, and flags formats that need converting, such as a Microsoft Access database. Details: [docs/technical/previews.md](docs/technical/previews.md).
 
-The catalog is local data: the backend refuses datasets that only have national totals, and the **Suggest a Data Resource** form (`/submit`) asks for the smallest geographic unit and explains why national-only data can't be listed.
+The catalog is local data: the backend leaves datasets with no state, county or ZIP breakdown out of the catalog, the build stops if one gets through, and the **Suggest a Data Resource** form (`/submit`) asks for the smallest geographic unit and explains why national-only data can't be listed.
 
 For backend work, the old preview API still runs locally (development only):
 

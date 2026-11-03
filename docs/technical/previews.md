@@ -52,7 +52,7 @@ the same value as `download.format` in its YAML, and a backend test checks they 
 
 ### Current output
 
-6,394 files, 23.7 MB. The three national-only sources were removed from the catalog (web#42).
+6,394 files, 23.7 MB. The three national-level sources are left out of the catalog (web#42), so they have no preview files.
 
 | Previewed | Not previewed |
 |---|---|

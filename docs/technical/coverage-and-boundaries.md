@@ -12,10 +12,12 @@ Every dataset records the places it covers, separately from how finely its rows 
 | `coverage` | Which places the data is about | national CHR file: `nation`; TRI Tennessee: `state 47`; Knox County Schools: `county 47093` |
 | `geographic_granularity` | What one row describes | `state`, `county`, `zip` or `point` |
 
-- **Local data only:** a dataset whose granularity is `nation` (only national totals) is out of
-  scope (web#42). The backend importer skips it and a backend test fails on it; `epa-tri-dioxin` is
-  the one exception, waiting on a decision. National *coverage* is fine (a county file for every
-  U.S. county), and community catalogs and map counts use coverage as before.
+- **Local data only:** a dataset whose `filters` show no state, county or ZIP breakdown is out of
+  scope (web#42). It stays in the backend's YAML and SQLite, but the catalog export and the dev API
+  leave it out, and `sync:catalog` stops the build if one appears in `catalog.json`. A dataset with
+  no `filters` also stops it, except the four Knox sources, which are flagged as pending review.
+  National *coverage* is fine (a county file for every U.S. county), and community catalogs and map
+  counts use coverage as before.
 
 - **Coverage is FIPS codes only.** It is a list of `{level: nation}`, `{level: state, fips: "47"}` or
   `{level: county, fips: "47093"}`. There is no geometry intersection.
