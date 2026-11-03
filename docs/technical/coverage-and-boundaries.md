@@ -15,7 +15,7 @@ Every dataset records the places it covers, separately from how finely its rows 
 - **Local data only:** a dataset whose `filters` show no state, county or ZIP breakdown is out of
   scope (web#42). It stays in the backend's YAML and SQLite, but the catalog export and the dev API
   leave it out, and `sync:catalog` stops the build if one appears in `catalog.json`. A dataset with
-  no `filters` also stops it, except the four Knox sources, which are flagged as pending review.
+  no `filters` also stops it.
   National *coverage* is fine (a county file for every U.S. county), and community catalogs and map
   counts use coverage as before.
 

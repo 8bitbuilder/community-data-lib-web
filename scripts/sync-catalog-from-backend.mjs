@@ -97,15 +97,12 @@ export async function loadCatalogSources() {
  * build if it doesn't, rather than publish a national-level or unchecked dataset.
  */
 export function assertCatalogInScope(sources) {
-  const { national, missingFilters, pendingReview } = checkCatalogScope(sources);
+  const { national, missingFilters } = checkCatalogScope(sources);
   const problems = [];
   if (national.length) problems.push(`national-level: ${national.join(', ')}`);
   if (missingFilters.length) problems.push(`no filters: ${missingFilters.join(', ')}`);
   if (problems.length) {
     throw new Error(`Catalog export breaks the local-data rule (web#42): ${problems.join('; ')}. Fix the YAML in the backend repo.`);
-  }
-  if (pendingReview.length) {
-    console.warn(`WARNING: no filters yet, pending review (web#42): ${pendingReview.join(', ')}`);
   }
 }
 

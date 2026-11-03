@@ -8,6 +8,7 @@ syncedFromBackend: true
 tags:
   - "PreK-12 Education"
   - "Children & Families"
+  - "county"
 dataThemes:
   - "PreK-12 Education"
   - "Children & Families"

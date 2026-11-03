@@ -31,12 +31,7 @@ test('state-only, county and ZIP-only are kept', () => {
 
 test('missing filters are reported, not passed as local', () => {
   const scope = checkCatalogScope([{ id: 'a' }, { id: 'b', filters: {} }, { id: 'c', filters: NONE }, { id: 'd', filters: { ...NONE, state: true } }]);
-  assert.deepEqual(scope, { national: ['c'], missingFilters: ['a', 'b'], pendingReview: [] });
-});
-
-test('sources pending review are reported apart from missing filters', () => {
-  const scope = checkCatalogScope([{ id: 'a', filters_pending_review: true }]);
-  assert.deepEqual(scope, { national: [], missingFilters: [], pendingReview: ['a'] });
+  assert.deepEqual(scope, { national: ['c'], missingFilters: ['a', 'b'] });
 });
 
 test('the sync stops on a national-level source or missing filters', () => {
