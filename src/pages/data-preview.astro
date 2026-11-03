@@ -5,6 +5,7 @@ import { getCollection } from 'astro:content';
 import Layout from '@layouts/Layout.astro';
 import { withBasePath } from '@lib/paths';
 import MetadataEditor from '@components/MetadataEditor.astro';
+import Notebook from '@components/notebook/Notebook';
 import {
   buildCatalogDescription,
   getGeographicDisplayTags,
@@ -64,6 +65,11 @@ const sources = Object.fromEntries(
         },
       ];
     })
+);
+
+// What the notebook needs to link to the provider and open an uploaded workbook.
+const notebookSources = Object.fromEntries(
+  (catalog?.sources ?? []).map(toSource).map(({ id, provider, download }) => [id, { provider, download }])
 );
 
 // ?community=<slug> preselects that library's county slice.
@@ -261,6 +267,8 @@ const pageData = {
           <p class="table-meta">Loading…</p>
         </div>
       </details>
+
+      <Notebook client:only="react" sources={notebookSources} />
     </div>
   </section>
 

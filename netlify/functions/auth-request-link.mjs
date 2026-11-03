@@ -7,7 +7,10 @@ import { sendMagicLink } from './_lib/mailer.mjs';
 
 const MINUTE = 60_000;
 const LINK_TTL_MS = 15 * MINUTE;
-const RESPONSE = { message: 'If that email is approved, a sign-in link is on its way.' };
+const SENT = { message: 'Check your email for a sign-in link. It expires in 15 minutes.' };
+const NOT_APPROVED = { error: "This email isn't on the approved editor list." };
+const RATE_LIMITED = { error: 'Too many attempts. Please try again later.' };
+const SEND_FAILED = { error: "We couldn't send the email. Please try again." };
 
 export function createHandler({ config, store, sendMail, now = Date.now }) {
   return async (request, context) => {
@@ -26,15 +29,19 @@ export function createHandler({ config, store, sendMail, now = Date.now }) {
     const emailLimited = await hitRateLimit(store, `email/${email}`, { limit: 3, windowMs: 15 * MINUTE }, now());
     if (ipLimited || emailLimited) {
       console.warn('auth-request-link: rate limited');
-      return json(200, RESPONSE);
+      return json(429, RATE_LIMITED);
     }
-    if (!isAllowed(email, config.editorEmails)) return json(200, RESPONSE);
+    if (!isAllowed(email, config.editorEmails)) return json(403, NOT_APPROVED);
 
     const token = signToken({ email, exp: now() + LINK_TTL_MS, nonce: newNonce(), purpose: 'link' }, config.authSecret);
     const link = `${config.siteOrigin}/.netlify/functions/auth-verify?token=${encodeURIComponent(token)}`;
-    const delivery = sendMail({ to: email, link }).catch((err) => console.error('auth-request-link: email failed:', err.message));
-    if (typeof context?.waitUntil === 'function') context.waitUntil(delivery);
-    return json(200, RESPONSE);
+    try {
+      await sendMail({ to: email, link });
+    } catch (err) {
+      console.error('auth-request-link: email failed:', err.message);
+      return json(502, SEND_FAILED);
+    }
+    return json(200, SENT);
   };
 }
 

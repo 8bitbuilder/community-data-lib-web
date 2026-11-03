@@ -26,7 +26,7 @@ test('pickEditable fills defaults, including tag groups missing from the file', 
   const picked = pickEditable(current, vocab);
   assert.equal(picked.notes, '');
   assert.equal(picked.sensitive, false);
-  assert.deepEqual(picked.download, { url: 'https://usda.gov/a.csv' });
+  assert.deepEqual(picked.download, { url: 'https://usda.gov/a.csv', sheet: '', header_row: '' });
   assert.deepEqual(picked.anova_tags, { 'good-for-one-way-anova': false, 'good-for-two-way-anova': false });
 });
 
@@ -108,4 +108,40 @@ test('tag changes merge into existing manual_tags', () => {
     anova_tags: { 'good-for-one-way-anova': true, 'good-for-two-way-anova': false },
     manual_tags: ['anova_tags', 'description_tags'],
   });
+});
+
+test('download sheet and header_row are validated', () => {
+  assert.deepEqual(validateChanges({ download: { sheet: 'Data', header_row: 4 } }, vocab), { download: { sheet: 'Data', header_row: 4 } });
+  assert.deepEqual(validateChanges({ download: { sheet: '2' } }, vocab), { download: { sheet: 2 } });
+  assert.deepEqual(validateChanges({ download: { sheet: '', header_row: null } }, vocab), { download: { sheet: null, header_row: null } });
+  assert.deepEqual(validateChanges({ download: { header_row: '' } }, vocab), { download: { header_row: null } });
+  assert.deepEqual(validateChanges({ download: { header_row: '3' } }, vocab), { download: { header_row: 3 } });
+  for (const bad of [0, 'x', 2.5]) {
+    assert.deepEqual(fieldOf(() => validateChanges({ download: { header_row: bad } }, vocab)), [400, 'download.header_row']);
+  }
+  assert.deepEqual(fieldOf(() => validateChanges({ download: { sheet: 'x'.repeat(101) } }, vocab)), [400, 'download.sheet']);
+});
+
+test('download.url is only required when present', () => {
+  assert.deepEqual(fieldOf(() => validateChanges({ download: { url: '' } }, vocab)), [400, 'download.url']);
+  assert.deepEqual(validateChanges({ download: { sheet: 'A' } }, vocab), { download: { sheet: 'A' } });
+});
+
+test('pickEditable exposes sheet and header_row as form strings', () => {
+  assert.deepEqual(pickEditable(current, vocab).download, { url: 'https://usda.gov/a.csv', sheet: '', header_row: '' });
+  const picked = pickEditable({ ...current, download: { url: 'https://x.org/a.xlsx', sheet: 0, header_row: 4 } }, vocab);
+  assert.deepEqual(picked.download, { url: 'https://x.org/a.xlsx', sheet: '0', header_row: '4' });
+});
+
+test('clearing sheet deletes the key rather than writing null', () => {
+  const cur = { ...current, download: { url: 'https://usda.gov/a.xlsx', sheet: 'Data', header_row: 3 } };
+  const updates = toTopLevelUpdates(cur, validateChanges({ download: { sheet: null } }, vocab), vocab);
+  assert.deepEqual(updates.download, { url: 'https://usda.gov/a.xlsx', header_row: 3 });
+  assert.equal(Object.hasOwn(updates.download, 'sheet'), false);
+  assert.deepEqual(toTopLevelUpdates(current, validateChanges({ download: { sheet: null } }, vocab), vocab), {});
+});
+
+test('clearing sheet on a dataset with no download block emits no update', () => {
+  const { download, ...noDownload } = current;
+  assert.deepEqual(toTopLevelUpdates(noDownload, validateChanges({ download: { sheet: null, header_row: null } }, vocab), vocab), {});
 });
