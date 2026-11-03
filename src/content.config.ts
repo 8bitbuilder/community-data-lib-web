@@ -33,7 +33,7 @@ const masterLibraryCollection = defineCollection({
     // Canonical fields from the SQLite export (see backend database/schema.sql).
     // 'unreviewed' uses the legacy student heuristics in communityFilter.ts.
     studentSuitability: z.enum(['suitable', 'not_suitable', 'unreviewed']).default('unreviewed'),
-    granularity: z.enum(['nation', 'state', 'county', 'zip', 'point']).optional(),
+    granularity: z.enum(['nation', 'state', 'county', 'tract', 'zip', 'point']).optional(),
     coverage: z
       .array(
         z.object({

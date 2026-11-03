@@ -10,7 +10,7 @@ Every dataset records the places it covers, separately from how finely its rows 
 | Field | Meaning | Example |
 |---|---|---|
 | `coverage` | Which places the data is about | national CHR file: `nation`; TRI Tennessee: `state 47`; Knox County Schools: `county 47093` |
-| `geographic_granularity` | What one row describes | `state`, `county`, `zip` or `point` |
+| `geographic_granularity` | What one row describes | `state`, `county`, `tract`, `zip` or `point` |
 
 - **Local data only:** a dataset whose `filters` show no state, county or ZIP breakdown is out of
   scope (web#42). It stays in the backend's YAML and SQLite, but the catalog export and the dev API

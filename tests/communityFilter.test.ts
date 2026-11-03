@@ -170,7 +170,7 @@ test('coverage: county match includes the dataset', () => {
 
 test('coverage: national or same-state data needs county-level granularity', () => {
   const nation = [{ level: 'nation' as const, geoid: 'US' }];
-  for (const g of ['county', 'zip', 'point'] as const) {
+  for (const g of ['county', 'tract', 'zip', 'point'] as const) {
     assert.equal(matchesCommunity(covered(nation, g), knox), true, g);
   }
   assert.equal(matchesCommunity(covered(nation, 'state'), knox), false);
