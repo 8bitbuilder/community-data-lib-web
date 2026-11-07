@@ -113,7 +113,6 @@ function isDataResourcesActive(path: string): boolean {
 
     <!-- CTA + hamburger -->
     <div class="nav-actions">
-      <button type="button" class="nav-editor" data-editor-auth hidden>Editor sign in</button>
       <ul class="nav-icons">
         {iconLinks.map((link) => (
           <li>
@@ -139,6 +138,10 @@ function isDataResourcesActive(path: string): boolean {
         ))}
       </ul>
       <a href={createCommunityHref} class="nav-cta">Create A Community Library</a>
+      <button type="button" class="nav-editor" data-editor-auth data-editor-icon aria-label="Editor sign in" title="Editor sign in" hidden>
+        <!-- Lucide "user-round-key" (lucide.dev, ISC license) -->
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 11v6"/><path d="M19 13h2"/><path d="M2 21a8 8 0 0 1 12.868-6.349"/><circle cx="10" cy="8" r="5"/><circle cx="19" cy="19" r="2"/></svg>
+      </button>
       <button
         class="mobile-menu-button"
         aria-label="Toggle navigation menu"
@@ -516,23 +519,29 @@ function isDataResourcesActive(path: string): boolean {
     flex-shrink: 0;
   }
 
+  /* Editor sign-in: a key icon in a navy just lighter than the bar, so it's barely visible. */
   .nav-editor {
     display: none;
-    padding: var(--space-2) var(--space-3);
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
     background: none;
-    color: var(--color-secondary);
-    border: 1.5px solid var(--color-secondary);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    white-space: nowrap;
+    color: #34495F; /* a step lighter than the #23354B bar */
+    border: none;
+    border-radius: 50%;
     cursor: pointer;
-    transition: all 0.18s ease;
+    transition: background 0.15s ease, color 0.15s ease;
   }
 
-  .nav-editor:hover {
-    background: var(--color-secondary);
-    color: #F8FAFC;
+  .nav-editor:hover,
+  .nav-editor:focus-visible {
+    color: #4A6280; /* just a bit lighter on hover */
+  }
+
+  .nav-editor:focus-visible {
+    outline: 2px solid #7CD3C4; /* keyboard users still get a clear focus ring */
+    outline-offset: 2px;
   }
 
   /* GitHub / coffee / lab icon links, in the light blue of the emblem's network nodes. */
@@ -607,7 +616,7 @@ function isDataResourcesActive(path: string): boolean {
 
   @media (min-width: 640px) {
     .nav-cta { display: inline-flex; align-items: center; }
-    .nav-editor:not([hidden]) { display: inline-flex; align-items: center; }
+    .nav-editor:not([hidden]) { display: inline-grid; }
   }
 
   /* ── Hamburger ────────────────────────────────── */

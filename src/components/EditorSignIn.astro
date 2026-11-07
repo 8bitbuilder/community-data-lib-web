@@ -68,7 +68,13 @@
     if (!res || ![200, 401, 403].includes(res.status)) return; // no Netlify Functions here
     const signedIn = res.status === 200;
     for (const button of buttons) {
-      button.textContent = signedIn ? 'Sign out' : 'Editor sign in';
+      const label = signedIn ? 'Sign out' : 'Editor sign in';
+      if (button.hasAttribute('data-editor-icon')) {
+        button.setAttribute('aria-label', label); // icon-only button: keep the icon, update the label
+        button.title = label;
+      } else {
+        button.textContent = label;
+      }
       button.addEventListener('click', signedIn ? signOut : openDialog);
       button.hidden = false;
     }
