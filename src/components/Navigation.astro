@@ -113,7 +113,6 @@ function isDataResourcesActive(path: string): boolean {
 
     <!-- CTA + hamburger -->
     <div class="nav-actions">
-      <button type="button" class="nav-editor" data-editor-auth hidden>Editor sign in</button>
       <ul class="nav-icons">
         {iconLinks.map((link) => (
           <li>
@@ -132,13 +131,39 @@ function isDataResourcesActive(path: string): boolean {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="7" y1="2" x2="7" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="13" y1="2" x2="13" y2="4"/></svg>
               )}
               {link.icon === 'lab' && (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2v7.31"/><path d="M14 9.3V2"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/><path d="M5.52 16h12.96"/></svg>
+                <!-- OPALS Lab mark: four boxes spelling O-P-A-L (O and L knocked out of the filled boxes) -->
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <defs>
+                    <path id="opals-lab-O" fill-rule="evenodd" d="M-2.6 0a2.6 3.2 0 1 0 5.2 0a2.6 3.2 0 1 0 -5.2 0ZM-1.2 0a1.2 2.5 0 1 0 2.4 0a1.2 2.5 0 1 0 -2.4 0Z" />
+                    <path id="opals-lab-P" fill-rule="evenodd" d="M-2.1 3H1V2.6H-0.1V0.6H0.7C2.1 0.6 2.6 -0.4 2.6 -1.2C2.6 -2.1 2.1 -3 0.7 -3H-1.3H-2.1V-2.6H-1.3V2.6H-2.1ZM-0.1 -2.5H0.5C1.3 -2.5 1.6 -1.9 1.6 -1.2C1.6 -0.6 1.3 0.1 0.5 0.1H-0.1Z" />
+                    <path id="opals-lab-A" d="M0 -3H0.8L2.3 2.6H1.2ZM-0.3 -3H0.2L-1.6 2.6H-2.1ZM-1.5 0.8H1.2V1.2H-1.5ZM-2.8 2.6H-0.9V3H-2.8ZM0.6 2.6H2.9V3H0.6Z" />
+                    <path id="opals-lab-L" d="M-2.3 -3H0.4V-2.6H-0.2V2.4H1.7V1.2H2.4V3H-2.3V2.6H-1.5V-2.6H-2.3Z" />
+                    <mask id="opals-lab-knockout" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+                      <rect x="0" y="0" width="24" height="24" fill="#fff" stroke="none" />
+                      <use href="#opals-lab-O" transform="translate(7.5 7.5)" fill="#000" stroke="none" />
+                      <use href="#opals-lab-L" transform="translate(16.5 16.5)" fill="#000" stroke="none" />
+                    </mask>
+                  </defs>
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M12 3v18" />
+                  <path d="M3 12h18" />
+                  <g mask="url(#opals-lab-knockout)" fill="currentColor" stroke="none">
+                    <path d="M5 3h7v9H3V5a2 2 0 0 1 2-2z" />
+                    <path d="M12 12h9v7a2 2 0 0 1-2 2h-7z" />
+                  </g>
+                  <use href="#opals-lab-P" transform="translate(16.25 7.5)" fill="currentColor" stroke="none" />
+                  <use href="#opals-lab-A" transform="translate(7.5 16.5)" fill="currentColor" stroke="none" />
+                </svg>
               )}
             </a>
           </li>
         ))}
       </ul>
       <a href={createCommunityHref} class="nav-cta">Create A Community Library</a>
+      <button type="button" class="nav-editor" data-editor-auth data-editor-icon aria-label="Editor sign in" title="Editor sign in" hidden>
+        <!-- Lucide "user-round-key" (lucide.dev, ISC license) -->
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 11v6"/><path d="M19 13h2"/><path d="M2 21a8 8 0 0 1 12.868-6.349"/><circle cx="10" cy="8" r="5"/><circle cx="19" cy="19" r="2"/></svg>
+      </button>
       <button
         class="mobile-menu-button"
         aria-label="Toggle navigation menu"
@@ -516,23 +541,29 @@ function isDataResourcesActive(path: string): boolean {
     flex-shrink: 0;
   }
 
+  /* Editor sign-in: a key icon in a navy just lighter than the bar, so it's barely visible. */
   .nav-editor {
     display: none;
-    padding: var(--space-2) var(--space-3);
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
     background: none;
-    color: var(--color-secondary);
-    border: 1.5px solid var(--color-secondary);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    white-space: nowrap;
+    color: #34495F; /* a step lighter than the #23354B bar */
+    border: none;
+    border-radius: 50%;
     cursor: pointer;
-    transition: all 0.18s ease;
+    transition: background 0.15s ease, color 0.15s ease;
   }
 
-  .nav-editor:hover {
-    background: var(--color-secondary);
-    color: #F8FAFC;
+  .nav-editor:hover,
+  .nav-editor:focus-visible {
+    color: #4A6280; /* just a bit lighter on hover */
+  }
+
+  .nav-editor:focus-visible {
+    outline: 2px solid #7CD3C4; /* keyboard users still get a clear focus ring */
+    outline-offset: 2px;
   }
 
   /* GitHub / coffee / lab icon links, in the light blue of the emblem's network nodes. */
@@ -607,7 +638,7 @@ function isDataResourcesActive(path: string): boolean {
 
   @media (min-width: 640px) {
     .nav-cta { display: inline-flex; align-items: center; }
-    .nav-editor:not([hidden]) { display: inline-flex; align-items: center; }
+    .nav-editor:not([hidden]) { display: inline-grid; }
   }
 
   /* ── Hamburger ────────────────────────────────── */
@@ -620,7 +651,7 @@ function isDataResourcesActive(path: string): boolean {
     width: 38px;
     height: 38px;
     background: transparent;
-    border: 1.5px solid var(--color-border);
+    border: 1.5px solid rgba(124, 211, 196, 0.45); /* light teal, like the nav icons */
     cursor: pointer;
     border-radius: var(--radius-md);
     transition: border-color 0.15s ease, background 0.15s ease;
@@ -629,8 +660,8 @@ function isDataResourcesActive(path: string): boolean {
   }
 
   .mobile-menu-button:hover {
-    background: var(--color-primary-glow);
-    border-color: var(--color-primary);
+    background: rgba(124, 211, 196, 0.14);
+    border-color: #7CD3C4;
     box-shadow: none;
     transform: none;
   }
@@ -638,24 +669,22 @@ function isDataResourcesActive(path: string): boolean {
   .hb {
     display: block;
     width: 18px;
-    height: 1.5px;
-    background: var(--color-text-muted);
+    height: 2px;
+    background: #7CD3C4; /* light teal, same as the nav icons */
     border-radius: 2px;
     transition: all 0.22s ease;
     transform-origin: center;
   }
 
   .mobile-menu-button.open .hb:nth-child(1) {
-    transform: translateY(6.5px) rotate(45deg);
-    background: var(--color-primary);
+    transform: translateY(7px) rotate(45deg);
   }
   .mobile-menu-button.open .hb:nth-child(2) {
     opacity: 0;
     transform: scaleX(0);
   }
   .mobile-menu-button.open .hb:nth-child(3) {
-    transform: translateY(-6.5px) rotate(-45deg);
-    background: var(--color-primary);
+    transform: translateY(-7px) rotate(-45deg);
   }
 
   @media (min-width: 1280px) {
