@@ -629,7 +629,7 @@ function isDataResourcesActive(path: string): boolean {
     width: 38px;
     height: 38px;
     background: transparent;
-    border: 1.5px solid var(--color-border);
+    border: 1.5px solid rgba(124, 211, 196, 0.45); /* light teal, like the nav icons */
     cursor: pointer;
     border-radius: var(--radius-md);
     transition: border-color 0.15s ease, background 0.15s ease;
@@ -638,8 +638,8 @@ function isDataResourcesActive(path: string): boolean {
   }
 
   .mobile-menu-button:hover {
-    background: var(--color-primary-glow);
-    border-color: var(--color-primary);
+    background: rgba(124, 211, 196, 0.14);
+    border-color: #7CD3C4;
     box-shadow: none;
     transform: none;
   }
@@ -647,24 +647,22 @@ function isDataResourcesActive(path: string): boolean {
   .hb {
     display: block;
     width: 18px;
-    height: 1.5px;
-    background: var(--color-text-muted);
+    height: 2px;
+    background: #7CD3C4; /* light teal, same as the nav icons */
     border-radius: 2px;
     transition: all 0.22s ease;
     transform-origin: center;
   }
 
   .mobile-menu-button.open .hb:nth-child(1) {
-    transform: translateY(6.5px) rotate(45deg);
-    background: var(--color-primary);
+    transform: translateY(7px) rotate(45deg);
   }
   .mobile-menu-button.open .hb:nth-child(2) {
     opacity: 0;
     transform: scaleX(0);
   }
   .mobile-menu-button.open .hb:nth-child(3) {
-    transform: translateY(-6.5px) rotate(-45deg);
-    background: var(--color-primary);
+    transform: translateY(-7px) rotate(-45deg);
   }
 
   @media (min-width: 1280px) {
