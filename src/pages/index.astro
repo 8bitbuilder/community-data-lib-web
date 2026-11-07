@@ -22,8 +22,11 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
     <div class="hero-copy">
       <br />
       <h1 class="hero-title" id="hero-title">Community Data Libraries</h1>
+      <!-- Two stacked copies: the gridded font in yellow underneath, the plain font in teal on top
+           (the two fonts share metrics, so the letters land exactly on the grid). -->
       <p class="hero-kicker">
-        &nbsp;&nbsp;&nbsp;Data about your community, for your community&nbsp;&nbsp;&nbsp;
+        <span class="hero-kicker-grid" aria-hidden="true">&nbsp;&nbsp;&nbsp;Data about your community, for your community&nbsp;&nbsp;&nbsp;</span>
+        <span class="hero-kicker-text">&nbsp;&nbsp;&nbsp;Data about your community, for your community&nbsp;&nbsp;&nbsp;</span>
       </p>
       <p class="hero-body">
         A free, open-source tool to locate and explore data about the U.S. community near you.
@@ -227,13 +230,27 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
   }
 
   .hero-kicker {
+    display: grid;
     margin: 0;
-    font-family: 'Micro 5 Charted', var(--font-mono);
     font-size: clamp(1.5rem, 2.6vw, 2rem);
     font-weight: 400;
     line-height: 1.3;
-    color: #25808f; /* darkened from #3EA8BC to meet WCAG AA contrast (4.6:1) */
     text-wrap: balance;
+  }
+
+  /* Both layers fill the same grid cell, so they sit exactly on top of each other. */
+  .hero-kicker > span {
+    grid-area: 1 / 1;
+  }
+
+  .hero-kicker-grid {
+    font-family: 'Micro 5 Charted', var(--font-mono);
+    color: #D4A017; /* gridlines: brand mustard */
+  }
+
+  .hero-kicker-text {
+    font-family: 'Micro 5', var(--font-mono);
+    color: #25808f; /* darkened from #3EA8BC to meet WCAG AA contrast (4.6:1) */
   }
 
   .hero-title {
