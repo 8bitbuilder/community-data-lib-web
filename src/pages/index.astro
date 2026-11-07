@@ -66,7 +66,9 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
     <!-- 1. Complete Catalog -->
     <article class="feature">
       <div class="feature-text">
-        <p class="feature-eyebrow">Complete Catalog</p>
+        <p class="feature-eyebrow">
+          <span class="grid-layer" aria-hidden="true">&nbsp;Complete Catalog&nbsp;</span><span class="text-layer">&nbsp;Complete Catalog&nbsp;</span>
+        </p>
         <h2 class="feature-title">View all available datasets.</h2>
         <p>
           The Complete Catalog is the list of all datasets we have in our master library so far (and
@@ -93,7 +95,9 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
     <!-- 2. Community Library -->
     <article class="feature feature-flip">
       <div class="feature-text">
-        <p class="feature-eyebrow">Community Data Libraries</p>
+        <p class="feature-eyebrow">
+          <span class="grid-layer" aria-hidden="true">&nbsp;Community Data Libraries&nbsp;</span><span class="text-layer">&nbsp;Community Data Libraries&nbsp;</span>
+        </p>
         <h2 class="feature-title">Create a data library for your community.</h2>
         <p>
           Use our tools to quickly create a community data library (CDL) for your community. Your
@@ -120,7 +124,9 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
     <!-- 3. Statistical tags for K-12 data science (Data Resources secondary) -->
     <article class="feature">
       <div class="feature-text">
-        <p class="feature-eyebrow">K-12 Data Science & Statistics Tags</p>
+        <p class="feature-eyebrow">
+          <span class="grid-layer" aria-hidden="true">&nbsp;K-12 Data Science & Statistics Tags&nbsp;</span><span class="text-layer">&nbsp;K-12 Data Science & Statistics Tags&nbsp;</span>
+        </p>
         <h2 class="feature-title">Find data for the content you're teaching.</h2>
         <p>
           Datasets are tagged with the K-12 statistical and data science content their variables can
@@ -514,24 +520,32 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
     max-width: 48ch;
   }
 
-  /* Same gridded pixel font as the hero tagline. No letter-spacing, so the grid
-     drawn inside the glyphs stays continuous; a padding space on each side
-     extends the grid past the text, like the tagline's &nbsp;s. */
+  /* Same two-layer pixel type as the hero tagline: mustard grid underneath, teal letters on
+     top. No letter-spacing, so the grid stays continuous; the &nbsp; on each side extends
+     the grid past the text. */
   .feature-eyebrow,
   .feature-text .feature-eyebrow {
+    display: grid;
     margin: 0;
-    font-family: 'Micro 5 Charted', var(--font-mono);
     font-size: 2rem;
     font-weight: 400;
     line-height: 1.2;
-    color: var(--color-primary); /* dark teal #0E7265 */
     letter-spacing: 0;
     text-transform: uppercase;
   }
 
-  .feature-eyebrow::before,
-  .feature-eyebrow::after {
-    content: '\00a0';
+  .feature-eyebrow > span {
+    grid-area: 1 / 1;
+  }
+
+  .feature-eyebrow .grid-layer {
+    font-family: 'Micro 5 Charted', var(--font-mono);
+    color: #B8860B; /* gridlines: darker gold, to hold up on the tinted section bands */
+  }
+
+  .feature-eyebrow .text-layer {
+    font-family: 'Micro 5', var(--font-mono);
+    color: var(--color-primary); /* dark teal #0E7265 */
   }
 
   .feature-title {
