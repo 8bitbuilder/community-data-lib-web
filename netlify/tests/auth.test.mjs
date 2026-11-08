@@ -42,19 +42,40 @@ function setup() {
 const linkToken = (email = 'alice@example.org', exp = NOW + 60_000, nonce = 'nonce-1') =>
   signToken({ email, exp, nonce, purpose: 'link' }, config.authSecret);
 
-test('request-link: identical responses for allowed, unknown, and rate-limited emails', async () => {
+test('request-link: approved email gets a link and a success message', async () => {
   const { sent, deps } = setup();
-  const handler = requestLink(deps);
-  const bodies = [];
-  for (const email of ['  ALICE@example.org ', 'mallory@example.org', 'alice@example.org', 'alice@example.org', 'alice@example.org']) {
-    const res = await handler(post('auth-request-link', { email }), { ip: '1.2.3.4' });
-    assert.equal(res.status, 200);
-    bodies.push(await res.text());
-  }
-  assert.equal(new Set(bodies).size, 1);
-  assert.equal(sent.length, 3); // 3 allowed requests within the per-email limit; the 4th alice request is limited
+  const res = await requestLink(deps)(post('auth-request-link', { email: '  ALICE@example.org ' }), { ip: '1.2.3.4' });
+  assert.equal(res.status, 200);
+  assert.match((await res.json()).message, /check your email/i);
+  assert.equal(sent.length, 1);
   assert.equal(sent[0].to, 'alice@example.org');
   assert.match(sent[0].link, /^https:\/\/cdl\.example\/\.netlify\/functions\/auth-verify\?token=/);
+});
+
+test('request-link: email not on the list gets an error and no link', async () => {
+  const { sent, deps } = setup();
+  const res = await requestLink(deps)(post('auth-request-link', { email: 'mallory@example.org' }), { ip: '1.2.3.4' });
+  assert.equal(res.status, 403);
+  assert.match((await res.json()).error, /isn't on the approved editor list/);
+  assert.equal(sent.length, 0);
+});
+
+test('request-link: too many attempts for one email gets a 429 and no link', async () => {
+  const { sent, deps } = setup();
+  const handler = requestLink(deps);
+  for (let i = 0; i < 3; i++) await handler(post('auth-request-link', { email: 'alice@example.org' }), { ip: '1.2.3.4' });
+  const res = await handler(post('auth-request-link', { email: 'alice@example.org' }), { ip: '1.2.3.4' });
+  assert.equal(res.status, 429);
+  assert.match((await res.json()).error, /too many attempts/i);
+  assert.equal(sent.length, 3);
+});
+
+test('request-link: unlisted emails are rate limited too, which slows probing of the list', async () => {
+  const { deps } = setup();
+  const handler = requestLink(deps);
+  for (let i = 0; i < 20; i++) await handler(post('auth-request-link', { email: `probe${i}@example.org` }), { ip: '1.2.3.4' });
+  const res = await handler(post('auth-request-link', { email: 'probe-last@example.org' }), { ip: '1.2.3.4' });
+  assert.equal(res.status, 429);
 });
 
 test('request-link: rejects bad origin, bad JSON, and malformed emails', async () => {
@@ -65,31 +86,24 @@ test('request-link: rejects bad origin, bad JSON, and malformed emails', async (
   assert.equal((await handler(new Request(`${URL_BASE}/auth-request-link`), {})).status, 405);
 });
 
-test('request-link: email failure still returns the same 200', async () => {
+test('request-link: email failure returns an error, not a success message', async () => {
   const { deps } = setup();
   const handler = requestLink({ ...deps, sendMail: async () => { throw new Error('resend down'); } });
-  assert.equal((await handler(post('auth-request-link', { email: 'alice@example.org' }), {})).status, 200);
+  const res = await handler(post('auth-request-link', { email: 'alice@example.org' }), {});
+  assert.equal(res.status, 502);
+  assert.match((await res.json()).error, /couldn't send/i);
 });
 
-test('request-link: no timing leak (never-resolving sendMail, context.waitUntil)', async () => {
+test('request-link: does not reply until the email has been accepted', async () => {
   const { deps } = setup();
-  let waitUntilCalled = false;
-  const handler = requestLink({ ...deps, sendMail: () => new Promise(() => {}) });
-  const context = { ip: '1.2.3.4', waitUntil: (p) => { waitUntilCalled = true; } };
-  const promise = handler(post('auth-request-link', { email: 'alice@example.org' }), context);
-  const race = Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 200))]);
-  const res = await race;
-  assert.equal(res.status, 200);
-  assert.equal(waitUntilCalled, true);
-});
-
-test('request-link: unknown email does not call context.waitUntil', async () => {
-  const { deps } = setup();
-  let waitUntilCalled = false;
-  const handler = requestLink(deps);
-  const context = { ip: '1.2.3.4', waitUntil: (p) => { waitUntilCalled = true; } };
-  await handler(post('auth-request-link', { email: 'unknown@example.org' }), context);
-  assert.equal(waitUntilCalled, false);
+  let accept;
+  const handler = requestLink({ ...deps, sendMail: () => new Promise((resolve) => { accept = resolve; }) });
+  let replied = false;
+  const pending = handler(post('auth-request-link', { email: 'alice@example.org' }), {}).then((res) => { replied = true; return res; });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(replied, false);
+  accept();
+  assert.equal((await pending).status, 200);
 });
 
 test('verify GET shows a confirm page and does NOT consume the link (email scanners)', async () => {

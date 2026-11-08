@@ -1,0 +1,99 @@
+---
+// Pop-up behind the navbar's "Editor sign in" buttons ([data-editor-auth] in Navigation.astro).
+// Server side lives in netlify/functions/; on hosts without Netlify Functions the buttons stay hidden.
+---
+<dialog id="editor-signin-dialog" class="editor-signin" aria-labelledby="editor-signin-title">
+  <h2 id="editor-signin-title">Editor sign in</h2>
+  <p>Enter your approved email and we'll send you a sign-in link.</p>
+  <form id="editor-signin-form">
+    <label>Email <input type="email" name="email" required autocomplete="email" /></label>
+    <p id="editor-signin-message" class="editor-signin-message" role="status" hidden></p>
+    <div class="editor-signin-actions">
+      <button type="button" id="editor-signin-cancel" class="editor-signin-cancel">Close</button>
+      <button type="submit" class="editor-signin-submit">Send sign-in link</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  /* global RequestInit */
+
+  const FN = '/.netlify/functions';
+  const buttons = document.querySelectorAll<HTMLButtonElement>('[data-editor-auth]');
+  const dialog = document.getElementById('editor-signin-dialog') as HTMLDialogElement;
+  const form = document.getElementById('editor-signin-form') as HTMLFormElement;
+  const message = document.getElementById('editor-signin-message') as HTMLElement;
+  const submit = form.querySelector<HTMLButtonElement>('button[type=submit]')!;
+
+  function say(text: string, isError: boolean) {
+    message.textContent = text;
+    message.classList.toggle('is-error', isError);
+    message.hidden = !text;
+  }
+
+  async function request(path: string, init: RequestInit = {}) {
+    return fetch(`${FN}/${path}`, { credentials: 'same-origin', ...init, headers: { 'content-type': 'application/json' } });
+  }
+
+  async function signOut() {
+    await request('auth-logout', { method: 'POST' }).catch(() => null);
+    location.reload();
+  }
+
+  function openDialog() {
+    say('', false);
+    dialog.showModal();
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const email = new FormData(form).get('email');
+    submit.disabled = true;
+    say('Sending…', false);
+    try {
+      const res = await request('auth-request-link', { method: 'POST', body: JSON.stringify({ email }) });
+      const body = await res.json().catch(() => null);
+      if (res.status === 403 && body?.error === 'Bad origin') say('Editing is only available on the main site.', true);
+      else say(body?.message ?? body?.error ?? 'Something went wrong.', !res.ok);
+    } catch {
+      say('Network error — please try again.', true);
+    }
+    submit.disabled = false;
+  });
+
+  document.getElementById('editor-signin-cancel')!.addEventListener('click', () => dialog.close());
+
+  async function init() {
+    const res = await request('auth-me').catch(() => null);
+    if (!res || ![200, 401, 403].includes(res.status)) return; // no Netlify Functions here
+    const signedIn = res.status === 200;
+    for (const button of buttons) {
+      const label = signedIn ? 'Sign out' : 'Editor sign in';
+      if (button.hasAttribute('data-editor-icon')) {
+        button.setAttribute('aria-label', label); // icon-only button: keep the icon, update the label
+        button.title = label;
+      } else {
+        button.textContent = label;
+      }
+      button.addEventListener('click', signedIn ? signOut : openDialog);
+      button.hidden = false;
+    }
+  }
+
+  init();
+</script>
+
+<style>
+  .editor-signin { width: min(26rem, calc(100vw - 2rem)); margin: auto; padding: 1.5rem; border: 1px solid var(--color-border, #d0d7de); border-radius: var(--radius-md); }
+  .editor-signin::backdrop { background: rgb(0 0 0 / 0.4); }
+  .editor-signin h2 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+  .editor-signin p { margin: 0 0 1rem; }
+  .editor-signin label { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 1rem; font-weight: 600; }
+  .editor-signin input { width: 100%; padding: 0.5rem; font-weight: 400; border: 1px solid var(--color-border, #d0d7de); border-radius: var(--radius-md); }
+  .editor-signin-message.is-error { color: #b42318; }
+  .editor-signin-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+  .editor-signin-actions button { padding: 0.5rem 1rem; border-radius: var(--radius-md); border: 1.5px solid var(--color-secondary); font-weight: 600; cursor: pointer; }
+  .editor-signin-cancel { background: none; color: var(--color-secondary); }
+  .editor-signin-submit { background: var(--color-secondary); color: #F8FAFC; }
+  .editor-signin-submit:disabled { opacity: 0.6; cursor: wait; }
+</style>

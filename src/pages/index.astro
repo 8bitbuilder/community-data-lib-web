@@ -1,13 +1,14 @@
 ---
 import Layout from '@layouts/Layout.astro';
-import { getCollection } from 'astro:content';
-import submissions from '@data/community-submissions.json';
+import { Picture } from 'astro:assets';
 import { withBasePath } from '@lib/paths';
+import heroCityscape from '../assets/home/hero-cityscape.png';
 
-const catalogResources = await getCollection('master-library');
-const datasetCount = catalogResources.filter((entry) => entry.data.category === 'dataset').length;
-const communityResourceCount = submissions.length;
-const regionCount = new Set(submissions.map((entry) => entry.region)).size;
+// Pointillist feature illustrations, drawn in the hero cityscape's palette
+// (generated with a Python script; the Knox map uses Census TIGER/Line 2025 county outlines).
+import artCatalog from '../assets/home/art-catalog.svg?url';
+import artCommunity from '../assets/home/art-community.svg?url';
+import artDotplot from '../assets/home/art-dotplot.svg?url';
 ---
 
 <Layout
@@ -15,716 +16,431 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
   description="Discover curated data science resources and contribute to our growing community library of datasets, tools, guides, and research papers."
 >
   <!-- ═══════════════════════════════════════════
-       HERO — asymmetric split, generous breathing room
+       HERO — centered copy, full-bleed illustration below
   ═══════════════════════════════════════════ -->
-  <section class="hero" aria-label="Introduction">
-    <div class="hero-text">
-      <div class="hero-kicker">
-        <span class="kicker-dot"></span>
-        Open-Source · Community-Focused · Free Forever
-      </div>
-
-      <h1 class="hero-title">Community Data Libraries</h1>
-
-      <div class="hero-rule" aria-hidden="true"></div>
-
-      <p class="hero-body">
-        Community Data Libraries is an open-source resource to explore and locate
-        datasets for a specific region or community near you.
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <br />
+      <h1 class="hero-title" id="hero-title">Community Data Libraries</h1>
+      <!-- Two stacked copies: the gridded font in yellow underneath, the plain font in teal on top
+           (the two fonts share metrics, so the letters land exactly on the grid). -->
+      <p class="hero-kicker">
+        <span class="hero-kicker-grid" aria-hidden="true">&nbsp;&nbsp;&nbsp;Data about your community, for your community&nbsp;&nbsp;&nbsp;</span>
+        <span class="hero-kicker-text">&nbsp;&nbsp;&nbsp;Data about your community, for your community&nbsp;&nbsp;&nbsp;</span>
       </p>
+      <p class="hero-body">
+        A free, open-source tool to locate and explore data about the U.S. community near you.
+      </p>
+      <div class="hero-actions">
+        <a href={withBasePath('/complete-catalog')} class="btn btn-primary btn-large">
+          Explore the data catalog
+        </a>
+        <a href={withBasePath('/create-community-library')} class="btn btn-secondary btn-large">
+          Build a community library
+        </a>
+      </div>
     </div>
-
-    <!-- Hero visual — abstract data grid -->
-    <div class="hero-visual" aria-hidden="true">
-      <div class="viz-glow"></div>
-      <div class="viz-card">
-        <div class="viz-header">
-          <span class="viz-dot r"></span>
-          <span class="viz-dot y"></span>
-          <span class="viz-dot g"></span>
-          <span class="viz-label">census-acs-demographics.csv</span>
-        </div>
-        <div class="viz-table">
-          <div class="vt-head">
-            <span>county_fips</span><span>population</span><span>median_income</span><span>category</span>
-          </div>
-          {[
-            ['17031', '5,275,541', '$62,088', 'Cook, IL'],
-            ['06037', '9,829,544', '$71,358', 'Los Angeles, CA'],
-            ['48201', '4,728,030', '$60,154', 'Harris, TX'],
-            ['04013', '4,420,568', '$66,422', 'Maricopa, AZ'],
-            ['06073', '3,338,330', '$79,506', 'San Diego, CA'],
-            ['06059', '3,175,692', '$83,044', 'Orange, CA'],
-          ].map(([fips, pop, income, name]) => (
-            <div class="vt-row">
-              <span class="mono">{fips}</span>
-              <span class="mono">{pop}</span>
-              <span class="mono">{income}</span>
-              <span>{name}</span>
-            </div>
-          ))}
-        </div>
-        <div class="viz-footer">
-          <span class="viz-tag">dataset</span>
-          <span class="viz-tag">beginner</span>
-          <span class="viz-tag">demographics</span>
-          <span class="viz-more">+3,142 rows</span>
-        </div>
-      </div>
-
-      <!-- Floating stat badges -->
-      <div class="badge badge-1">
-        <strong>{datasetCount}</strong>
-        <span>Curated datasets</span>
-      </div>
-      <div class="badge badge-2">
-        <span>Any</span>
-        <strong>U.S.</strong>
-        <span>Community</span>
+    <br />
+    <br />
+    <div class="hero-art">
+      <div class="hero-art-frame">
+        <Picture
+          src={heroCityscape}
+          formats={['avif', 'webp']}
+          widths={[800, 1400, 2172]}
+          sizes="100vw"
+          alt="Illustration of a town drawn in dots (houses, a school, trees and people walking) linked overhead by a network of data points."
+          loading="eager"
+          fetchpriority="high"
+        />
+        <!-- Animated glow laid over the sun in the illustration -->
+        <span class="sun-glow" aria-hidden="true"></span>
       </div>
     </div>
   </section>
 
-  <div class="section-divider" aria-hidden="true"></div>
-
   <!-- ═══════════════════════════════════════════
-       DIRECTORY — numbered editorial cards
+       FEATURE ROWS — alternating text / visual
   ═══════════════════════════════════════════ -->
-  <section class="directory-section" aria-labelledby="directory-heading">
-    <header class="section-header">
-      <p class="section-eyebrow">Explore the platform</p>
-      <h2 class="section-title" id="directory-heading">
-        Find the right place to start.
-      </h2>
-    </header>
-
-    <div class="directory-grid">
-      <article class="directory-card dc-1">
-        <div class="directory-head">
-          <h3 class="directory-title">
-            <a href={withBasePath('/complete-catalog')}>Complete Catalog</a>
-          </h3>
-          <span class="directory-index" aria-hidden="true">01</span>
-        </div>
-        <p>
-          New to the platform? Start with the Complete Catalog. This is the master
-          collection of all datasets available across the platform, giving you
-          access to the full range of information that has been added to the
-          system.
+  <section class="features" aria-label="What you can do">
+    <!-- 1. Complete Catalog -->
+    <article class="feature">
+      <div class="feature-text">
+        <p class="feature-eyebrow">
+          <span class="grid-layer" aria-hidden="true">&nbsp;Complete Catalog&nbsp;</span><span class="text-layer">&nbsp;Complete Catalog&nbsp;</span>
         </p>
-      </article>
-
-      <article class="directory-card dc-2">
-        <div class="directory-head">
-          <h3 class="directory-title">
-            <a href={withBasePath('/create-community-library')}>Community Library</a>
-          </h3>
-          <span class="directory-index" aria-hidden="true">02</span>
-        </div>
+        <h2 class="feature-title">View all available datasets.</h2>
         <p>
-          Need data for a specific area? Create your own Community Library to
-          generate a curated collection of datasets tailored to a selected
-          community or region. Built from the Complete Catalog, it automatically
-          includes only datasets with information relevant to that area, making it
-          easier to discover local data and insights without searching through
-          the entire collection. You can view an example community library
-          <a href={withBasePath('/communities/knox-county/')}>here</a>.
+          The Complete Catalog is the list of all datasets we have in our master library so far (and
+          that are used to populate the local community data libraries). Are we missing a great one?
+          <a href={withBasePath('/submit')}>Suggest it</a>.
         </p>
-      </article>
+        <a class="btn btn-secondary feature-link" href={withBasePath('/complete-catalog')}
+          >Browse the complete catalog</a
+        >
+      </div>
+      <div class="feature-visual">
+        <img
+          class="dot-art"
+          src={artCatalog}
+          alt="A tall bookshelf full of books, drawn in dots"
+          width="480"
+          height="370"
+          loading="lazy"
+          decoding="async"
+        />
+      </div>
+    </article>
 
-      <article class="directory-card dc-3">
-        <div class="directory-head">
-          <h3 class="directory-title">
-            <a href={withBasePath('/data-resources')}>Data Resources</a>
-          </h3>
-          <span class="directory-index" aria-hidden="true">03</span>
-        </div>
-        <p>
-          The Data Resources section contains open-source educational and
-          community engagement materials developed by our team. These resources
-          are intended to support the use of the Community Data Library (CDL) in
-          a variety of settings, including classrooms and community workshops.
-          Planned resources include lesson plans, guided activities, and other
-          tools designed to help users explore, analyze, and discuss community
-          data.
+    <!-- 2. Community Library -->
+    <article class="feature feature-flip">
+      <div class="feature-text">
+        <p class="feature-eyebrow">
+          <span class="grid-layer" aria-hidden="true">&nbsp;Community Data Libraries&nbsp;</span><span class="text-layer">&nbsp;Community Data Libraries&nbsp;</span>
         </p>
-      </article>
+        <h2 class="feature-title">Create a data library for your community.</h2>
+        <p>
+          Use our tools to quickly create a community data library (CDL) for your community. Your
+          CDL will show only datasets with data about your community. To build your CDL, simply
+          <a href={withBasePath('/create-community-library')}>fill out our form</a>.
+        </p>
+        <a class="btn btn-secondary feature-link" href={withBasePath('/communities/knox-county/')}
+          >See an example library (Knoxville, TN)</a
+        >
+      </div>
+      <div class="feature-visual">
+        <img
+          class="dot-art"
+          src={artCommunity}
+          alt="Dot-density map of Knox County, Tennessee, and its eight neighboring counties, linked by a network"
+          width="480"
+          height="330"
+          loading="lazy"
+          decoding="async"
+        />
+      </div>
+    </article>
 
-      <article class="directory-card dc-4">
-        <div class="directory-head">
-          <h3 class="directory-title">
-            <a href={withBasePath('/maps')}>Interactive Map</a>
-          </h3>
-          <span class="directory-index" aria-hidden="true">04</span>
-        </div>
-        <p>
-          The Interactive Map provides an overview of the data available for
-          communities across the region before a user creates a Community Data
-          Library. Just place a pin on the map at the location of interest and
-          the system will then identify the surrounding community and display a
-          filtered catalog containing datasets relevant to that area. By
-          exploring the map, you can quickly determine what information is
-          currently available for a particular location.
+    <!-- 3. Statistical tags for K-12 data science (Data Resources secondary) -->
+    <article class="feature">
+      <div class="feature-text">
+        <p class="feature-eyebrow">
+          <span class="grid-layer" aria-hidden="true">&nbsp;K-12 Data Science & Statistics Tags&nbsp;</span><span class="text-layer">&nbsp;K-12 Data Science & Statistics Tags&nbsp;</span>
         </p>
-      </article>
-    </div>
+        <h2 class="feature-title">Find data for the content you're teaching.</h2>
+        <p>
+          Datasets are tagged with the K-12 statistical and data science content their variables can
+          support, from distributional characteristics, to significance testing, and more. We
+          provide these in "Teacher View" to make lesson planning easier, but they are still in
+          beta.
+          <!-- address assembled by the script in Layout.astro on interaction; not in the page source -->
+          Please
+          <a href="#" class="js-email" data-u="ofni" data-d="gro.seirarbilatadytinummoc"
+            >provide suggestions</a
+          > for their improvement!
+        </p>
+        <!-- <p class="feature-note">
+          Our team also shares lesson plans and workshop materials in
+          <a href={withBasePath('/data-resources')}>Data Resources</a>.
+        </p> -->
+        <a
+          class="btn btn-secondary feature-link"
+          href={withBasePath('communities/knox-county/catalog/?audience=teacher')}
+          >See K-12 tags in an example CDL</a
+        >
+      </div>
+      <div class="feature-visual">
+        <!-- Callouts use real pedagogical tags from the catalog ("has mode", "right skewed
+             distribution", "contains outliers", "mean median different"), reworded for display.
+             Positions match the leader-line ends drawn in art-dotplot.svg (% of its viewBox). -->
+        <figure class="plot-figure">
+          <img
+            class="dot-art"
+            src={artDotplot}
+            alt="A dot plot of a right-skewed distribution with a dotted density curve, and markers at the mean and median"
+            width="480"
+            height="360"
+            loading="lazy"
+            decoding="async"
+          />
+          <span class="chip plot-tag tag-left" style="left: 25.3%; top: 9.7%">Has a mode</span>
+          <span class="chip plot-tag tag-above" style="left: 75.4%; top: 41.1%"
+            >Right-skewed distribution</span
+          >
+          <span class="chip chip-gold plot-tag tag-above" style="left: 81.9%; top: 55%"
+            >Contains outliers</span
+          >
+          <span class="chip chip-blue plot-tag tag-left" style="left: 31.8%; top: 90%"
+            >Mean ≠ median</span
+          >
+        </figure>
+      </div>
+    </article>
   </section>
 
   <!-- ═══════════════════════════════════════════
        CONTRIBUTE CTA BANNER
   ═══════════════════════════════════════════ -->
-  <section class="cta-banner" aria-label="Contribute">
+  <section class="cta-banner" aria-labelledby="cta-heading">
     <div class="cta-text">
-      <p class="cta-eyebrow">Community-Driven Catalog</p>
-      <h2 class="cta-title">Know an open dataset containing community data?</h2>
-      <p class="cta-body">Help expand the dataset catalog by sharing datasets openly available on the web. All submissions are reviewed before publication.</p>
+      <h2 class="cta-title" id="cta-heading">Know an open dataset containing community data?</h2>
+      <p class="cta-body">
+        Help expand the catalog by sharing datasets openly available on the web. The datasets should
+        include a geographic variable at the state-level or smaller. All submissions are reviewed
+        before addition to our catalog.
+      </p>
     </div>
     <div class="cta-actions">
-      <a href={withBasePath('/submit')} class="btn-primary btn-large">Submit a Resource →</a>
-      <a href="https://github.com/community-data-libraries/web" target="_blank" rel="noopener noreferrer" class="cta-github">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/></svg>
-        View us on GitHub
-      </a>
+      <a href={withBasePath('/submit')} class="btn btn-primary btn-large">Suggest a dataset</a>
     </div>
   </section>
-
 </Layout>
 
 <style>
+  /* The hero art bleeds to the window edges; keep that from adding a sideways scrollbar. */
+  :global(body) {
+    overflow-x: clip;
+  }
+
   /* ══════════════════════════════════════════════
      HERO
   ══════════════════════════════════════════════ */
   .hero {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--space-12);
-    padding: var(--space-16) 0 var(--space-16);
-    align-items: center;
+    padding-top: var(--space-6);
+    margin-bottom: var(--space-4);
   }
 
-  @media (min-width: 900px) {
+  /* Big screens (taller and wider than a laptop): stretch the hero to roughly the window
+     height and center its content, adding space above and below so the first feature row
+     starts just below the fold (only a ~40px sliver of its band peeks up).
+     162px ≈ nav (76) + main top padding (32) + hero bottom margin (16) + the 40px peek. */
+  @media (min-width: 1280px) and (min-height: 900px) {
     .hero {
-      grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-      gap: var(--space-16);
-      padding: var(--space-16) 0 var(--space-20, var(--space-16));
-      min-height: 600px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: calc(100svh - 162px);
     }
   }
 
-  /* ── Text side ───────────────────────────── */
-  .hero-text {
+  .hero-copy {
     display: grid;
-    gap: var(--space-6);
-    justify-items: start;
-    animation: fadeUp 0.7s ease both;
+    justify-items: center;
+    gap: var(--space-4);
+    text-align: center;
+    max-width: 760px;
+    margin: 0 auto;
+    /* Sit above the illustration, which slides up underneath the buttons. */
+    position: relative;
+    z-index: 1;
   }
 
   .hero-kicker {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-family: var(--font-mono);
-    font-size: var(--font-size-xs);
-    font-weight: 500;
-    color: var(--color-primary);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    display: grid;
+    margin: 0;
+    font-size: clamp(1.5rem, 2.6vw, 2rem);
+    font-weight: 400;
     line-height: 1.3;
+    text-wrap: balance;
   }
 
-  .kicker-dot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--color-primary);
-    flex-shrink: 0;
-    animation: pulse 2s ease-in-out infinite;
+  /* Both layers fill the same grid cell, so they sit exactly on top of each other. */
+  .hero-kicker > span {
+    grid-area: 1 / 1;
   }
 
-  @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50%  { opacity: 0.5; transform: scale(0.75); }
+  .hero-kicker-grid {
+    font-family: 'Micro 5 Charted', var(--font-mono);
+    color: #D4A017; /* gridlines: brand mustard */
+  }
+
+  .hero-kicker-text {
+    font-family: 'Micro 5', var(--font-mono);
+    color: #25808f; /* darkened from #3EA8BC to meet WCAG AA contrast (4.6:1) */
   }
 
   .hero-title {
-    font-family: var(--font-display);
-    font-size: clamp(2.8rem, 6vw, 4.5rem);
-    font-weight: 900;
-    line-height: 1.0;
-    letter-spacing: -0.04em;
-    color: var(--color-text);
     margin: 0;
-    max-width: 14ch;
-  }
-
-  .hero-rule {
-    width: 96px;
-    height: 4px;
-    border-radius: 999px;
-    background: var(--color-primary);
-    opacity: 0.85;
+    font-family: var(--font-display);
+    /* vh term keeps the title from eating short laptop screens */
+    font-size: clamp(2.6rem, min(6.5vw, 8.5vh), 4.75rem);
+    font-weight: 700;
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+    color: var(--color-text);
+    text-wrap: balance;
   }
 
   .hero-body {
-    font-size: var(--font-size-lg);
-    color: var(--color-text-muted);
-    line-height: var(--line-height-relaxed);
     margin: 0;
-    max-width: 46ch;
-  }
-
-  /* ── Visual side ──────────────────────────── */
-  .hero-visual {
-    position: relative;
-    isolation: isolate;
-    animation: fadeUp 0.7s 0.15s ease both;
-  }
-
-  /* Soft halo behind the CSV card */
-  .viz-glow {
-    position: absolute;
-    inset: -12% -8%;
-    z-index: -1;
-    border-radius: 50%;
-    background: var(--color-primary-glow);
-    filter: blur(44px);
-    opacity: 0.75;
-    pointer-events: none;
-  }
-
-  .viz-card {
-    background: var(--color-surface);
-    border: 1.5px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    box-shadow: var(--shadow-lg);
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-  }
-
-  .hero-visual:hover .viz-card {
-    transform: translateY(-4px);
-    box-shadow: 0 24px 60px -18px rgba(15, 118, 110, 0.25);
-  }
-
-  .viz-header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-4);
-    background: var(--color-surface-raised);
-    border-bottom: 1.5px solid var(--color-border);
-  }
-
-  .viz-dot {
-    width: 9px; height: 9px;
-    border-radius: 50%;
-    display: block;
-    flex-shrink: 0;
-  }
-
-  .viz-dot.r { background: #E57373; }
-  .viz-dot.y { background: #FFB74D; }
-  .viz-dot.g { background: #81C784; }
-
-  .viz-label {
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    color: var(--color-text-dim);
-    margin-left: var(--space-2);
-  }
-
-  .viz-table { padding: 0; }
-
-  .vt-head {
-    display: grid;
-    grid-template-columns: 80px 100px 120px 1fr;
-    gap: 0;
-    padding: var(--space-3) var(--space-4);
-    background: var(--color-surface-raised);
-    border-bottom: 1px solid var(--color-border);
-    color: var(--color-primary);
-    font-weight: 500;
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .vt-row {
-    display: grid;
-    grid-template-columns: 80px 100px 120px 1fr;
-    gap: 0;
-    padding: var(--space-3) var(--space-4);
-    border-bottom: 1px solid var(--color-border);
+    max-width: 44ch;
+    font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+    line-height: var(--line-height-normal);
     color: var(--color-text-muted);
-    font-size: 0.68rem;
-    transition: background 0.12s ease;
+    text-wrap: pretty;
   }
 
-  .vt-row:last-child { border-bottom: none; }
-  .vt-row:hover { background: var(--color-primary-glow); }
-
-  .vt-row .mono { color: var(--color-text); }
-
-  .viz-footer {
+  .hero-actions {
     display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-4);
-    background: var(--color-surface-raised);
-    border-top: 1.5px solid var(--color-border);
     flex-wrap: wrap;
-  }
-
-  .viz-tag {
-    padding: 3px 9px;
-    background: var(--color-primary-glow);
-    border: 1px solid rgba(15, 118, 110, 0.2);
-    border-radius: var(--radius-sm);
-    font-size: 0.62rem;
-    font-weight: 600;
-    color: var(--color-primary);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .viz-more {
-    margin-left: auto;
-    font-size: 0.65rem;
-    color: var(--color-text-dim);
-  }
-
-  /* Floating badges */
-  .badge {
-    position: absolute;
-    background: var(--color-surface);
-    border: 1.5px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    padding: var(--space-3) var(--space-5);
-    box-shadow: var(--shadow-md);
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    animation: float 4s ease-in-out infinite;
-  }
-
-  .badge strong {
-    font-family: var(--font-display);
-    font-size: 1.4rem;
-    font-weight: 900;
-    color: var(--color-primary);
-    line-height: 1;
-    letter-spacing: -0.04em;
-  }
-
-  .badge span {
-    font-size: 0.65rem;
-    color: var(--color-text-dim);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  .badge-1 {
-    bottom: -28px;
-    left: -28px;
-    animation-delay: 0s;
-  }
-
-  .badge-2 {
-    top: -28px;
-    right: -24px;
-    animation-delay: 1.5s;
-  }
-
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-6px); }
-  }
-
-  @media (max-width: 1100px) {
-    .badge-1 { left: -8px; }
-    .badge-2 { right: -8px; }
-  }
-
-  @media (max-width: 899px) {
-    .badge { display: none; }
-  }
-
-  /* ══════════════════════════════════════════════
-     SECTION DIVIDER
-  ══════════════════════════════════════════════ */
-  .section-divider {
-    height: 1.5px;
-    background: var(--color-border);
-    border: 0;
-    margin: 0 0 var(--space-16);
-    opacity: 0.9;
-  }
-
-  /* ══════════════════════════════════════════════
-     SECTION HEADER
-  ══════════════════════════════════════════════ */
-  .section-header {
-    margin-bottom: var(--space-12);
-    max-width: 38ch;
-  }
-
-  .section-eyebrow {
-    font-family: var(--font-mono);
-    font-size: var(--font-size-xs);
-    font-weight: 600;
-    color: var(--color-primary);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin: 0 0 var(--space-3);
-  }
-
-  .section-title {
-    font-family: var(--font-display);
-    font-size: clamp(var(--font-size-3xl), 4vw, 3rem);
-    font-weight: 900;
-    line-height: 1.1;
-    letter-spacing: -0.03em;
-    color: var(--color-text);
-    margin: 0;
-  }
-
-  /* ══════════════════════════════════════════════
-     DIRECTORY CARDS
-  ══════════════════════════════════════════════ */
-  .directory-section {
-    margin-bottom: var(--space-16);
-  }
-
-  .directory-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--space-6);
-  }
-
-  @media (min-width: 768px) {
-    .directory-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: var(--space-6);
-    }
-  }
-
-  @media (min-width: 1100px) {
-    .directory-grid { gap: var(--space-8); }
-  }
-
-  .directory-card {
-    position: relative;
-    display: grid;
-    align-content: start;
-    gap: var(--space-4);
-    padding: var(--space-8);
-    background: var(--color-surface);
-    border: 1.5px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
-  }
-
-  /* Top accent band, revealed on hover */
-  .directory-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 4px;
-    transform: scaleX(0);
-    transform-origin: left;
-    transition: transform 0.28s ease;
-  }
-
-  .dc-1::before { background: var(--color-primary); }
-  .dc-2::before { background: var(--color-secondary); }
-  .dc-3::before { background: var(--color-accent); }
-  .dc-4::before { background: var(--color-primary); }
-
-  .directory-card:hover,
-  .directory-card:focus-within {
-    transform: translateY(-4px);
-    box-shadow: 0 16px 44px -14px rgba(15, 118, 110, 0.18);
-    border-color: rgba(15, 118, 110, 0.3);
-  }
-
-  .directory-card:hover::before,
-  .directory-card:focus-within::before {
-    transform: scaleX(1);
-  }
-
-  /* Title + number share a baseline-aligned row */
-  .directory-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-4);
-  }
-
-  .directory-index {
-    flex-shrink: 0;
-    font-family: var(--font-mono);
-    font-size: var(--font-size-xs);
-    font-weight: 600;
-    color: var(--color-text-dim);
-    letter-spacing: 0.1em;
-    line-height: 1;
-  }
-
-  .directory-card p {
-    margin: 0;
-    color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
-    line-height: var(--line-height-relaxed);
-    max-width: 60ch;
-  }
-
-  .directory-title {
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: var(--font-size-2xl);
-    font-weight: 700;
-    line-height: 1.25;
-    letter-spacing: -0.03em;
-  }
-
-  .directory-title a {
-    display: inline-flex;
-    align-items: baseline;
-    gap: var(--space-2);
-    color: var(--color-text);
-    text-decoration: none;
-    transition: color 0.18s ease;
-  }
-
-  .directory-title a::after {
-    content: "→";
-    color: var(--color-primary);
-    opacity: 0;
-    transform: translateX(-4px);
-    transition: opacity 0.18s ease, transform 0.18s ease;
-  }
-
-  .directory-title a:hover,
-  .directory-title a:focus-visible {
-    color: var(--color-primary);
-    text-decoration: underline;
-    text-underline-offset: 0.18em;
-  }
-
-  .directory-title a:hover::after,
-  .directory-title a:focus-visible::after {
-    opacity: 1;
-    transform: translateX(0);
-  }
-
-  .directory-title a:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 4px;
-    border-radius: 2px;
-  }
-
-  /* ══════════════════════════════════════════════
-     CTA BANNER
-  ══════════════════════════════════════════════ */
-  .cta-banner {
-    display: grid;
-    grid-template-columns: 1fr;
-    align-items: center;
-    gap: var(--space-10);
-    padding: var(--space-12) var(--space-10);
-    background: var(--color-surface-raised);
-    border: 1.5px solid var(--color-border);
-    border-radius: var(--radius-xl);
-    position: relative;
-    overflow: hidden;
-    margin-bottom: var(--space-16);
-  }
-
-  @media (min-width: 900px) {
-    .cta-banner {
-      grid-template-columns: minmax(0, 1.4fr) auto;
-      padding: var(--space-16);
-      gap: var(--space-16);
-    }
-  }
-
-  .cta-text {
-    position: relative;
-    z-index: 1;
-    display: grid;
+    justify-content: center;
     gap: var(--space-3);
+    margin-top: var(--space-2);
   }
 
-  .cta-eyebrow {
-    font-family: var(--font-mono);
-    font-size: var(--font-size-xs);
-    font-weight: 600;
-    color: var(--color-primary);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin: 0;
+  /* Full-bleed: break out of <main>'s 1200px column. */
+  .hero-art {
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    /* Pull the art up so its empty sky (network lines, sun) tucks behind the buttons
+       and the town is visible without scrolling on laptop screens. */
+    margin-top: calc(-1 * min(10vw, 217px));
   }
 
-  .cta-title {
-    font-family: var(--font-display);
-    font-size: var(--font-size-3xl);
-    font-weight: 900;
-    color: var(--color-text);
-    margin: 0;
-    line-height: 1.15;
-    letter-spacing: -0.03em;
-    max-width: 24ch;
-  }
-
-  .cta-body {
-    margin: 0;
-    font-size: var(--font-size-base);
-    color: var(--color-text-muted);
-    line-height: var(--line-height-relaxed);
-    max-width: 48ch;
-  }
-
-  .cta-actions {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-    flex-shrink: 0;
+  .hero-art-frame {
     position: relative;
-    z-index: 1;
-    align-items: stretch;
+    max-width: 2172px;
+    margin: 0 auto;
   }
 
-  .btn-primary {
+  .hero-art :global(img) {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  /* ── Sun animation ──────────────────────────
+     Positions are % of the illustration, so they track the sun at any width.
+     Sun disc center in the 2172×724 source ≈ (1555, 195). */
+  .sun-glow {
+    position: absolute;
+    pointer-events: none;
+    translate: -50% -50%;
+    left: 71.6%;
+    top: 27%;
+    width: 17%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(255, 196, 60, 0.75) 0%,
+      rgba(255, 196, 60, 0.35) 38%,
+      rgba(255, 196, 60, 0) 70%
+    );
+    mix-blend-mode: multiply;
+    animation: sunPulse 4s ease-in-out infinite;
+  }
+
+  @keyframes sunPulse {
+    0%,
+    100% {
+      scale: 0.8;
+      opacity: 0.35;
+    }
+    50% {
+      scale: 1.15;
+      opacity: 1;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .hero {
+      padding-top: 3.25rem;
+    }
+    /* Drop the spacer <br>s on phones so the illustration lands above the fold. */
+    .hero > br,
+    .hero-copy > br {
+      display: none;
+    }
+    .hero-art {
+      margin-top: var(--space-4);
+    }
+    .hero-actions {
+      flex-direction: column;
+      align-self: stretch;
+    }
+    /* A 3:1 strip gets tiny on phones; crop to the middle of the town instead. */
+    .hero-art :global(img) {
+      height: 210px;
+      object-fit: cover;
+      object-position: 50% 60%;
+    }
+    /* The phone crop moves the sun, so skip the overlay there. */
+    .sun-glow {
+      display: none;
+    }
+  }
+
+  /* ══════════════════════════════════════════════
+     BUTTONS
+  ══════════════════════════════════════════════ */
+  /* Near-square corners, a soft navy offset shadow, solid fills.
+     Hover presses the button down into its shadow. */
+  .btn {
+    --btn-shadow: rgba(35, 53, 75, 0.32); /* soft navy */
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
     padding: var(--space-3) var(--space-6);
-    background: var(--color-secondary);
-    color: #F8FAFC;
-    border: 1.5px solid var(--color-secondary);
-    border-radius: var(--radius-md);
+    border: 2px solid transparent;
+    border-radius: 3px;
+    box-shadow: 3px 4px 8px var(--btn-shadow);
     font-size: var(--font-size-sm);
-    font-weight: 600;
-    letter-spacing: 0.02em;
+    font-weight: 700;
+    letter-spacing: 0.01em;
     text-decoration: none;
-    transition: all 0.18s ease;
-    cursor: pointer;
     white-space: nowrap;
+    cursor: pointer;
+    transition:
+      transform 0.12s ease,
+      box-shadow 0.12s ease,
+      background-color 0.18s ease,
+      color 0.18s ease;
+  }
+
+  .btn:hover {
+    text-decoration: none;
+    transform: translate(1px, 2px);
+    box-shadow: 2px 2px 4px var(--btn-shadow);
+  }
+
+  .btn:active {
+    transform: translate(2px, 3px);
+    box-shadow: 0 0 1px var(--btn-shadow);
+  }
+
+  .btn-primary {
+    background: var(--color-primary);
+    color: #fff;
   }
 
   .btn-primary:hover {
-    background: #0F4A5E;
-    border-color: #0F4A5E;
-    box-shadow: var(--shadow-glow-secondary);
-    transform: translateY(-1px);
-    text-decoration: none;
-    color: #F8FAFC;
+    background: #0b6358;
+    color: #fff;
+  }
+
+  .btn-secondary {
+    /* faint grid-paper lines (echoing the gridded slogan font) on very light teal */
+    background:
+      linear-gradient(rgba(62, 168, 188, 0.09) 1px, transparent 1px) border-box,
+      linear-gradient(90deg, rgba(62, 168, 188, 0.09) 1px, transparent 1px) border-box,
+      #eef8f8 border-box;
+    background-size:
+      6px 6px,
+      6px 6px;
+    border: 2px solid transparent;
+    color: #23354b;
+  }
+
+  .btn-secondary:hover {
+    color: var(--color-primary);
+  }
+
+  .btn-primary:focus-visible,
+  .btn-secondary:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
   }
 
   .btn-large {
@@ -732,47 +448,488 @@ const regionCount = new Set(submissions.map((entry) => entry.region)).size;
     font-size: var(--font-size-base);
   }
 
-  .cta-github {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-5);
-    background: transparent;
-    border: 1.5px solid var(--color-border);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    color: var(--color-text-muted);
-    text-decoration: none;
-    transition: all 0.18s ease;
+  /* ══════════════════════════════════════════════
+     FEATURE ROWS
+  ══════════════════════════════════════════════ */
+  /* Each row is a full-width band (like joinmastodon.org): tinted, white, tinted…
+     The band is a pseudo-element that bleeds past <main>'s 1200px column. */
+  .features {
+    display: grid;
+    isolation: isolate;
   }
 
-  .cta-github:hover {
-    border-color: var(--color-text);
+  .feature {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-8);
+    align-items: center;
+    padding-block: var(--space-24);
+  }
+
+  .feature::before,
+  .cta-banner::before {
+    content: '';
+    position: absolute;
+    inset: 0 calc(50% - 50vw);
+    z-index: -1;
+    background: var(--band-bg, transparent);
+  }
+
+  /* Pastel speckles (the Knoxville map's palette) over the contribute band, faded out
+     behind the text so it stays clean. */
+  .cta-banner::after {
+    content: '';
+    position: absolute;
+    inset: 0 calc(50% - 50vw);
+    z-index: -1;
+    background: url('../assets/home/speckle-tile.svg') 0 0 / 260px 260px repeat;
+    opacity: 1;
+    -webkit-mask-image: radial-gradient(ellipse 60% 70% at 50% 50%, transparent 35%, #000 100%);
+    mask-image: radial-gradient(ellipse 60% 70% at 50% 50%, transparent 35%, #000 100%);
+    pointer-events: none;
+  }
+
+  .feature:nth-child(odd) {
+    --band-bg: #f4f8f7;
+  }
+
+  @media (max-width: 640px) {
+    .feature {
+      padding-block: var(--space-12);
+    }
+  }
+
+  @media (min-width: 900px) {
+    .feature {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+      gap: var(--space-16);
+    }
+    .feature-flip .feature-text {
+      order: 2;
+    }
+    .feature-flip .feature-visual {
+      order: 1;
+    }
+  }
+
+  .feature-text {
+    display: grid;
+    gap: var(--space-4);
+    justify-items: start;
+    max-width: 48ch;
+  }
+
+  /* Same two-layer pixel type as the hero tagline: mustard grid underneath, teal letters on
+     top. No letter-spacing, so the grid stays continuous; the &nbsp; on each side extends
+     the grid past the text. */
+  .feature-eyebrow,
+  .feature-text .feature-eyebrow {
+    display: grid;
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+
+  .feature-eyebrow > span {
+    grid-area: 1 / 1;
+  }
+
+  .feature-eyebrow .grid-layer {
+    font-family: 'Micro 5 Charted', var(--font-mono);
+    color: #B8860B; /* gridlines: darker gold, to hold up on the tinted section bands */
+  }
+
+  .feature-eyebrow .text-layer {
+    font-family: 'Micro 5', var(--font-mono);
+    color: var(--color-primary); /* dark teal #0E7265 */
+  }
+
+  .feature-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.9rem, 3.4vw, 2.6rem);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  .feature-text p {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    line-height: var(--line-height-relaxed);
+    color: var(--color-text-muted);
+  }
+
+  /* Pill-shaped light-teal button (builds on .btn-secondary, minus the grid paper). */
+  .feature-link {
+    background: #eef8f8; /* solid light teal, no grid lines */
+    border-radius: 999px;
+    margin-top: var(--space-2);
+    padding: var(--space-3) var(--space-6);
+    /* long labels wrap on narrow phones instead of overflowing */
+    white-space: normal;
+    text-align: center;
+  }
+
+  .feature-visual {
+    position: relative;
+  }
+
+  .dot-art {
+    display: block;
+    width: 100%;
+    max-width: 480px;
+    height: auto;
+    margin: 0 auto;
+  }
+
+  /* Dot plot with tag callouts laid over the leader-line ends */
+  .plot-figure {
+    position: relative;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  /* Chart labels: soft tinted pills in Barlow Semi Condensed, sentence case, no border or shadow.
+     Tint is layered on white so the leader lines don't show through. */
+  .plot-figure .plot-tag {
+    position: absolute;
+    padding: 3px 11px;
+    border: 0;
+    border-radius: 999px;
+    background-color: #fff;
+    background-image: linear-gradient(
+      var(--tag-tint, var(--color-primary-glow)),
+      var(--tag-tint, var(--color-primary-glow))
+    );
+    font-family: var(--font-tag);
+    font-weight: 400;
+    font-size: 0.95rem;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .plot-figure .plot-tag.chip-gold {
+    --tag-tint: rgba(212, 160, 23, 0.16);
+  }
+
+  .plot-figure .plot-tag.chip-blue {
+    --tag-tint: rgba(62, 168, 188, 0.15);
+  }
+
+  .tag-left {
+    translate: calc(-100% - 2px) -50%;
+  }
+
+  .tag-above {
+    translate: -50% calc(-100% - 2px);
+  }
+
+  /* ── Shared mock card pieces ─────────────── */
+  .mock-card {
+    background: var(--color-surface);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 18px 40px -22px rgba(14, 114, 101, 0.35);
+    overflow: hidden;
+    font-size: 0.8rem;
+  }
+
+  .mock-foot {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .mock-foot,
+  .map-caption {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  /* Plain, readable labels: sentence case in the body font, small corner radius (like the buttons) */
+  .chip {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 4px;
+    background: var(--color-primary-glow);
+    color: var(--color-primary);
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.35;
+    white-space: nowrap;
+  }
+
+  .mock-more {
+    margin-left: auto;
+    font-family: var(--font-sans);
+    font-size: 0.68rem;
+    color: var(--color-text-dim);
+  }
+
+  /* ── Complete Catalog mock: list of datasets ── */
+  .lib-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border-bottom: 1.5px solid var(--color-border);
+  }
+
+  .lib-head strong {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
     color: var(--color-text);
-    text-decoration: none;
-    transform: translateY(-1px);
+  }
+
+  .lib-head span:not(.lib-pin) {
+    font-size: 0.72rem;
+    color: var(--color-text-dim);
+  }
+
+  .lib-pin {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .lib-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .lib-list li {
+    display: grid;
+    gap: 4px;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .lib-list li:last-child {
+    border-bottom: none;
+  }
+
+  .lib-title {
+    font-weight: 700;
+    color: var(--color-text);
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .lib-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.72rem;
+    color: var(--color-text-dim);
+  }
+
+  /* Keep the catalog card compact and centred in its (wider) column. */
+  .catalog-card {
+    max-width: 440px;
+    margin: 0 auto;
+  }
+
+  .cat-search {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: var(--space-3) var(--space-4);
+    padding: 7px 12px;
+    border: 1.5px solid var(--color-border);
+    border-radius: 999px;
+    background: #f7faf9;
+    color: var(--color-text-dim);
+    font-size: 0.74rem;
+  }
+
+  .cat-search svg {
+    color: var(--color-primary);
+    flex-shrink: 0;
+  }
+
+  .catalog-card .lib-list {
+    border-top: 1px solid var(--color-border);
+  }
+
+  /* Topic chips in the site's accent colours */
+  .chip-gold {
+    background: rgba(212, 160, 23, 0.16);
+    color: #8a6a0c;
+  }
+  .chip-green {
+    background: var(--color-accent-glow);
+    color: var(--color-accent);
+  }
+  .chip-blue {
+    background: rgba(62, 168, 188, 0.15);
+    color: #1f6f80;
+  }
+
+  /* ── Community Library mock: map of the selected community ── */
+  .map-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #fafcfb;
+  }
+
+  .county path {
+    fill: #e6efec;
+    stroke: #fff;
+    stroke-width: 3;
+    stroke-linejoin: round;
+  }
+
+  .county-active {
+    fill: rgba(14, 114, 101, 0.22);
+    stroke: var(--color-primary);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+  }
+
+  .pin {
+    fill: var(--color-primary);
+  }
+
+  .pin-pulse {
+    fill: var(--color-primary);
+    opacity: 0.12;
+    transform-origin: 172.9px 92.4px;
+    animation: pulse 2.6s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      transform: scale(0.8);
+      opacity: 0.16;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 0.06;
+    }
+  }
+
+  .map-caption {
+    border-top: 1.5px solid var(--color-border);
+  }
+
+  /* ── Statistical tags card ─────────────── */
+  .tag-group {
+    display: grid;
+    gap: 6px;
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .tag-label {
+    font-family: var(--font-sans);
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-dim);
+  }
+
+  .tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .stats-card .lib-head + .tag-group {
+    border-top: none;
+  }
+
+  .stats-card .tag-group:last-child {
+    padding-bottom: var(--space-4);
+  }
+
+  .feature-text .feature-note {
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
+    color: var(--color-text-dim);
+  }
+
+  /* ══════════════════════════════════════════════
+     CTA BANNER
+  ══════════════════════════════════════════════ */
+  /* A plain, centered closing line + one button (no label, no split layout) */
+  .cta-banner {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+    gap: var(--space-6);
+    position: relative;
+    isolation: isolate;
+    padding: var(--space-16) 0;
+    --band-bg: #e3f0ee;
+    /* Run the band straight into the footer: cancel <main>'s bottom padding
+       and the footer's top margin (both set in Layout.astro). */
+    margin-bottom: calc(-1 * (var(--space-8) + var(--space-16)));
+  }
+
+  @media (min-width: 900px) {
+    .cta-banner {
+      padding: var(--space-20, 5rem) 0;
+    }
+  }
+
+  .cta-text {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-3);
+  }
+
+  .cta-title {
+    margin: 0;
+    max-width: 40ch;
+    font-family: var(--font-display);
+    font-size: clamp(1.7rem, 3vw, 2.2rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+
+  .cta-body {
+    margin: 0;
+    max-width: 100ch;
+    text-wrap: balance;
+    color: var(--color-text-muted);
+    line-height: var(--line-height-relaxed);
+  }
+
+  .cta-actions {
+    display: flex;
+    justify-content: center;
   }
 
   /* ══════════════════════════════════════════════
      MOTION
   ══════════════════════════════════════════════ */
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(16px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
   @media (prefers-reduced-motion: reduce) {
-    .hero-text,
-    .hero-visual,
-    .badge,
-    .kicker-dot { animation: none; }
-
-    .directory-card,
-    .viz-card,
-    .btn-primary,
-    .cta-github { transition: none; }
+    .sun-glow {
+      animation: none;
+    }
+    .btn {
+      transition: none;
+    }
   }
 </style>
-

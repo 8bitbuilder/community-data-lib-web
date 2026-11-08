@@ -1,5 +1,5 @@
 function resolveApiBase(): string {
-  const configured = import.meta.env.PUBLIC_API_BASE_URL?.trim();
+  const configured = import.meta.env?.PUBLIC_API_BASE_URL?.trim();
   if (configured) return configured.replace(/\/$/, '');
   // Same origin: in dev, Astro proxies /api/* to backend/server.mjs (see astro.config.mjs).
   // Development only; the deployed Data Preview page reads static files instead.
@@ -18,6 +18,8 @@ export interface SourceDownload {
   url?: string;
   description?: string;
   file_size?: string;
+  sheet?: string | number;
+  header_row?: number;
 }
 
 export interface SourceFilters {
@@ -64,7 +66,34 @@ export interface Datasheet {
   when: string;
 }
 
+/**
+ * A sheet, always as its 0-based position in the workbook. The `sheet` query and
+ * page-URL parameter is an index, never a name, so sheets named like numbers
+ * ("2024", "1") can't be confused with positions.
+ */
+export type SheetParam = number;
+
+/** The `sheet` URL/query value -> 0-based index; anything but whole digits is ignored. */
+export function parseSheetParam(value: string | null | undefined): SheetParam | undefined {
+  return value != null && /^\d+$/.test(value) ? Number(value) : undefined;
+}
+
+export interface ExcelLayout {
+  format: 'xlsx' | 'xls';
+  sheets: string[];
+  sheet: string;
+  headerRow: number;
+  dataRowCount: number;
+  trimmedRows: number;
+  origin: {
+    sheet: 'visitor' | 'curator' | 'auto';
+    headerRow: 'visitor' | 'curator' | 'auto';
+  };
+}
+
 export interface PreviewParams {
+  sheet?: SheetParam;
+  headerRow?: number;
   state?: string;
   county?: string;
   limit?: number;
@@ -79,6 +108,7 @@ export interface PreviewResponse {
   total: number;
   filters: { state: string | null; county: string | null };
   availableFilters: SourceFilters;
+  layout?: ExcelLayout;
 }
 
 export interface ChartSeriesPoint {
@@ -109,6 +139,22 @@ export interface FilterOption {
 
 const API_TIMEOUT_MS = 60_000;
 
+export class ApiError extends Error {
+  status: number;
+  body: Record<string, unknown>;
+  constructor(message: string, status: number, body: Record<string, unknown> = {}) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
+function setLayoutParams(search: URLSearchParams, params: { sheet?: SheetParam; headerRow?: number }) {
+  if (params.sheet != null) search.set('sheet', String(params.sheet));
+  if (params.headerRow != null) search.set('header_row', String(params.headerRow));
+}
+
 async function apiFetch<T>(path: string): Promise<T> {
   try {
     const response = await fetch(`${API_BASE}${path}`, {
@@ -118,16 +164,20 @@ async function apiFetch<T>(path: string): Promise<T> {
       const contentType = response.headers.get('content-type') ?? '';
       if (contentType.includes('text/html')) {
         throw new Error(
-          import.meta.env.DEV
+          import.meta.env?.DEV
             ? `API error ${response.status}: preview API not reachable. Run \`npm run backend:dev\` (port 4323) in the web repo, then reload.`
             : `API error ${response.status}: the preview service is unavailable. Please try again later.`,
         );
       }
-      const body = (await response.json().catch(() => ({}))) as { details?: string; error?: string };
+      const body = (await response.json().catch(() => ({}))) as {
+        details?: string;
+        error?: string;
+        [key: string]: unknown;
+      };
       // e.g. "This dataset can't be previewed yet (XLSX files are not supported…)"
       const message =
         body.error && body.details ? `${body.error} (${body.details})` : body.details ?? body.error;
-      throw new Error(message ?? `API error ${response.status}`);
+      throw new ApiError(message ?? `API error ${response.status}`, response.status, body);
     }
     return response.json() as Promise<T>;
   } catch (error) {
@@ -162,6 +212,7 @@ export async function fetchDatasheet(id: string): Promise<Datasheet> {
 
 export async function fetchPreview(id: string, params: PreviewParams = {}): Promise<PreviewResponse> {
   const search = new URLSearchParams();
+  setLayoutParams(search, params);
   if (params.state) search.set('state', params.state);
   if (params.county) search.set('county', params.county);
   if (params.limit != null) search.set('limit', String(params.limit));
@@ -182,9 +233,12 @@ export async function fetchChart(
     state?: string;
     county?: string;
     limit?: number;
+    sheet?: SheetParam;
+    headerRow?: number;
   } = {},
 ): Promise<ChartResponse> {
   const search = new URLSearchParams();
+  setLayoutParams(search, params);
   if (params.variable) search.set('variable', params.variable);
   if (params.xVariable) search.set('xVariable', params.xVariable);
   if (params.plotType) search.set('plotType', params.plotType);
@@ -201,8 +255,10 @@ export async function fetchFilterOptions(
   id: string,
   type: 'state' | 'county',
   state?: string,
+  layout: { sheet?: SheetParam; headerRow?: number } = {},
 ): Promise<FilterOption[]> {
   const search = new URLSearchParams({ type });
+  setLayoutParams(search, layout);
   if (state) search.set('state', state);
   const data = await apiFetch<{ options: FilterOption[] }>(
     `/api/sources/${encodeURIComponent(id)}/filters?${search}`,
@@ -218,7 +274,7 @@ export function normalizeDescriptionTags(tags: BackendSource['description_tags']
     .map(([tag]) => tag);
 }
 
-export { getPedagogicalTags } from './tags';
+export { getPedagogicalTags } from './tags.ts';
 
 export function buildCatalogDescription(source: BackendSource): string {
   const provider = source.provider?.name ?? 'a government data provider';

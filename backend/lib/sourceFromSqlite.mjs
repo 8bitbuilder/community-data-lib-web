@@ -38,6 +38,12 @@ function buildDownload(row) {
   if (row.download_url) download.url = row.download_url;
   if (row.download_description) download.description = row.download_description;
   if (row.download_file_size) download.file_size = row.download_file_size;
+  if (row.download_sheet) {
+    download.sheet = /^\d+$/.test(row.download_sheet)
+      ? Number(row.download_sheet)
+      : row.download_sheet;
+  }
+  if (row.download_header_row) download.header_row = row.download_header_row;
   return Object.keys(download).length > 0 ? download : null;
 }
 
