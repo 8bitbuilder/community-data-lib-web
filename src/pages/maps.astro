@@ -3,6 +3,7 @@ import { getCollection } from 'astro:content';
 import Layout from '@layouts/Layout.astro';
 import vocabulary from '@data/geo-vocabulary.json';
 import { catalogEntryHref, withBasePath } from '@lib/paths';
+import { granularityLabel } from '@lib/data/communityFilter';
 import {
   buildBoundaryIndex,
   coverageLabel,
@@ -31,6 +32,9 @@ const datasets = entries
     href: catalogEntryHref(entry.data),
     label: coverageLabel(entry.data.coverage, index),
     national: isNational(entry.data.coverage),
+    // Tract or ZIP coverage shades whole counties but describes only part of each.
+    partial: entry.data.coverage.some((c) => c.level === 'tract' || c.level === 'zip'),
+    dataLevel: granularityLabel(entry.data.granularity),
   }))
   .sort((a, b) => a.title.localeCompare(b.title));
 
@@ -60,7 +64,8 @@ const mapData = {
     <h1>Coverage Map</h1>
     <p class="lede">
       See which places each dataset in the catalog describes. A national dataset covers every county; a statewide
-      dataset covers every county in its state.
+      dataset covers every county in its state. A dataset about some census tracts or ZIP codes shades each county
+      they are in, including every county a ZIP code crosses into.
     </p>
 
     <form class="map-controls" id="map-controls">
@@ -157,6 +162,7 @@ const mapData = {
       classForCount,
       countClasses,
       countsByCounty,
+      coverageInCounty,
       datasetsForCounty,
       expandCoverage,
       type BoundaryArea,
@@ -168,6 +174,8 @@ const mapData = {
       href: string;
       label: string;
       national: boolean;
+      partial: boolean;
+      dataLevel: string | null;
     }
     interface BoundaryFeature {
       type: 'Feature';
@@ -332,7 +340,8 @@ const mapData = {
           legendEl.append(swatch(HIGHLIGHT, `Covered by ${dataset.title}`), swatch(null, 'Not covered'));
           noteEl.textContent = dataset.national
             ? 'This is a national dataset: it covers the whole United States, every county in all 50 states and DC.'
-            : `${dataset.label}: ${plural(highlighted.size, 'county', 'counties')}.`;
+            : `${dataset.label}: ${plural(highlighted.size, 'county', 'counties')}.` +
+              (dataset.partial ? ' Its census tracts or ZIP codes cover part of each shaded county.' : '');
           return;
         }
         const title = document.createElement('span');
@@ -384,7 +393,11 @@ const mapData = {
           ...covering.map((d) => {
             const item = document.createElement('li');
             const link = Object.assign(document.createElement('a'), { href: d.href, textContent: d.title });
-            const label = Object.assign(document.createElement('span'), { className: 'coverage-tag', textContent: d.label });
+            const level = d.dataLevel ? ` · by ${d.dataLevel}` : '';
+            const label = Object.assign(document.createElement('span'), {
+              className: 'coverage-tag',
+              textContent: coverageInCounty(d.coverage, geoid, index) + level,
+            });
             item.append(link, label);
             return item;
           })

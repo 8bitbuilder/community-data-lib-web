@@ -7,7 +7,7 @@ import { checkCatalogScope, isNationalLevel } from '../backend/lib/catalogScope.
 // @ts-expect-error plain .mjs module without types
 import { loadAllSources, loadSourceById } from '../backend/lib/sourceStore.mjs';
 // @ts-expect-error plain .mjs module without types
-import { assertCatalogInScope } from '../scripts/sync-catalog-from-backend.mjs';
+import { assertCatalogInScope, coverageLine } from '../scripts/sync-catalog-from-backend.mjs';
 
 const NONE = { year: true, state: false, county: false, zipcode: false };
 
@@ -58,4 +58,17 @@ test('the preview API serves catalog sources only', async () => {
   assert.deepEqual(ids.sort(), catalog.sources.map((source: { id: string }) => source.id).sort());
   for (const id of EXCLUDED) assert.equal(await loadSourceById(id), null, id);
   assert.equal((await loadSourceById('chr-analytic-data-2025')).id, 'chr-analytic-data-2025');
+});
+
+test('coverageLine keeps the counties of tract and zip coverage in the frontmatter', () => {
+  assert.equal(coverageLine({ level: 'nation', geoid: 'US' }), '  - { level: "nation", geoid: "US" }');
+  assert.equal(coverageLine({ level: 'county', geoid: '47093' }), '  - { level: "county", geoid: "47093" }');
+  assert.equal(
+    coverageLine({ level: 'tract', geoid: '47093004600', counties: ['47093'] }),
+    '  - { level: "tract", geoid: "47093004600", counties: ["47093"] }'
+  );
+  assert.equal(
+    coverageLine({ level: 'zip', geoid: '37801', counties: ['47009', '47123'] }),
+    '  - { level: "zip", geoid: "37801", counties: ["47009", "47123"] }'
+  );
 });

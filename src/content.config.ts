@@ -4,6 +4,14 @@ import geoVocabulary from './data/geo-vocabulary.json';
 import { createVocabulary } from './lib/community/geoVocabulary.mjs';
 import { loadCommunities } from './lib/community/communityStore.mjs';
 
+const COVERAGE_GEOID = {
+  nation: /^US$/,
+  state: /^\d{2}$/,
+  county: /^\d{5}$/,
+  tract: /^\d{11}$/,
+  zip: /^\d{5}$/,
+} as const;
+
 const masterLibraryCollection = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/master-library' }),
   schema: z.object({
@@ -34,12 +42,22 @@ const masterLibraryCollection = defineCollection({
     // 'unreviewed' uses the legacy student heuristics in communityFilter.ts.
     studentSuitability: z.enum(['suitable', 'not_suitable', 'unreviewed']).default('unreviewed'),
     granularity: z.enum(['nation', 'state', 'county', 'tract', 'zip', 'point']).optional(),
+    // Tract and zip (ZCTA) entries carry the counties they lie in, from the backend
+    // export's Census crosswalk; see docs/technical/coverage-and-boundaries.md.
     coverage: z
       .array(
-        z.object({
-          level: z.enum(['nation', 'state', 'county']),
-          geoid: z.string().regex(/^(US|\d{2}|\d{5})$/),
-        })
+        z
+          .object({
+            level: z.enum(['nation', 'state', 'county', 'tract', 'zip']),
+            geoid: z.string(),
+            counties: z.array(z.string().regex(/^\d{5}$/)).min(1).optional(),
+          })
+          .refine((c) => COVERAGE_GEOID[c.level].test(c.geoid), {
+            message: 'geoid must be US, a 2-digit state, 5-digit county, 11-digit tract or 5-digit ZCTA code',
+          })
+          .refine((c) => (c.level === 'tract' || c.level === 'zip') === Boolean(c.counties), {
+            message: 'tract and zip coverage need `counties`; other levels must not have it',
+          })
       )
       .default([]),
     url: z.string().url().optional(),

@@ -34,7 +34,7 @@ export interface CatalogEntryData {
   sensitive?: boolean;
   /** Canonical (SQLite) student classification; 'unreviewed' uses the legacy fallback. */
   studentSuitability?: StudentSuitability;
-  /** Places the dataset describes: 'US', 2-digit state FIPS, or 5-digit county FIPS. */
+  /** Places the dataset describes: nation, states, counties, census tracts or ZCTAs. */
   coverage?: CoverageEntry[];
   /** Finest geographic level the data resolves to. */
   granularity?: Granularity;
@@ -42,13 +42,42 @@ export interface CatalogEntryData {
 
 export type StudentSuitability = 'suitable' | 'not_suitable' | 'unreviewed';
 export type Granularity = 'nation' | 'state' | 'county' | 'tract' | 'zip' | 'point';
+export type CoverageLevel = 'nation' | 'state' | 'county' | 'tract' | 'zip';
 export interface CoverageEntry {
-  level: 'nation' | 'state' | 'county';
+  level: CoverageLevel;
+  /** 'US', 2-digit state FIPS, 5-digit county FIPS, 11-digit tract GEOID, or 5-digit ZCTA (level 'zip'). */
   geoid: string;
+  /**
+   * Tract and zip entries only: the counties the place lies in, from the backend export.
+   * A tract's county is its first 5 digits; a ZCTA's come from the backend's Census
+   * ZCTA-to-county crosswalk (data/reference/zcta-county.json), largest share first.
+   */
+  counties?: string[];
 }
 
 /** Levels fine enough to show county-level data for a community. */
 const COUNTY_RESOLVABLE: readonly Granularity[] = ['county', 'tract', 'zip', 'point'];
+
+/**
+ * County FIPS codes a single county, tract or zip coverage entry lies in.
+ * Nation and state entries return [] (they cover whole areas; see matchesCommunity).
+ */
+export function entryCounties(entry: CoverageEntry): string[] {
+  if (entry.level === 'county') return [entry.geoid];
+  if (entry.level === 'tract') return entry.counties ?? [entry.geoid.slice(0, 5)];
+  if (entry.level === 'zip') return entry.counties ?? [];
+  return [];
+}
+
+const GRANULARITY_LABELS: Partial<Record<Granularity, string>> = {
+  tract: 'census tract',
+  zip: 'ZIP code (ZCTA)',
+};
+
+/** What one row describes, for data finer than a county ('census tract'), or null for other levels. */
+export function granularityLabel(granularity: Granularity | undefined): string | null {
+  return (granularity && GRANULARITY_LABELS[granularity]) ?? null;
+}
 
 /** The subset of community configuration this module needs. */
 export interface CommunityGeo {
@@ -96,10 +125,12 @@ export function communityGeoKeys(community: CommunityGeo): string[] {
  * Whether a catalog entry belongs in a community's catalog.
  *
  * Entries with canonical coverage (everything from the SQLite export):
- *   1. coverage includes the community's county FIPS -> include;
+ *   1. coverage includes the community's county, or a tract or ZCTA in it -> include.
+ *      A ZCTA that crosses county lines counts for every county it lists;
  *   2. coverage includes its state or the nation AND the data resolves to county
- *      level or finer (county, zip, point) -> include;
- *   3. otherwise exclude (e.g. state-only or national-only data).
+ *      level or finer (county, tract, zip, point) -> include;
+ *   3. otherwise exclude (e.g. state-only or national-only data, or tracts and
+ *      ZCTAs only in other counties).
  * Entries without coverage (hand-written guides and tools) fall back to tag matching.
  */
 export function matchesCommunity(entry: CatalogEntryData, community: CommunityGeo): boolean {
@@ -114,7 +145,7 @@ function matchesByCoverage(entry: CatalogEntryData, community: CommunityGeo): bo
   if (!countyFips) return false;
   const stateFips = countyFips.slice(0, 2);
   const coverage = entry.coverage ?? [];
-  if (coverage.some((c) => c.level === 'county' && c.geoid === countyFips)) return true;
+  if (coverage.some((c) => entryCounties(c).includes(countyFips))) return true;
   const coversArea = coverage.some(
     (c) => c.level === 'nation' || (c.level === 'state' && c.geoid === stateFips)
   );
