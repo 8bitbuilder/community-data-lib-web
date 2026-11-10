@@ -1,7 +1,7 @@
 ---
 import Layout from '@layouts/Layout.astro';
 import { getCollection } from 'astro:content';
-import { withBasePath } from '@lib/paths';
+import { libraryHref, withBasePath } from '@lib/paths';
 
 // Existing libraries come from the same collection that generates community pages,
 // so this list can never drift from what is actually published.
@@ -84,7 +84,7 @@ const loginHref = withBasePath('/librarian/login/');
           <ul class="community-list">
             {communities.map((community) => (
               <li class="community-item">
-                <a href={withBasePath(`/communities/${community.data.slug}/`)}>
+                <a href={libraryHref(community.data.slug)}>
                   {community.data.name}
                 </a>
                 <span class="community-meta">

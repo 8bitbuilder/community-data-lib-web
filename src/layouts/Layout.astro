@@ -1,7 +1,7 @@
 ---
 import Navigation from '@components/Navigation.astro';
 import { Image } from 'astro:assets';
-import { withBasePath } from '@lib/paths';
+import { libraryHref, withBasePath } from '@lib/paths';
 import cdlEmblem from '../assets/brand/cdl-emblem-transparent.png';
 // Lower-48 county (fainter) + state outlines from Census cb_2024 1:20m, Albers projection.
 // Strokes are baked into the SVG; loaded as a cached file rather than inlined on every page.
@@ -96,7 +96,7 @@ const librarianLoginHref = withBasePath('/librarian/login/');
           </div>
           <nav class="footer-links" aria-label="Footer navigation">
             <a href={withBasePath('/complete-catalog')}>Complete Catalog</a>
-            <a href={withBasePath('/communities/knox-county/')}>Example Community Library</a>
+            <a href={libraryHref('knox-county')}>Example Community Library</a>
             <a href={withBasePath('/create-community-library')}>Create a Community Library</a>
             <a href={withBasePath('/submit')}>Suggest a Dataset</a>
           </nav>

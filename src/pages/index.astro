@@ -1,7 +1,7 @@
 ---
 import Layout from '@layouts/Layout.astro';
 import { Picture } from 'astro:assets';
-import { withBasePath } from '@lib/paths';
+import { libraryHref, withBasePath } from '@lib/paths';
 import heroCityscape from '../assets/home/hero-cityscape.png';
 
 // Pointillist feature illustrations, drawn in the hero cityscape's palette
@@ -97,7 +97,7 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
           CDL will show only datasets with data about your community. To build your CDL, simply
           <a href={withBasePath('/create-community-library')}>fill out our form</a>.
         </p>
-        <a class="btn btn-secondary feature-link" href={withBasePath('/communities/knox-county/')}
+        <a class="btn btn-secondary feature-link" href={libraryHref('knox-county')}
           >See an example library (Knoxville, TN)</a
         >
       </div>
@@ -136,7 +136,7 @@ import artDotplot from '../assets/home/art-dotplot.svg?url';
         </p> -->
         <a
           class="btn btn-secondary feature-link"
-          href={withBasePath('communities/knox-county/catalog/?audience=teacher')}
+          href={libraryHref('knox-county', '/catalog/?audience=teacher')}
           >See K-12 tags in an example CDL</a
         >
       </div>
