@@ -113,9 +113,18 @@ test('other hosts (netlify.app, deploy previews) pass through', () => {
   assert.equal(route('https://deploy-preview-3--cdl.netlify.app/'), null);
 });
 
-test('a main site on another host also redirects old addresses', () => {
-  const other = { libraryDomain: 'communitydatalibraries.org', mainSiteUrl: 'https://cdl.netlify.app' };
-  assert.deepEqual(route('https://cdl.netlify.app/web/communities/knox-county/', other), {
+test('the production setup: main site on netlify.app, libraries on the custom domain', () => {
+  const production = { libraryDomain: 'communitydatalibraries.org', mainSiteUrl: 'https://community-data-libraries.netlify.app' };
+  assert.deepEqual(route('https://community-data-libraries.netlify.app/web/communities/knox-county/', production), {
     redirect: 'https://knox-county.communitydatalibraries.org/',
   });
+  assert.deepEqual(route('https://knox-county.communitydatalibraries.org/web/submit', production), {
+    redirect: 'https://community-data-libraries.netlify.app/web/submit',
+  });
+  assert.equal(route('https://community-data-libraries.netlify.app/web/', production), null);
+  assert.equal(route('https://deploy-preview-64--community-data-libraries.netlify.app/web/communities/knox-county/', production), null);
+  assert.equal(
+    mainSiteUrl('/', { ...production, basePath: '/web' }),
+    'https://community-data-libraries.netlify.app/web/',
+  );
 });

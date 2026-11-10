@@ -129,7 +129,7 @@ Serve each community library on its own subdomain (web#31).
 
 - **`PUBLIC_LIBRARY_DOMAIN`:** e.g. `communitydatalibraries.org`. Libraries then live at
   `https://<slug>.communitydatalibraries.org/`.
-- **`PUBLIC_MAIN_SITE_URL`:** the main site's origin, e.g. `https://communitydatalibraries.org`.
+- **`PUBLIC_MAIN_SITE_URL`:** the main site's origin, `https://community-data-libraries.netlify.app`.
   Library pages link back to the main site with it.
 - **Who reads them:** the build bakes both into links, and the `library-host` edge function reads
   them at runtime.

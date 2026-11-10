@@ -106,7 +106,10 @@ and the repo change is small and testable locally (`netlify dev` with a `Host` h
 If Netlify support won't accept the wildcard alias, the same code works with per-library aliases
 (b2) for the first few libraries, and (c1) is the long-term fallback.
 
-Open questions for the team:
+Answers to the open questions (2026-11-10):
 
-1. Where is DNS for `communitydatalibraries.org` today, and can it move to Netlify DNS?
-2. What is the main site's public address: `communitydatalibraries.org/web/`, or another host?
+1. **The main site stays at `https://community-data-libraries.netlify.app/web/`.** Only the
+   libraries move to `*.communitydatalibraries.org`.
+2. **DNS is on Namecheap,** with Namecheap email forwarding. Moving to Netlify DNS means
+   carrying the mail records over, and possibly replacing the forwarding. Steps:
+   [netlify.md](netlify.md#library-subdomains-web31).

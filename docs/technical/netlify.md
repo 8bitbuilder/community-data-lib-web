@@ -30,7 +30,8 @@ Note: The current Astro config sets `base: '/web'` and `site` to GitHub Pages. I
 ## Library subdomains (web#31)
 
 Each approved community library is served at `https://<slug>.communitydatalibraries.org/`
-(home) and `/catalog/`, from the same site and the same deploy. Why this design:
+(home) and `/catalog/`, from the same site and the same deploy. The main site stays at
+`https://community-data-libraries.netlify.app/web/`. Why this design:
 [library-subdomains.md](library-subdomains.md).
 
 ### How it works
@@ -45,9 +46,10 @@ Each approved community library is served at `https://<slug>.communitydatalibrar
     - Files with an extension (`/web/_astro/*`, `/web/favicon.svg`, JSON) and `/api/*` pass
       through. So does the contact form.
     - Main-site pages (`/web/<page>` without an extension) get a 301 to the main site.
-  - **Main site's host:** `/web/communities/<slug>/...` gets a 301 to the library's subdomain,
-    so old links keep working.
-  - **Any other host** (`*.netlify.app`, deploy previews, branch deploys): passes through.
+  - **Main site's hosts** (the `PUBLIC_MAIN_SITE_URL` host, plus `communitydatalibraries.org`
+    and `www.`): `/web/communities/<slug>/...` gets a 301 to the library's subdomain, so old
+    links keep working.
+  - **Any other host** (deploy previews, branch deploys): passes through.
   - **Unknown slug:** the build writes `/web/library-slugs.json` (the libraries in that deploy).
     The function reads it once per deploy and answers a subdomain that isn't in it with the 404
     page and status 404. The page says the library wasn't found.
@@ -75,7 +77,7 @@ Neither is a secret.
 | Variable | Value | Scopes | Deploy contexts |
 |---|---|---|---|
 | `PUBLIC_LIBRARY_DOMAIN` | `communitydatalibraries.org` | All scopes (the build bakes it into links; the edge function reads it at runtime) | **Production only** |
-| `PUBLIC_MAIN_SITE_URL` | The main site's origin, e.g. `https://communitydatalibraries.org` (no path) | All scopes | **Production only** |
+| `PUBLIC_MAIN_SITE_URL` | `https://community-data-libraries.netlify.app` (the main site's origin, no path) | All scopes | **Production only** |
 
 Production only keeps deploy previews on path addresses, which they need: their hostnames
 aren't library subdomains.
@@ -83,21 +85,39 @@ aren't library subdomains.
 ### Dashboard steps (do these in order)
 
 These are settings code can't change. Steps 1 to 4 can be done before this branch is merged.
-Merging without the variables changes nothing on the live site.
+Merging without the variables changes nothing on the live site. The main site's address doesn't
+change.
 
-1. **Main site domain.**
-   - Domain management > Production domains > **Add a domain**: `communitydatalibraries.org`,
-     if the site doesn't have it yet.
-   - Its address is then `https://communitydatalibraries.org/web/`. The `/` → `/web/` redirect
-     already handles the bare domain.
+The domain today (checked 2026-11-10):
+- `communitydatalibraries.org` is on Namecheap DNS (`dns1/dns2.registrar-servers.com`).
+- It uses Namecheap email forwarding: MX `eforward1` to `eforward5.registrar-servers.com`, and
+  the SPF record `v=spf1 include:spf.efwd.registrar-servers.com ~all`.
+- It has no A record and no `www`, so nothing is served on it yet.
+
+1. **Add the domain to the site.**
+   - Domain management > Production domains > **Add a domain**: `communitydatalibraries.org`.
+     A site needs a primary custom domain before it can take aliases, so this becomes the
+     primary domain.
+   - `https://community-data-libraries.netlify.app/` keeps working; Netlify's docs say the
+     Netlify subdomain always works. Links between the main site and libraries use
+     `PUBLIC_MAIN_SITE_URL`, so the main site stays on netlify.app.
+   - The bare domain will also show the main site. Its old library addresses redirect like the
+     netlify.app ones.
+   - Identity emails (librarian sign-up and password reset) will likely link to the primary
+     domain. The librarian portal works on either host, but a librarian signed in on one isn't
+     signed in on the other.
+   - `SITE_ORIGIN` stays `https://community-data-libraries.netlify.app`.
 2. **Netlify DNS for `communitydatalibraries.org`.** This is needed for the wildcard
-   certificate.
+   certificate: Netlify only issues one automatically when it runs the domain's DNS.
+   - **Email forwarding first.** Namecheap's email forwarding may stop working once the domain
+     uses other nameservers. Check Namecheap's help for "email forwarding" with third-party DNS
+     before switching. If it stops, move the mail to another forwarder (for example ImprovMX or
+     Cloudflare Email Routing) and point the MX records there.
    - Domain management > the domain > **Set up Netlify DNS**.
-   - **Before you change nameservers,** copy every existing record into Netlify DNS: email (MX),
-     SPF and DKIM for Resend, which sends from `@communitydatalibraries.org`, and any
-     verification TXT records. Missing ones break email.
-   - At the registrar, set the nameservers to the four Netlify shows. This can take up to 24
-     hours.
+   - **Before you change nameservers,** copy the MX and SPF records above, and any other
+     records shown in Namecheap's Advanced DNS tab, into Netlify DNS.
+   - In Namecheap > Domain List > the domain > Nameservers, choose **Custom DNS** and enter the
+     four nameservers Netlify shows. This can take up to 24 hours.
 3. **Wildcard subdomain.**
    - The docs don't describe adding a wildcard alias to a site. Ask Netlify support
      (support.netlify.com) to add `*.communitydatalibraries.org` to this site.
@@ -112,19 +132,18 @@ Merging without the variables changes nothing on the live site.
      certificate.
 5. **Variables.** Site configuration > Environment variables > **Add a variable**: the two above,
    with **Different value for each deploy context** set for Production only.
-6. **`SITE_ORIGIN`.** If the main site's address changed in step 1, set `SITE_ORIGIN` to it
-   (see [environment-variables.md](environment-variables.md#site_origin)). The metadata editor
-   rejects requests from any other origin.
-7. **Deploy.**
+6. **Deploy.**
    - Merge the branch, or Deploys > **Trigger deploy** > Deploy site. One production deploy,
      15 credits.
    - The variables only reach links at build time, so this deploy is required.
-8. **Check.**
+7. **Check.**
    - `https://knox-county.communitydatalibraries.org/` shows the Knox County library with its
      styles, and the address stays on the subdomain.
    - `/catalog/?audience=teacher` works there, and `/catalog` gets a 301 to `/catalog/`.
-   - "Back to Community Data Libraries" opens `https://communitydatalibraries.org/web/`.
-   - `https://communitydatalibraries.org/web/communities/knox-county/` gets a 301 to the subdomain.
+   - "Back to Community Data Libraries" opens `https://community-data-libraries.netlify.app/web/`.
+   - `https://community-data-libraries.netlify.app/web/communities/knox-county/` gets a 301 to
+     the subdomain.
+   - An email to an `@communitydatalibraries.org` address still arrives.
    - The contact form on the library page sends.
    - `https://nowhere.communitydatalibraries.org/` shows the "couldn't find that community
      library" 404.

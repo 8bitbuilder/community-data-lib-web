@@ -9,7 +9,7 @@
  * Both settings come from environment variables and are optional:
  * - libraryDomain (PUBLIC_LIBRARY_DOMAIN), e.g. "communitydatalibraries.org". Unset,
  *   libraries stay at /web/communities/<slug>/ and the edge function does nothing.
- * - mainSiteUrl (PUBLIC_MAIN_SITE_URL), e.g. "https://communitydatalibraries.org".
+ * - mainSiteUrl (PUBLIC_MAIN_SITE_URL), e.g. "https://community-data-libraries.netlify.app".
  *   Library pages link to main-site pages with it. Unset, those links stay relative.
  *
  * See docs/technical/library-subdomains.md and docs/technical/netlify.md.
