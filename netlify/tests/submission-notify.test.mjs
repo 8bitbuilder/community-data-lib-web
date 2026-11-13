@@ -2,7 +2,7 @@ import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
-const { handler } = createRequire(import.meta.url)('./submission-notify.cjs');
+const { handler } = createRequire(import.meta.url)('../functions/submission-notify.cjs');
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
