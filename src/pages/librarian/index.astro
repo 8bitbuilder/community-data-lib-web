@@ -58,7 +58,7 @@ import { withBasePath } from '@lib/paths';
     });
     const meta = Object.assign(document.createElement('span'), {
       className: 'item-meta',
-      textContent: `${where(lib)} · /communities/${lib.slug}/ · editors: ${lib.editors.join(', ')}`,
+      textContent: `${where(lib)} · ${pages.community(lib.slug)} · editors: ${lib.editors.join(', ')}`,
     });
     main.append(name, chip, meta);
     li.append(main, ...actions);

@@ -8,7 +8,7 @@
  */
 
 import { getSettings, getUser, logout, type User } from '@netlify/identity';
-import { withBasePath } from '@lib/paths';
+import { libraryHref, withBasePath } from '@lib/paths';
 import { safeNext } from './portal';
 
 export const API = '/api/librarian/libraries';
@@ -18,7 +18,7 @@ export const pages = {
   login: withBasePath('/librarian/login/'),
   register: withBasePath('/librarian/register/'),
   edit: (slug: string) => withBasePath(`/librarian/${encodeURIComponent(slug)}/edit/`),
-  community: (slug: string) => withBasePath(`/communities/${encodeURIComponent(slug)}/`),
+  community: (slug: string) => libraryHref(slug),
 };
 
 export const nextPage = (next: string | null) => safeNext(next, pages.dashboard);

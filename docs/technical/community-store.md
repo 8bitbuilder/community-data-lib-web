@@ -118,6 +118,10 @@ under `/api/librarian/libraries`:
 | `/librarian/register/` | Register a library: name, county (searchable list from the vocabulary), place name, web address, description |
 | `/librarian/<slug>/edit/` | Edit details and editors |
 
+- **Public library pages** are `/communities/<slug>/` and `/communities/<slug>/catalog/`. With
+  `PUBLIC_LIBRARY_DOMAIN` set, they are served at `https://<slug>.<domain>/` and `/catalog/`
+  (web#31; see [netlify.md](netlify.md#library-subdomains-web31)). That is why some slugs are
+  reserved.
 - **One edit page:** a single static page, `dist/librarian/edit/index.html`, serves every
   library through a rewrite in `netlify.toml`, so libraries registered after the last build can
   be edited. Locally, use `/web/librarian/edit/?slug=<slug>`.

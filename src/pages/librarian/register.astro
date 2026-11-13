@@ -2,9 +2,11 @@
 import LibrarianPage from '@components/librarian/LibrarianPage.astro';
 import CountyPicker from '@components/librarian/CountyPicker.astro';
 import { LIMITS } from '@lib/community/librarianRules.mjs';
-import { withBasePath } from '@lib/paths';
+import { libraryHref, withBasePath } from '@lib/paths';
 
-const communityBase = withBasePath('/communities/');
+// How the address will look: https://<slug>.<domain>/ or /web/communities/<slug>/ (web#31).
+const SLUG_MARK = 'slug-placeholder';
+const [addressBefore, addressAfter] = libraryHref(SLUG_MARK).split(SLUG_MARK);
 ---
 
 <LibrarianPage
@@ -33,7 +35,7 @@ const communityBase = withBasePath('/communities/');
         <label for="f-slug">Web address</label>
         <input id="f-slug" name="slug" type="text" maxlength={LIMITS.slug} pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="knox-county" />
         <p class="field-hint">
-          <code>{communityBase}<span id="slug-preview">…</span>/</code>. It can't be changed later.
+          <code>{addressBefore}<span id="slug-preview">…</span>{addressAfter}</code>. It can't be changed later.
         </p>
         <p class="field-error" data-error-for="slug"></p>
       </div>

@@ -1,14 +1,14 @@
 ---
 import EditorSignIn from '@components/EditorSignIn.astro';
 import { Image } from 'astro:assets';
-import { withBasePath } from '@lib/paths';
+import { libraryHref, withBasePath } from '@lib/paths';
 import cdlEmblem from '../assets/brand/cdl-emblem-transparent.png'; // teal background keyed out so the art sits on the ribbon
 
 const currentPath = Astro.url.pathname;
 
 const homeHref = withBasePath('/');
 const catalogHref = withBasePath('/complete-catalog');
-const exampleCommunityHref = withBasePath('/communities/knox-county/');
+const exampleCommunityHref = libraryHref('knox-county');
 const mapHref = withBasePath('/maps');
 const dataResourcesHref = withBasePath('/data-resources');
 const submitHref = withBasePath('/submit');

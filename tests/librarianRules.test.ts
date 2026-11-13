@@ -105,6 +105,14 @@ test('invalid fields are reported together', () => {
   assert.deepEqual(fields(result).sort(), ['description', 'name', 'slug']);
 });
 
+test('slugs that are reserved subdomains are refused (web#31)', () => {
+  for (const slug of ['www', 'api', 'admin', 'web']) {
+    const result = checkRegistration({ input: { ...davidsonInput, slug }, user: stranger, existing: [], vocabulary });
+    assert.equal(result.status, 400, slug);
+    assert.deepEqual(fields(result), ['slug']);
+  }
+});
+
 // ── Editing ──────────────────────────────────────────────────
 
 const edit = (input: Record<string, unknown>, user = editor, existing: object[] = []) =>

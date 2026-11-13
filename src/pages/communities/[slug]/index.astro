@@ -1,7 +1,7 @@
 ---
 import CommunityLayout from '@layouts/CommunityLayout.astro';
 import { getCollection, type CollectionEntry } from 'astro:content';
-import { withBasePath } from '@lib/paths';
+import { libraryHref } from '@lib/paths';
 import { AUDIENCE_LABELS, AUDIENCE_ROLES, communityDisplay } from '@lib/data/communityFilter';
 
 export async function getStaticPaths() {
@@ -19,8 +19,7 @@ interface Props {
 const { community } = Astro.props;
 const data = community.data;
 const { libraryTitle, welcomeHeading, placeName } = communityDisplay(data);
-const base = `/communities/${data.slug}`;
-const catalogHref = withBasePath(`${base}/catalog/`);
+const catalogHref = libraryHref(data.slug, '/catalog/');
 const location = [data.county, data.state_code].filter(Boolean).join(', ');
 
 const roleDescriptions = {
@@ -36,7 +35,8 @@ const roleDescriptions = {
     `${libraryTitle}: local data for teachers, students, and community members.`}
   communityName={libraryTitle}
   communityLocation={location || undefined}
-  communityBase={base}
+  communitySlug={data.slug}
+  page="home"
 >
   <section class="landing">
     <header class="landing-header">

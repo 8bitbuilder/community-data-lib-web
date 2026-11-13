@@ -13,6 +13,7 @@
  */
 
 import { describeCounty } from './geoVocabulary.mjs';
+import { isReservedSlug } from './libraryHosts.mjs';
 
 /**
  * Two-digit state FIPS codes. Only the pre-database librarian page still uses this;
@@ -113,6 +114,9 @@ export function validateCommunity(community, vocabulary) {
     add('slug', 'Web address (slug) is required.');
   } else if (!SLUG_PATTERN.test(community.slug) || community.slug.length > LIMITS.slug) {
     add('slug', 'Use lowercase letters, numbers, and single hyphens (up to 60 characters).');
+  } else if (isReservedSlug(community.slug)) {
+    // The slug is also the library's subdomain (web#31).
+    add('slug', `"${community.slug}" is reserved. Choose another web address.`);
   }
 
   if (!community.county_fips) {

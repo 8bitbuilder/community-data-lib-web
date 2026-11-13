@@ -60,6 +60,11 @@ These are settings that code can't change. Do them in this order.
     - Team invite and password-reset emails now open `/web/librarian/login/`. Team members set
       their password there, then log in at `/web/admin/`.
 
+## Library subdomains
+
+11. **Optional, for web#31:** the domain, Netlify DNS, wildcard and variable steps are in
+    [netlify.md](netlify.md#library-subdomains-web31).
+
 ## Check it
 
 - **Log in:** open `/web/librarian/login/`, create an account and confirm the email. Registering
