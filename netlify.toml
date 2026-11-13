@@ -4,8 +4,13 @@
   functions = "netlify/functions"
 
 [build.environment]
-  # GITHUB_REPO is a public repo identifier (owner/name), not a credential.
-  SECRETS_SCAN_OMIT_KEYS = "GITHUB_REPO"
+  # The secrets scan fails a build whose output contains any environment variable's
+  # value. These are public, not credentials, and are expected in the output:
+  # - GITHUB_REPO: the repo identifier (owner/name).
+  # - SITE_ORIGIN: the main site's address. It appears in the library-host edge
+  #   function, which is deployed with its source (comments included).
+  # - PUBLIC_MAIN_SITE_URL, PUBLIC_LIBRARY_DOMAIN: built into the pages on purpose.
+  SECRETS_SCAN_OMIT_KEYS = "GITHUB_REPO,SITE_ORIGIN,PUBLIC_MAIN_SITE_URL,PUBLIC_LIBRARY_DOMAIN"
 
 # ── Form submission webhook ──────────────────────────────────────────────────
 # Triggers the submission-notify function whenever a new form submission
