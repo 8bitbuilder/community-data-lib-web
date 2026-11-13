@@ -23,7 +23,8 @@
     "test": "node --test --experimental-strip-types tests/*.test.ts",
     "test:functions": "node --test \"netlify/**/*.test.mjs\" \"src/lib/editor/*.test.mjs\"",
     "check": "npm run lint && npm test && npm run build",
-    "geo:boundaries": "node scripts/build-geo-boundaries.mjs"
+    "geo:boundaries": "node scripts/build-geo-boundaries.mjs",
+    "db:seed": "node scripts/seed-communities.mjs"
   },
   "repository": {
     "type": "git",
@@ -49,6 +50,8 @@
     "@codemirror/state": "^6.7.6",
     "@codemirror/view": "^6.43.15",
     "@netlify/blobs": "^10.7.13",
+    "@netlify/database": "^2.0.1",
+    "@netlify/identity": "^2.0.0",
     "adm-zip": "^0.5.16",
     "astro": "^6.1.9",
     "codemirror": "^6.0.2",

@@ -41,14 +41,14 @@ export interface CatalogEntryData {
 }
 
 export type StudentSuitability = 'suitable' | 'not_suitable' | 'unreviewed';
-export type Granularity = 'nation' | 'state' | 'county' | 'zip' | 'point';
+export type Granularity = 'nation' | 'state' | 'county' | 'tract' | 'zip' | 'point';
 export interface CoverageEntry {
   level: 'nation' | 'state' | 'county';
   geoid: string;
 }
 
 /** Levels fine enough to show county-level data for a community. */
-const COUNTY_RESOLVABLE: readonly Granularity[] = ['county', 'zip', 'point'];
+const COUNTY_RESOLVABLE: readonly Granularity[] = ['county', 'tract', 'zip', 'point'];
 
 /** The subset of community configuration this module needs. */
 export interface CommunityGeo {

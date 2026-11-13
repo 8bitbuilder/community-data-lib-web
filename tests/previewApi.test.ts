@@ -22,6 +22,11 @@ const ZIP = (() => {
   zip.addFile('title-rows.xlsx', fixture('title-rows.xlsx'));
   return zip.toBuffer();
 })();
+const ACCESS = (() => {
+  const zip = new AdmZip();
+  zip.addFile('database.accdb', Buffer.from('not a table'));
+  return zip.toBuffer();
+})();
 
 let server: http.Server;
 let base = '';
@@ -31,6 +36,9 @@ before(async () => {
     if (req.url === '/counties.csv') {
       res.writeHead(200, { 'Content-Type': 'text/csv' });
       res.end(CSV);
+    } else if (req.url === '/access.zip') {
+      res.writeHead(200, { 'Content-Type': 'application/zip' });
+      res.end(ACCESS);
     } else if (req.url === '/bundle.zip') {
       res.writeHead(200, { 'Content-Type': 'application/zip' });
       res.end(ZIP);
@@ -72,6 +80,8 @@ function sources() {
     { id: 'zipped', title: 'Zipped', download: { url: `${base}/bundle.zip` } },
     { id: 'notes-first', title: 'Notes', download: { url: `${base}/fx/notes-first.xlsx` } },
     { id: 'numeric-sheets', title: 'Years', download: { url: `${base}/fx/numeric-sheets.xlsx` } },
+    { id: 'old-excel', title: 'Old Excel', download: { url: `${base}/fx/legacy.xls` } },
+    { id: 'access', title: 'Access', download: { url: `${base}/access.zip` } },
     { id: 'portal', title: 'Portal only', provider: { url: 'https://example.gov' } },
   ];
 }
@@ -94,7 +104,7 @@ test('health and source listing', async () => {
   assert.equal(health.status, 200);
   assert.equal(health.body.previewEngine, 'node');
   const list = await get('/api/sources');
-  assert.equal(list.body.count, 8);
+  assert.equal(list.body.count, sources().length);
   assert.equal((await get('/api/sources/counties')).body.title, 'Counties');
   assert.equal(list.headers.get('access-control-allow-origin'), '*');
 });
@@ -125,7 +135,17 @@ test('chart and filter options', async () => {
   assert.ok(Array.isArray(states.body.options) && states.body.options.length === 2);
 });
 
+test('a real .xls file previews through the API', async () => {
+  const preview = await get('/api/sources/old-excel/preview');
+  assert.equal(preview.status, 200);
+  assert.equal(preview.body.layout.format, 'xls');
+  assert.ok(preview.body.total > 0);
+});
+
 test('datasets that cannot be previewed get a clear 422, not a crash', async () => {
+  const access = await get('/api/sources/access/preview');
+  assert.equal(access.status, 422);
+  assert.match(access.body.details, /no CSV, TSV or Excel files/);
   const portal = await get('/api/sources/portal/preview');
   assert.equal(portal.status, 422);
   assert.match(portal.body.details, /no download URL/);

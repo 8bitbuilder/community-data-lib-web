@@ -10,7 +10,14 @@ Every dataset records the places it covers, separately from how finely its rows 
 | Field | Meaning | Example |
 |---|---|---|
 | `coverage` | Which places the data is about | national CHR file: `nation`; TRI Tennessee: `state 47`; Knox County Schools: `county 47093` |
-| `geographic_granularity` | What one row describes | `nation`, `state`, `county`, `zip` or `point` |
+| `geographic_granularity` | What one row describes | `state`, `county`, `tract`, `zip` or `point` |
+
+- **Local data only:** a dataset whose `filters` show no state, county or ZIP breakdown is out of
+  scope (web#42). It stays in the backend's YAML and SQLite, but the catalog export and the dev API
+  leave it out, and `sync:catalog` stops the build if one appears in `catalog.json`. A dataset with
+  no `filters` also stops it.
+  National *coverage* is fine (a county file for every U.S. county), and community catalogs and map
+  counts use coverage as before.
 
 - **Coverage is FIPS codes only.** It is a list of `{level: nation}`, `{level: state, fips: "47"}` or
   `{level: county, fips: "47093"}`. There is no geometry intersection.
@@ -73,6 +80,8 @@ is the site's list of valid FIPS codes.
   | Check | What it does | Where it runs |
   |---|---|---|
   | `npm run check:geo` (`scripts/check-geo-vocabulary.mjs`) | Fails if a catalog entry's coverage or a community file's `county_fips` is not in the vocabulary | `prebuild`, after `sync:catalog` |
+  | Communities loader | Fails the build for a library with an unknown county | `src/lib/community/communityStore.mjs` |
+  | Librarian function | Refuses a county outside the vocabulary | Netlify Functions |
   | `test_coverage_vocabulary.py` | Checks YAML coverage against the copy in `data/reference/geo-vocabulary.json` | backend pytest |
   | `county-names.json` | Names counties for the Data Preview county picker | Built to `/geo/county-names.json` |
 

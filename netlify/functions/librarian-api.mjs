@@ -1,47 +1,50 @@
 /**
- * Netlify Function: librarian portal API (/api/librarian/*).
+ * Netlify Function: librarian API (/api/librarian/*).
  *
- * Lets community librarians register and edit their community library files
- * (src/content/communities/*.md). Logins come from Netlify Identity. New libraries
- * open a pull request for the team to approve; edits to approved libraries are
- * committed to GitHub, which triggers a rebuild. Librarian emails are kept private
- * in Netlify Blobs (store "librarians").
+ * Lets librarians register community libraries and edit the ones they maintain.
+ * Records live in Netlify Database (tables in netlify/database/migrations); logins
+ * come from Netlify Identity (@netlify/identity reads the nf_jwt cookie set by the
+ * /librarian/ pages). Routes and rules: netlify/lib/librarianApi.mjs.
  *
  * Environment variables (Netlify > Site configuration > Environment variables,
  * scoped to Functions):
- *   LIBRARIAN_GITHUB_TOKEN   Fine-grained token with Contents and Pull requests read/write (required)
- *   LIBRARIAN_GITHUB_REPO    "owner/name" (default community-data-libraries/web)
- *   LIBRARIAN_GITHUB_BRANCH  Branch the site deploys from (default main)
- *   LIBRARIAN_IDENTITY_URL   Identity service to verify logins against (default: this site's
- *                            /.netlify/identity). Set it for `netlify dev`, where localhost has none.
+ *   COMMUNITY_BUILD_HOOK_URL  Build hook that rebuilds the site after an approval or an
+ *                             edit to an approved library. Optional: without it the
+ *                             write succeeds and the rebuild is skipped with a warning.
+ * NETLIFY_DB_URL is provided by Netlify when the site has a database.
  */
 
-import { getStore } from '@netlify/blobs';
-import { createGitHubCommunityStore } from '../lib/githubCommunityStore.mjs';
-import { createIdentityVerifier } from '../lib/identity.mjs';
+import { getDatabase } from '@netlify/database';
+import { getUser } from '@netlify/identity';
+import geoVocabulary from '../../src/data/geo-vocabulary.json' with { type: 'json' };
+import { createVocabulary } from '../../src/lib/community/geoVocabulary.mjs';
+import { normalizeEmail } from '../../src/lib/community/librarianRules.mjs';
+import { createBuildHook } from '../lib/buildHook.mjs';
+import { createCommunityDb } from '../lib/communityDb.mjs';
 import { createLibrarianHandler } from '../lib/librarianApi.mjs';
-import { createLibrarianStore, LIBRARIAN_STORE_NAME } from '../lib/librarianStore.mjs';
 
-const token = process.env.LIBRARIAN_GITHUB_TOKEN;
+const vocabulary = createVocabulary(geoVocabulary);
 
-function getHandler() {
-  // Built per request: Netlify provides the Blobs context to each invocation.
-  return createLibrarianHandler({
-    verifyUser: createIdentityVerifier({ identityUrl: process.env.LIBRARIAN_IDENTITY_URL || undefined }),
-    github: token
-      ? createGitHubCommunityStore({
-          token,
-          repo: process.env.LIBRARIAN_GITHUB_REPO || 'community-data-libraries/web',
-          branch: process.env.LIBRARIAN_GITHUB_BRANCH || 'main',
-        })
-      : null,
-    librarians: token
-      ? createLibrarianStore(getStore({ name: LIBRARIAN_STORE_NAME, consistency: 'strong' }))
-      : null,
-  });
+/** The logged-in Identity user, or null. Unconfirmed accounts cannot log in at all. */
+async function verifyUser() {
+  const user = await getUser();
+  const email = normalizeEmail(user?.email);
+  return email ? { email, roles: user.roles ?? [] } : null;
 }
 
-export default async (request) => getHandler()(request);
+let db = null;
+function openDb() {
+  db ??= createCommunityDb(getDatabase().pool);
+  return db;
+}
+
+export default async (request) =>
+  createLibrarianHandler({
+    verifyUser,
+    db: process.env.NETLIFY_DB_URL ? openDb : null,
+    rebuild: createBuildHook({ url: process.env.COMMUNITY_BUILD_HOOK_URL }),
+    vocabulary,
+  })(request);
 
 export const config = {
   path: ['/api/librarian/libraries', '/api/librarian/libraries/*'],

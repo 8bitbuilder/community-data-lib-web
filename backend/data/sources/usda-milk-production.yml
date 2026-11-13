@@ -5,6 +5,11 @@ provider:
   name: USDA Economic Research Service (ERS)
   agency: U.S. Department of Agriculture
   url: https://www.ers.usda.gov/data-products/dairy-data
+filters:
+  year: true
+  state: false
+  county: false
+  zipcode: false
 requires_account: false
 download:
   url: https://www.ers.usda.gov/media/5503/us-milk-production-and-related-data-quarterly-and-annual.csv?v=38125

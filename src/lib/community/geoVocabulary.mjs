@@ -3,7 +3,7 @@
  * written by `npm run geo:boundaries` from the Census county file that /maps draws.
  *
  * Pure functions only (the vocabulary is passed in) so the same rules run in the
- * prebuild check and tests (and later any other caller that needs them).
+ * prebuild check, the communities loader, the librarian Netlify Function and tests.
  */
 
 /**

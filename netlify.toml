@@ -25,6 +25,14 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 
+# Librarian edit pages: one static page serves every library (it reads the slug
+# from the address), so libraries registered after the last build can be edited.
+# Must come before the /web/* rewrite below.
+[[redirects]]
+  from = "/web/librarian/:slug/edit/*"
+  to = "/librarian/edit/index.html"
+  status = 200
+
 [[redirects]]
   from = "/"
   to = "/web/"
