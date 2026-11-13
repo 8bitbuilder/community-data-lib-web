@@ -5,6 +5,8 @@ import {
   canAudienceAccess,
   communityDisplay,
   communityGeoKeys,
+  entryCounties,
+  granularityLabel,
   matchesCommunity,
   normalizeAudience,
   roleView,
@@ -178,6 +180,71 @@ test('coverage: national or same-state data needs county-level granularity', () 
   assert.equal(matchesCommunity(covered(nation), knox), false);
   assert.equal(matchesCommunity(covered([{ level: 'state', geoid: '47' }], 'county'), knox), true);
   assert.equal(matchesCommunity(covered([{ level: 'state', geoid: '37' }], 'county'), knox), false);
+});
+
+// Tract and zip (ZCTA) coverage carries the counties it lies in, from the backend export.
+const tractInKnox = { level: 'tract' as const, geoid: '47093004600', counties: ['47093'] };
+const tractInDavidson = { level: 'tract' as const, geoid: '47037019500', counties: ['47037'] };
+// A ZCTA that crosses county lines lists every county it lies in (made-up example).
+const zipAcrossLines = { level: 'zip' as const, geoid: '37999', counties: ['47037', '47093'] };
+const zipInDavidson = { level: 'zip' as const, geoid: '37203', counties: ['47037'] };
+
+test('coverage: a tract matches the library of the county it lies in', () => {
+  assert.equal(matchesCommunity(covered([tractInKnox], 'tract'), knox), true);
+  assert.equal(matchesCommunity(covered([tractInKnox], 'tract'), davidson), false);
+  assert.equal(matchesCommunity(covered([tractInKnox, tractInDavidson], 'tract'), davidson), true);
+});
+
+test('coverage: a ZCTA that crosses county lines matches every county it lists', () => {
+  assert.equal(matchesCommunity(covered([zipAcrossLines], 'zip'), knox), true);
+  assert.equal(matchesCommunity(covered([zipAcrossLines], 'zip'), davidson), true);
+  assert.equal(matchesCommunity(covered([zipInDavidson], 'zip'), knox), false);
+  assert.equal(matchesCommunity(covered([zipInDavidson], 'zip'), davidson), true);
+});
+
+test('coverage: a ZCTA without its counties matches no library', () => {
+  assert.equal(matchesCommunity(covered([{ level: 'zip', geoid: '37919' }], 'zip'), knox), false);
+});
+
+test('coverage: each level, for the Knox County library', () => {
+  const cases: [CatalogEntryData['coverage'], CatalogEntryData['granularity'], boolean][] = [
+    [[{ level: 'nation', geoid: 'US' }], 'nation', false],
+    [[{ level: 'nation', geoid: 'US' }], 'county', true],
+    [[{ level: 'state', geoid: '47' }], 'state', false],
+    [[{ level: 'state', geoid: '47' }], 'tract', true],
+    [[{ level: 'county', geoid: '47093' }], 'county', true],
+    [[{ level: 'county', geoid: '47037' }], 'county', false],
+    [[tractInKnox], 'tract', true],
+    [[tractInDavidson], 'tract', false],
+    [[zipAcrossLines], 'zip', true],
+    [[zipInDavidson], 'zip', false],
+    [[{ level: 'nation', geoid: 'US' }], 'point', true],
+  ];
+  for (const [coverage, granularity, expected] of cases) {
+    assert.equal(
+      matchesCommunity(covered(coverage, granularity), knox),
+      expected,
+      JSON.stringify([coverage, granularity])
+    );
+  }
+});
+
+test('entryCounties: county, tract and zip entries name their counties; wider levels none', () => {
+  assert.deepEqual(entryCounties({ level: 'county', geoid: '47093' }), ['47093']);
+  assert.deepEqual(entryCounties(tractInKnox), ['47093']);
+  assert.deepEqual(entryCounties({ level: 'tract', geoid: '47093004600' }), ['47093']);
+  assert.deepEqual(entryCounties(zipAcrossLines), ['47037', '47093']);
+  assert.deepEqual(entryCounties({ level: 'zip', geoid: '37919' }), []);
+  assert.deepEqual(entryCounties({ level: 'state', geoid: '47' }), []);
+  assert.deepEqual(entryCounties({ level: 'nation', geoid: 'US' }), []);
+});
+
+test('granularityLabel names tract and ZIP data only', () => {
+  assert.equal(granularityLabel('tract'), 'census tract');
+  assert.equal(granularityLabel('zip'), 'ZIP code (ZCTA)');
+  for (const g of ['nation', 'state', 'county', 'point', undefined] as const) {
+    assert.equal(granularityLabel(g), null, String(g));
+  }
 });
 
 test('coverage wins over tags; entries without coverage still match by tag', () => {

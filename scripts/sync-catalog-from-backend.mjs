@@ -182,6 +182,19 @@ function yamlQuote(value) {
   return `"${text}"`;
 }
 
+/**
+ * One coverage entry as a frontmatter flow mapping. Tract and zip (ZCTA) entries keep
+ * the `counties` the backend export lists, so the site matches them to libraries
+ * without a crosswalk of its own.
+ */
+export function coverageLine(c) {
+  const geoid = yamlQuote(c.geoid ?? c.fips ?? 'US');
+  const counties = Array.isArray(c.counties) && c.counties.length
+    ? `, counties: [${c.counties.map((county) => yamlQuote(county)).join(', ')}]`
+    : '';
+  return `  - { level: ${yamlQuote(c.level)}, geoid: ${geoid}${counties} }`;
+}
+
 function buildMarkdown(source) {
   const themes = normalizeDescriptionTags(source.description_tags);
   const pedagogicalTags = extractPedagogicalTags(source);
@@ -219,9 +232,7 @@ function buildMarkdown(source) {
     ...(coverage.length
       ? [
           'coverage:',
-          ...coverage.map(
-            (c) => `  - { level: ${yamlQuote(c.level)}, geoid: ${yamlQuote(c.geoid ?? c.fips ?? 'US')} }`
-          ),
+          ...coverage.map(coverageLine),
         ]
       : []),
     ...(source.published_date ? [`publishedDate: ${source.published_date}`] : []),

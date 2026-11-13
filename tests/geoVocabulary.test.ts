@@ -31,6 +31,20 @@ test('coverage entries must name a known nation, state or county', () => {
   assert.equal(isKnownCoverage(fixture, { level: 'county', geoid: '09001' }), false);
 });
 
+test('tract and zip coverage is checked by the counties it lists', () => {
+  assert.equal(isKnownCoverage(fixture, { level: 'tract', geoid: '47093004600', counties: ['47093'] }), true);
+  assert.equal(isKnownCoverage(fixture, { level: 'zip', geoid: '40299', counties: ['21111'] }), true);
+  assert.equal(isKnownCoverage(fixture, { level: 'zip', geoid: '37999', counties: ['47093', '21111'] }), true);
+  // Wrong length, no counties, a tract outside its own county, or an unknown county.
+  assert.equal(isKnownCoverage(fixture, { level: 'tract', geoid: '4709300460', counties: ['47093'] }), false);
+  assert.equal(isKnownCoverage(fixture, { level: 'tract', geoid: '47093004600' }), false);
+  assert.equal(isKnownCoverage(fixture, { level: 'tract', geoid: '47093004600', counties: ['21111'] }), false);
+  assert.equal(isKnownCoverage(fixture, { level: 'tract', geoid: '09001010100', counties: ['09001'] }), false);
+  assert.equal(isKnownCoverage(fixture, { level: 'zip', geoid: '37919', counties: [] }), false);
+  assert.equal(isKnownCoverage(fixture, { level: 'zip', geoid: '00601', counties: ['72001'] }), false);
+  assert.equal(isKnownCoverage(fixture, { level: 'block', geoid: '47' }), false);
+});
+
 test('findUnknownGeoids lists every bad dataset coverage and community FIPS by file', () => {
   const problems = findUnknownGeoids(fixture, {
     datasets: [
