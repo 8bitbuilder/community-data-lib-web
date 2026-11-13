@@ -1,5 +1,10 @@
 ---
+import { Image } from 'astro:assets';
 import { withBasePath } from '@lib/paths';
+// Same emblem + ribbon bookmark as the main site nav
+import cdlEmblem from '../assets/brand/cdl-emblem-transparent.png';
+// Lower-48 county/state outlines used as the footer texture on the main site
+import usCountiesUrl from '../assets/footer/us-counties.svg?url';
 import '../styles/tailwind.css';
 
 interface Props {
@@ -8,6 +13,7 @@ interface Props {
   communityName: string;
   communityLocation?: string;
   communityBase: string; // e.g. '/communities/knox-county'
+  footerTitle?: string;  // e.g. 'Knoxville Community Data Library'
 }
 
 const {
@@ -15,14 +21,17 @@ const {
   communityName,
   communityLocation,
   communityBase,
+  footerTitle,
   description = `A community data library for ${communityName}.`,
 } = Astro.props;
 
 const pageTitle = title ? `${title} | ${communityName}` : communityName;
+const footerName = footerTitle ?? communityName;
 
 const base = communityBase.replace(/\/$/, '');
 const homeHref   = withBasePath(`${base}/`);
 const catalogHref = withBasePath(`${base}/catalog/`);
+const contactHref = withBasePath(`${base}/contact/`);
 // Data Resources and Suggest a Data Resource are main-site pages; community
 // libraries never get their own copies (or their own map).
 const dataHref    = withBasePath('/data-resources');
@@ -33,6 +42,7 @@ const navItems = [
   { href: catalogHref, label: 'Community Catalog', carryAudience: true },
   { href: dataHref, label: 'Data Resources', carryAudience: false },
   { href: submitHref, label: 'Suggest a Data Resource', carryAudience: false },
+  { href: contactHref, label: 'Contact the Librarian', carryAudience: false },
 ];
 
 const currentPath = Astro.url.pathname;
@@ -44,8 +54,6 @@ function isActive(href: string): boolean {
   if (href === homeHref) return false;
   return currentPath.startsWith(normalized);
 }
-
-const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
 ---
 
 <!doctype html>
@@ -84,10 +92,22 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
     <nav class="navbar" role="navigation" aria-label="Community navigation">
       <div class="nav-container">
 
-        <!-- Brand -->
+        <!-- Brand: the main-site ribbon bookmark (links to Community Data Libraries)
+             followed by this library's name (links to the library home). -->
         <div class="nav-brand">
+          <a href={cdlHref} class="brand-tab-link" aria-label="Community Data Libraries home">
+            <span class="brand-tab">
+              <Image
+                src={cdlEmblem}
+                alt=""
+                class="brand-mark"
+                widths={[58, 116, 174]}
+                sizes="58px"
+                loading="eager"
+              />
+            </span>
+          </a>
           <a href={homeHref} class="brand-link">
-            <span class="brand-mark">{initials}</span>
             <span class="brand-name">{communityName}{communityLocation && <><br/><span class="brand-location">{communityLocation}</span></>}</span>
           </a>
         </div>
@@ -108,9 +128,6 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
 
         <!-- Actions -->
         <div class="nav-actions">
-          <a href={cdlHref} class="nav-cdl" title="Community Data Libraries network">
-            <span class="cdl-badge">CDL</span>
-          </a>
           <button
             class="mobile-menu-button"
             aria-label="Toggle navigation menu"
@@ -148,12 +165,13 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
     </main>
 
     <footer>
+      <img src={usCountiesUrl} alt="" class="footer-map" aria-hidden="true" loading="lazy" decoding="async" />
       <div class="footer-inner">
         <div class="footer-top">
           <div class="footer-brand">
-            <div class="footer-mark">{initials}</div>
+            <Image src={cdlEmblem} alt="" class="footer-mark" widths={[72, 144, 216]} sizes="72px" />
             <div>
-              <span class="footer-title">{communityName}</span>
+              <span class="footer-title">{footerName}</span>
               {communityLocation && <p class="footer-tagline">{communityLocation}</p>}
             </div>
           </div>
@@ -166,8 +184,20 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
           </nav>
         </div>
         <div class="footer-bottom">
-          <p class="footer-copy">&copy; {new Date().getFullYear()} {communityName}. Part of the <a href={cdlHref}>Community Data Libraries</a> network.</p>
-          <p class="footer-tagline-bottom">Open source under MIT · Built with Astro</p>
+          <p class="footer-copy">&copy; {new Date().getFullYear()} {footerName}. Part of the <a href={cdlHref}>Community Data Libraries</a> network.</p>
+          <p class="footer-tagline-bottom">
+            Created by <a href="https://opalslab.org" target="_blank" rel="noopener noreferrer">OPALS Lab</a>
+            <span aria-hidden="true">·</span>
+            <a href="https://www.netlify.com" target="_blank" rel="noopener noreferrer">This site is powered by Netlify</a>
+            <span aria-hidden="true">·</span>
+            <a href="https://github.com/community-data-libraries/web/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener noreferrer">Code of Conduct</a>
+            <span aria-hidden="true">·</span>
+            <!-- Email link: the address is never in the HTML (reversed in data attributes and
+                 assembled by script only when used), which keeps simple scrapers from harvesting it. -->
+            <a href="#" class="footer-email js-email" data-u="ofni" data-d="gro.seirarbilatadytinummoc" aria-label="Email us" title="Email us">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            </a>
+          </p>
         </div>
       </div>
     </footer>
@@ -180,6 +210,18 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
   // Keep the visitor's chosen role on links within this community library.
   const audience = currentAudience();
   if (audience) applyAudienceToLinks(audience);
+
+  // Build the mailto only on interaction so the address never sits in the page source.
+  const rev = (v: string | undefined) => (v ?? '').split('').reverse().join('');
+  document.querySelectorAll<HTMLAnchorElement>('a.js-email').forEach((link) => {
+    const arm = () => {
+      link.href = `mailto:${rev(link.dataset.u)}@${rev(link.dataset.d)}`;
+    };
+    ['pointerenter', 'focus', 'touchstart'].forEach((evt) =>
+      link.addEventListener(evt, arm, { once: true, passive: true })
+    );
+    link.addEventListener('click', arm);
+  });
 
   const btn = document.getElementById('mobile-menu-button');
   const drawer = document.getElementById('mobile-drawer');
@@ -319,6 +361,8 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
     min-height: 100vh; display: flex; flex-direction: column;
     /* Plain white so it matches the white background of the homepage illustration. */
     background-color: var(--color-background);
+    /* Full-bleed bands inside <main> must not add a sideways scrollbar. */
+    overflow-x: clip;
   }
 
   main {
@@ -417,6 +461,18 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
     background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-accent-light) 50%, var(--color-secondary-light) 100%);
   }
 
+  /* Very faint U.S. county and state outlines as a background texture, as on the main site. */
+  .footer-map {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    translate: -64% -58%;
+    width: max(250%, 2600px);
+    max-width: none;
+    height: auto;
+    pointer-events: none;
+  }
+
   .footer-inner { max-width: 1200px; margin: 0 auto; position: relative; z-index: 1; }
   .footer-top {
     display: flex; justify-content: space-between; align-items: flex-start;
@@ -424,12 +480,10 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
     margin-bottom: var(--space-6);
   }
   .footer-brand { display: flex; align-items: flex-start; gap: var(--space-4); }
-  /* Round navy-grosgrain badge, like the main footer emblem */
+  /* Same emblem art as the nav ribbon (transparent background), on navy grosgrain */
   .footer-mark {
-    display: grid; place-items: center; width: 72px; height: 72px; flex-shrink: 0; margin-top: -4px;
-    font-family: var(--font-brand); font-variation-settings: 'ROND' 100;
-    font-size: var(--font-size-xl); font-weight: 800; letter-spacing: 0; line-height: 1;
-    color: var(--color-node-blue);
+    display: block; width: 72px; height: 72px; padding: 9px 7px 11px;
+    object-fit: contain; flex-shrink: 0; margin-top: -4px;
     border: 1px solid rgba(175, 229, 243, 0.35); border-radius: 50%;
     background: repeating-linear-gradient(
       to bottom,
@@ -451,7 +505,14 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
   .footer-copy { font-size: var(--font-size-xs); color: #8BA4B8; margin: 0; font-family: var(--font-sans); }
   .footer-copy a { color: var(--color-primary-light); text-decoration: underline; text-underline-offset: 3px; }
   .footer-copy a:hover { color: #FFFFFF; text-decoration: underline; }
-  .footer-tagline-bottom { font-size: var(--font-size-xs); color: #8BA4B8; margin: 0; font-family: var(--font-sans); }
+  .footer-tagline-bottom {
+    display: flex; align-items: center; gap: var(--space-2);
+    font-size: var(--font-size-xs); color: #8BA4B8; margin: 0; font-family: var(--font-sans);
+  }
+  .footer-tagline-bottom a { color: var(--color-primary-light); text-decoration: underline; text-underline-offset: 3px; }
+  .footer-tagline-bottom a:hover { color: #FFFFFF; text-decoration: underline; }
+  .footer-tagline-bottom .footer-email { display: inline-flex; color: var(--color-teal-light); text-decoration: none; }
+  .footer-tagline-bottom .footer-email:hover { color: #FFFFFF; }
 
   :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: var(--radius-sm); }
   @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
@@ -469,20 +530,95 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
   }
   .nav-container {
     max-width: 1200px; margin: 0 auto; padding: 0 var(--space-6);
-    display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); height: 64px;
+    /* 76px matches the main site bar, which the ribbon bookmark geometry is built around. */
+    display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); height: 76px;
   }
 
   /* Brand */
-  .nav-brand { flex-shrink: 0; }
-  .brand-link { display: flex; align-items: center; gap: var(--space-3); text-decoration: none; transition: opacity 0.15s ease; }
+  .nav-brand { flex-shrink: 0; display: flex; align-items: center; gap: var(--space-3); }
+  .brand-link { display: flex; align-items: center; text-decoration: none; transition: opacity 0.15s ease; }
   .brand-link:hover { opacity: 0.8; text-decoration: none; }
-  .brand-mark {
-    font-family: var(--font-brand); font-variation-settings: 'ROND' 100;
-    font-weight: 800; font-size: 1.1rem; letter-spacing: -0.02em;
-    color: #FFFFFF; background: var(--color-primary); border: 1.5px solid var(--color-gold);
-    padding: 0.2em 0.45em 0.18em;
-    border-radius: 3px; line-height: 1; flex-shrink: 0;
+  .brand-tab-link { display: flex; text-decoration: none; }
+  .brand-tab-link:hover { text-decoration: none; }
+
+  /* "Bookmark" ribbon that hangs below the bar and holds the emblem (same as the main nav).
+     The tab keeps the bar's 76px in the layout; the ribbon overhangs the page. */
+  .brand-tab {
+    position: relative;
+    align-self: flex-start;
+    width: 76px;
+    height: 76px;
+    flex-shrink: 0;
+    filter: drop-shadow(0 4px 5px rgba(15, 25, 40, 0.3));
   }
+
+  /* ::before is the thin mustard edge (full ribbon shape); ::after is the grosgrain face,
+     inset 1.5px on the sides and along the notch so the mustard shows as a border. */
+  .brand-tab::before,
+  .brand-tab::after {
+    content: '';
+    position: absolute;
+    top: -24px;
+  }
+
+  .brand-tab::before {
+    left: 0;
+    right: 0;
+    height: 170px;
+    background: var(--color-secondary);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 18px), 0 100%);
+  }
+
+  .brand-tab::after {
+    left: 1.5px;
+    right: 1.5px;
+    height: 167.6px;
+    background: repeating-linear-gradient(
+        to bottom,
+        #1C8A7B 0 1px,
+        #0E7265 1px 2.5px,
+        #08544A 2.5px 3.5px
+      );
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 17.3px), 0 100%);
+  }
+
+  /* Retracted at rest; drops down on hover/focus. */
+  .brand-tab::before,
+  .brand-tab::after,
+  .brand-mark {
+    transition: translate 0.6s cubic-bezier(0.34, 1.25, 0.64, 1);
+  }
+
+  .brand-tab::before,
+  .brand-tab::after { translate: 0 -70px; }
+  .brand-mark { translate: 0 -50px; }
+
+  .brand-tab-link:hover .brand-tab::before,
+  .brand-tab-link:hover .brand-tab::after,
+  .brand-tab-link:hover .brand-mark,
+  .brand-tab-link:focus-visible .brand-tab::before,
+  .brand-tab-link:focus-visible .brand-tab::after,
+  .brand-tab-link:focus-visible .brand-mark {
+    translate: 0 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .brand-tab::before,
+    .brand-tab::after,
+    .brand-mark { transition: none; }
+  }
+
+  /* Emblem art (transparent background) sitting on the lower part of the ribbon. */
+  .brand-mark {
+    position: absolute;
+    z-index: 1;
+    top: 69px;
+    left: 9px;
+    display: block;
+    width: 58px;
+    height: auto;
+  }
+
   /* Community name in Doto (round dots), white on the navy bar — same as the main wordmark. */
   .brand-name {
     font-family: var(--font-brand); font-variation-settings: 'ROND' 100;
@@ -496,7 +632,7 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
 
   /* Desktop links */
   .nav-links { display: none; list-style: none; gap: var(--space-1); margin: 0; padding: 0; }
-  @media (min-width: 768px) { .nav-links { display: flex; } }
+  @media (min-width: 900px) { .nav-links { display: flex; } }
   .nav-item { margin: 0; }
   .nav-link {
     display: inline-flex; align-items: center; padding: var(--space-2) var(--space-3);
@@ -519,35 +655,6 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
 
   /* Nav actions */
   .nav-actions { display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0; }
-  .nav-cta {
-    display: none; padding: 10px var(--space-5);
-    background: linear-gradient(180deg, #E4B232 0%, var(--color-secondary) 100%) border-box;
-    color: var(--color-nav); border-radius: 3px;
-    font-family: var(--font-nav); font-size: var(--font-size-sm); font-weight: 700; letter-spacing: 0.01em;
-    text-decoration: none; white-space: nowrap; border: 2px solid transparent;
-    box-shadow: 3px 4px 8px rgba(5, 12, 22, 0.55);
-    transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.18s ease;
-  }
-  .nav-cta:hover {
-    background: linear-gradient(180deg, #EDBF45 0%, #E2AE22 100%) border-box;
-    box-shadow: 2px 2px 4px rgba(5, 12, 22, 0.55); transform: translate(1px, 2px);
-    text-decoration: none; color: var(--color-nav);
-  }
-  .nav-cta:active { transform: translate(2px, 3px); box-shadow: 0 0 1px rgba(5, 12, 22, 0.55); }
-  .nav-cta:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 3px; }
-  @media (min-width: 640px) { .nav-cta { display: inline-flex; align-items: center; } }
-
-  .nav-cdl {
-    display: flex; align-items: center; text-decoration: none;
-    padding: var(--space-1) var(--space-2); border-radius: var(--radius-md); transition: background 0.15s ease;
-  }
-  .nav-cdl:hover { background: var(--color-teal-light-glow); text-decoration: none; }
-  .cdl-badge {
-    font-family: var(--font-brand); font-variation-settings: 'ROND' 100;
-    font-weight: 800; font-size: 0.7rem; letter-spacing: 0;
-    color: var(--color-teal-light); background: rgba(124, 211, 196, 0.12); border: 1px solid rgba(124, 211, 196, 0.45);
-    padding: 0.2em 0.4em 0.15em; border-radius: 3px; line-height: 1;
-  }
 
   /* Hamburger */
   .mobile-menu-button {
@@ -562,12 +669,12 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
   .mobile-menu-button.open .hb:nth-child(1) { transform: translateY(7px) rotate(45deg); }
   .mobile-menu-button.open .hb:nth-child(2) { opacity: 0; transform: scaleX(0); }
   .mobile-menu-button.open .hb:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-  @media (min-width: 768px) { .mobile-menu-button { display: none; } }
+  @media (min-width: 900px) { .mobile-menu-button { display: none; } }
 
   /* Mobile drawer */
   .mobile-drawer { display: none; background: var(--color-surface); border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); padding: var(--space-4) var(--space-6); box-shadow: var(--shadow-md); }
   .mobile-drawer.open { display: block; }
-  @media (min-width: 768px) { .mobile-drawer { display: none !important; } }
+  @media (min-width: 900px) { .mobile-drawer { display: none !important; } }
   .mobile-links { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
   .mobile-link {
     display: block; padding: var(--space-3) var(--space-4); font-family: var(--font-nav);
@@ -577,7 +684,5 @@ const initials = communityName.split(' ').slice(0, 2).map(w => w[0]).join('');
   }
   .mobile-link:hover { background: var(--color-primary-glow); color: var(--color-primary); text-decoration: none; }
   .mobile-link.active { color: var(--color-primary); font-weight: 600; background: var(--color-primary-glow); }
-  .mobile-link-cta { color: var(--color-primary); font-weight: 700; border: 1.5px solid var(--color-border); text-align: center; margin-top: var(--space-2); }
-  .mobile-link-cta:hover { background: var(--color-primary); color: #F8FAFC; border-color: var(--color-primary); }
   .mobile-link-cdl { font-size: var(--font-size-sm); color: var(--color-text-dim); border-top: 1px solid var(--color-border); margin-top: var(--space-2); padding-top: var(--space-4); }
 </style>
