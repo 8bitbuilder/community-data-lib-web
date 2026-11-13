@@ -1,11 +1,12 @@
 ---
 import CommunityLayout from '@layouts/CommunityLayout.astro';
 import { getCollection, type CollectionEntry } from 'astro:content';
-import { withBasePath } from '@lib/paths';
+import { mainSiteHref } from '@lib/paths';
 import {
   AUDIENCE_LABELS,
   AUDIENCE_ROLES,
   communityDisplay,
+  granularityLabel,
   matchesCommunity,
   topicalTags,
   visibleAudiences,
@@ -26,7 +27,6 @@ interface Props {
 const { community } = Astro.props;
 const data = community.data;
 const { libraryTitle, placeName } = communityDisplay(data);
-const base = `/communities/${data.slug}`;
 const location = [data.county, data.state_code].filter(Boolean).join(', ');
 
 // A community catalog is always a filtered view of the main catalog.
@@ -36,11 +36,11 @@ const resources = (await getCollection('master-library'))
 
 function detailHref(entry: CollectionEntry<'master-library'>): string {
   if (entry.data.sourceId) {
-    return withBasePath(
+    return mainSiteHref(
       `/data-preview?source=${encodeURIComponent(entry.data.sourceId)}&audience=community&community=${encodeURIComponent(data.slug)}`
     );
   }
-  return entry.data.url ?? withBasePath('/complete-catalog');
+  return entry.data.url ?? mainSiteHref('/complete-catalog');
 }
 ---
 
@@ -49,7 +49,8 @@ function detailHref(entry: CollectionEntry<'master-library'>): string {
   description={`Datasets for ${placeName} from the Community Data Libraries catalog.`}
   communityName={libraryTitle}
   communityLocation={location || undefined}
-  communityBase={base}
+  communitySlug={data.slug}
+  page="catalog"
 >
   <div class="catalog-shell">
     <header class="page-header">
@@ -89,8 +90,8 @@ function detailHref(entry: CollectionEntry<'master-library'>): string {
           <div class="empty-state">
             <p>
               No datasets in the main catalog are linked to {placeName} yet. Browse the
-              <a href={withBasePath('/complete-catalog')}>complete catalog</a> or
-              <a href={withBasePath('/submit')}>suggest a data resource</a>.
+              <a href={mainSiteHref('/complete-catalog')}>complete catalog</a> or
+              <a href={mainSiteHref('/submit')}>suggest a data resource</a>.
             </p>
           </div>
         ) : (
@@ -114,6 +115,9 @@ function detailHref(entry: CollectionEntry<'master-library'>): string {
                     </h3>
                     <p>{entry.data.description}</p>
                     <div class="chips">
+                      {granularityLabel(entry.data.granularity) && (
+                        <span class="chip chip-level">By {granularityLabel(entry.data.granularity)}</span>
+                      )}
                       {topicalTags(entry.data, data)
                         .slice(0, 4)
                         .map((tag) => (
@@ -304,6 +308,12 @@ function detailHref(entry: CollectionEntry<'master-library'>): string {
       line-height: 1.35;
       background: rgba(35, 53, 75, 0.07);
       color: var(--color-text-muted);
+    }
+
+    /* Data finer than a county (tract, ZIP): outlined so it reads as a fact, not a topic. */
+    .chip-level {
+      background: transparent;
+      box-shadow: inset 0 0 0 1px rgba(35, 53, 75, 0.3);
     }
 
     .chip-pedagogical {

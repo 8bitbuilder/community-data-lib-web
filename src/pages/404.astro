@@ -28,8 +28,11 @@ import { withBasePath } from '@lib/paths';
 </Layout>
 
 <script>
-  // Unknown community slugs are not generated at build time, so they land here.
-  if (window.location.pathname.includes('/communities/')) {
+  // Unknown community slugs are not generated at build time, so they land here,
+  // either at /web/communities/<slug>/ or at <slug>.<PUBLIC_LIBRARY_DOMAIN> (web#31).
+  const libraryDomain = import.meta.env.PUBLIC_LIBRARY_DOMAIN;
+  const onLibraryHost = Boolean(libraryDomain) && window.location.hostname.endsWith(`.${libraryDomain}`);
+  if (onLibraryHost || window.location.pathname.includes('/communities/')) {
     const note = document.getElementById('community-missing');
     if (note) note.hidden = false;
   }

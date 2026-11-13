@@ -8,6 +8,8 @@ syncedFromBackend: true
 tags:
   - "Business & Economy"
   - "Population Data"
+  - "state"
+  - "county"
 dataThemes:
   - "Business & Economy"
   - "Population Data"

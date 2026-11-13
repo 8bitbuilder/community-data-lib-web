@@ -2,13 +2,15 @@
 import { withBasePath } from '@lib/paths';
 
 interface Props {
-  /** Site-relative path, without the base (e.g. '/communities/knox-county/'). */
-  to: string;
+  /** Site-relative path without the base (e.g. '/maps'). */
+  to?: string;
+  /** A finished address instead of `to`, e.g. from libraryHref(). */
+  href?: string;
   label: string;
 }
 
-const { to, label } = Astro.props;
-const target = withBasePath(to);
+const { to = '/', href, label } = Astro.props;
+const target = href ?? withBasePath(to);
 ---
 
 <!doctype html>

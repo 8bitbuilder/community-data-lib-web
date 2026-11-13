@@ -1,5 +1,6 @@
 ---
 import Redirect from '@components/Redirect.astro';
+import { libraryHref } from '@lib/paths';
 ---
 
-<Redirect to="/communities/knox-county/" label="Knoxville Community Data Library" />
+<Redirect href={libraryHref('knox-county', '/')} label="Knoxville Community Data Library" />

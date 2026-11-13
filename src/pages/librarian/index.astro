@@ -1,0 +1,125 @@
+---
+import LibrarianPage from '@components/librarian/LibrarianPage.astro';
+import { withBasePath } from '@lib/paths';
+---
+
+<LibrarianPage
+  title="Librarian Portal"
+  description="Register a community data library and keep its details up to date."
+  heading="My libraries"
+  intro="Libraries you edit. Register a new one for your county, or update one you maintain."
+>
+  <section class="card" id="mine" hidden>
+    <h2>Your libraries</h2>
+    <ul class="item-list" id="library-list"></ul>
+    <p class="note" id="library-empty" hidden>
+      You don't edit any library yet. Register one for your county, or ask an existing library's editors to add your
+      email.
+    </p>
+    <div class="actions">
+      <a class="button" href={withBasePath('/librarian/register/')}>Register a new library</a>
+    </div>
+  </section>
+
+  <section class="card" id="review" hidden>
+    <h2>Waiting for approval</h2>
+    <p class="note">
+      New libraries registered by anyone with an account. Approving one publishes it on the next site rebuild;
+      rejecting deletes it.
+    </p>
+    <ul class="item-list" id="pending-list"></ul>
+    <p class="note" id="pending-empty" hidden>Nothing is waiting for approval.</p>
+  </section>
+</LibrarianPage>
+
+<script>
+  import { api, pages, rebuildMessage, requireUser, showStatus } from '@lib/librarian/client';
+
+  interface Library {
+    slug: string;
+    name: string;
+    county?: string;
+    state_code?: string;
+    approved: boolean;
+    editors: string[];
+  }
+
+  const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+  const where = (lib: Library) => [lib.county, lib.state_code].filter(Boolean).join(', ');
+
+  function item(lib: Library, actions: HTMLElement[]) {
+    const li = document.createElement('li');
+    const main = document.createElement('div');
+    main.className = 'item-main';
+    const name = Object.assign(document.createElement('span'), { className: 'item-name', textContent: lib.name });
+    const chip = Object.assign(document.createElement('span'), {
+      className: `chip ${lib.approved ? 'is-live' : 'is-pending'}`,
+      textContent: lib.approved ? 'Published' : 'Waiting for approval',
+    });
+    const meta = Object.assign(document.createElement('span'), {
+      className: 'item-meta',
+      textContent: `${where(lib)} · ${pages.community(lib.slug)} · editors: ${lib.editors.join(', ')}`,
+    });
+    main.append(name, chip, meta);
+    li.append(main, ...actions);
+    return li;
+  }
+
+  const link = (text: string, href: string) => Object.assign(document.createElement('a'), { className: 'button button-secondary button-link', textContent: text, href });
+
+  function button(text: string, className: string, onClick: (b: HTMLButtonElement) => void) {
+    const b = Object.assign(document.createElement('button'), { type: 'button', className, textContent: text });
+    b.addEventListener('click', () => onClick(b));
+    return b;
+  }
+
+  async function review(slug: string, action: 'approve' | 'reject') {
+    try {
+      const result = await api(action === 'approve' ? `/${encodeURIComponent(slug)}/approve` : `/${encodeURIComponent(slug)}`, {
+        method: action === 'approve' ? 'POST' : 'DELETE',
+      });
+      showStatus(action === 'approve' ? `Approved ${slug}. ${rebuildMessage(result.rebuild)}` : `Rejected and deleted ${slug}.`);
+      await load();
+    } catch (err) {
+      showStatus(message(err), 'error');
+    }
+  }
+
+  async function load() {
+    const data = (await api()) as { libraries: Library[]; pending: Library[]; isAdmin: boolean };
+    const list = document.getElementById('library-list')!;
+    list.replaceChildren(
+      ...data.libraries.map((lib) =>
+        item(lib, [link('Edit', pages.edit(lib.slug)), ...(lib.approved ? [link('View page', pages.community(lib.slug))] : [])])
+      )
+    );
+    document.getElementById('library-empty')!.hidden = data.libraries.length > 0;
+    document.getElementById('mine')!.hidden = false;
+
+    document.getElementById('review')!.hidden = !data.isAdmin;
+    if (data.isAdmin) {
+      document.getElementById('pending-list')!.replaceChildren(
+        ...data.pending.map((lib) =>
+          item(lib, [
+            button('Approve', '', () => review(lib.slug, 'approve')),
+            // Two steps instead of a confirm() dialog.
+            button('Reject', 'button-secondary', (b) => {
+              if (b.dataset.armed) return review(lib.slug, 'reject');
+              b.dataset.armed = '1';
+              b.textContent = 'Click again to reject';
+              b.className = 'button-danger';
+            }),
+          ])
+        )
+      );
+      document.getElementById('pending-empty')!.hidden = data.pending.length > 0;
+    }
+  }
+
+  async function init() {
+    if (!(await requireUser())) return;
+    await load();
+  }
+
+  init().catch((err) => showStatus(message(err), 'error'));
+</script>

@@ -6,7 +6,7 @@ This guide covers every environment variable used by the Community Data Librarie
 
 | Location | Where to set it | Variables |
 |---|---|---|
-| Netlify (production site) | Netlify → Site configuration → Environment variables | [Metadata editor](#metadata-editor-netlify), [Notifications](#notifications-netlify) |
+| Netlify (production site) | Netlify → Site configuration → Environment variables | [Metadata editor](#metadata-editor-netlify), [Librarian portal and contact form](#librarian-portal-and-contact-form-netlify), [Notifications](#notifications-netlify) |
 | GitHub Actions secret (backend repo) | `community-data-libraries/backend` → Settings → Secrets and variables → Actions → **Repository secrets** | [`NETLIFY_BUILD_HOOK`](#netlify_build_hook) |
 | Your computer (local development) | `web/.env`, or your shell | [Local development](#local-development-optional) |
 
@@ -90,6 +90,51 @@ A GitHub token the editor uses to create a branch, commit the change, and open a
 **Optional** · Default: `community-data-libraries/backend`
 
 The repository (`owner/name`) where edit pull requests are opened. Point it at a fork when testing so you don't open real pull requests, for example `your-username/backend`. `GITHUB_TOKEN` must have access to whichever repo you choose.
+
+---
+
+## Librarian portal and contact form (Netlify)
+
+The librarian portal (`/librarian/`) and the *Contact the librarian* form. See [community-store.md](community-store.md) and the [setup checklist](netlify-setup-checklist.md).
+
+### `NETLIFY_DB_URL`
+**Set by Netlify**
+
+The Netlify Database connection string. Netlify provides it to builds and functions when the site has a database (Data & Storage → Database). Don't set it by hand on Netlify.
+
+- **In builds:** without it, community pages are built from `src/content/communities/*.md` with a loud warning. A production build with it that can't read the database fails instead of publishing without its libraries.
+- **In functions:** without it, the librarian API answers "not configured".
+- **Locally:** set it to test a build or `npm run db:seed` against a database, for example Netlify's local emulator.
+
+### `COMMUNITY_BUILD_HOOK_URL`
+**Optional · Secret · Scope: Functions**
+
+A Netlify build hook (Site configuration → Build & deploy → Build hooks, branch `main`). The librarian function calls it after an approval, or an edit that changes a public field of an approved library, so the static community pages rebuild.
+
+- **Cost:** each call is a production build and deploy (15 credits on credit-based plans; see [community-store.md](community-store.md#costs)).
+- **If missing:** saves still work. The function logs `COMMUNITY_BUILD_HOOK_URL is not set; skipping the site rebuild`, and changes appear after the next deploy.
+- **Risk if leaked:** anyone can trigger builds. To rotate, delete the hook and create a new one.
+
+### `RESEND_API_KEY` and `CONTACT_FROM_EMAIL`
+**Required for the contact form · Scope: Functions**
+
+The contact form sends through Resend, like the metadata editor's sign-in emails. `CONTACT_FROM_EMAIL` is the sender, on a verified domain, for example `Community Data Libraries <librarians@your-domain.org>`. Without these (or without a database), the form says it isn't set up yet.
+
+Identity settings (registration open, the `admin` role for approvers) are site settings, not variables; see the [setup checklist](netlify-setup-checklist.md).
+
+### `PUBLIC_LIBRARY_DOMAIN` and `PUBLIC_MAIN_SITE_URL`
+**Optional · Not secret · All scopes · Production context only**
+
+Serve each community library on its own subdomain (web#31).
+
+- **`PUBLIC_LIBRARY_DOMAIN`:** e.g. `communitydatalibraries.org`. Libraries then live at
+  `https://<slug>.communitydatalibraries.org/`.
+- **`PUBLIC_MAIN_SITE_URL`:** the main site's origin, `https://community-data-libraries.netlify.app`.
+  Library pages link back to the main site with it.
+- **Who reads them:** the build bakes both into links, and the `library-host` edge function reads
+  them at runtime.
+- **If missing:** libraries stay at `/web/communities/<slug>/`, as before.
+- **Setup and DNS:** [netlify.md](netlify.md#library-subdomains-web31).
 
 ---
 

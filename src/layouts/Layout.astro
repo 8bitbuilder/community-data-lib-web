@@ -1,7 +1,7 @@
 ---
 import Navigation from '@components/Navigation.astro';
 import { Image } from 'astro:assets';
-import { withBasePath } from '@lib/paths';
+import { libraryHref, withBasePath } from '@lib/paths';
 import cdlEmblem from '../assets/brand/cdl-emblem-transparent.png';
 // Lower-48 county (fainter) + state outlines from Census cb_2024 1:20m, Albers projection.
 // Strokes are baked into the SVG; loaded as a cached file rather than inlined on every page.
@@ -20,7 +20,7 @@ const {
 
 const siteTitle =
   title === 'Community Data Libraries' ? title : `${title} | Community Data Libraries`;
-const librarianPortalHref = withBasePath('/librarian/');
+const librarianLoginHref = withBasePath('/librarian/login/');
 ---
 
 <!doctype html>
@@ -63,20 +63,15 @@ const librarianPortalHref = withBasePath('/librarian/');
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500&display=swap" rel="stylesheet">
 
     <title>{siteTitle}</title>
-    <!-- is:inline keeps this a classic script; Astro would otherwise bundle it as a
-         cross-origin module import, which identity.netlify.com's CORS headers block. -->
-    <script is:inline src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-    <script is:inline define:vars={{ librarianPortalHref }}>
-      // Sign-up confirmation and invite links land on the home page; after logging in
-      // there, send librarians to their portal. (Team members open /admin/ directly.)
-      if (window.netlifyIdentity) {
-        window.netlifyIdentity.on('init', (user) => {
-          if (!user && !document.location.pathname.startsWith(librarianPortalHref)) {
-            window.netlifyIdentity.on('login', () => {
-              document.location.href = librarianPortalHref;
-            });
-          }
-        });
+    <script is:inline define:vars={{ librarianLoginHref }}>
+      // Links in Netlify Identity emails (confirm, invite, password reset) land on the
+      // home page with a token in the hash; the librarian login page handles them.
+      // No Identity code loads on public pages.
+      if (
+        /(?:^#|&)(?:confirmation|invite|recovery|email_change)_token=|(?:^#|&)access_token=/.test(location.hash) &&
+        !location.pathname.startsWith(librarianLoginHref.replace(/\/$/, ''))
+      ) {
+        location.replace(librarianLoginHref + location.hash);
       }
     </script>
     <slot name="head" />
@@ -101,7 +96,7 @@ const librarianPortalHref = withBasePath('/librarian/');
           </div>
           <nav class="footer-links" aria-label="Footer navigation">
             <a href={withBasePath('/complete-catalog')}>Complete Catalog</a>
-            <a href={withBasePath('/communities/knox-county/')}>Example Community Library</a>
+            <a href={libraryHref('knox-county')}>Example Community Library</a>
             <a href={withBasePath('/create-community-library')}>Create a Community Library</a>
             <a href={withBasePath('/submit')}>Suggest a Dataset</a>
           </nav>

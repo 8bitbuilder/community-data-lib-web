@@ -1,324 +1,12 @@
 {
   "exportVersion": 1,
-  "sourceCount": 22,
+  "sourceCount": 23,
+  "excludedNationalLevel": [
+    "census-annual-pop-by-age-sex-2025",
+    "census-annual-pop-selected-age-groups-2024",
+    "usda-milk-production"
+  ],
   "sources": [
-    {
-      "id": "census-annual-pop-by-age-sex-2025",
-      "title": "Annual Estimates of the Resident Population by Single Year of Age and Sex for the United States: April 1 2020 to July 1 2025",
-      "version": "1.0",
-      "notes": "SEX codes: 0 = Total, 1 = Male, 2 = Female. AGE 999 = total population across all ages.",
-      "provider": {
-        "name": "U.S. Census Bureau",
-        "agency": "U.S. Department of Commerce",
-        "url": "https://www.census.gov/data/datasets/time-series/demo/popest/2020s-national-detail.html"
-      },
-      "download": {
-        "url": "https://www2.census.gov/programs-surveys/popest/datasets/2020-2025/national/asrh/nc-est2025-agesex-res.csv",
-        "description": "Link downloads a CSV file.",
-        "file_size": "17.9 KB"
-      },
-      "requires_account": false,
-      "sensitive": false,
-      "pipeline_ready": true,
-      "student_suitability": "unreviewed",
-      "geographic_granularity": "nation",
-      "coverage": [
-        {
-          "level": "nation",
-          "geoid": "US"
-        }
-      ],
-      "location": {
-        "latitude": 38.8468,
-        "longitude": -76.9296,
-        "label": "U.S. Census Bureau headquarters, Suitland, MD (approximate)"
-      },
-      "variables": [
-        "SEX",
-        "AGE",
-        "ESTIMATESBASE2020",
-        "POPESTIMATE2020",
-        "POPESTIMATE2021",
-        "POPESTIMATE2022",
-        "POPESTIMATE2023",
-        "POPESTIMATE2024",
-        "POPESTIMATE2025"
-      ],
-      "description_tags": [
-        "Business & Economy",
-        "Population Data"
-      ],
-      "analysis_tags": {
-        "anova_tags": {
-          "good-for-one-way-anova": true,
-          "good-for-two-way-anova": false,
-          "good-for-chi-square-gof": true,
-          "good-for-chi-square-independence": false,
-          "good-for-paired-t-test": false
-        },
-        "association_tags": {
-          "positive-correlation": true,
-          "negative-correlation": false,
-          "no-correlation": false,
-          "strong-correlation": true,
-          "moderate-correlation": false,
-          "weak-correlation": false,
-          "linear-relationship": true,
-          "nonlinear-relationship": false,
-          "curved-relationship": false,
-          "exponential-pattern": false
-        },
-        "automation_rules_tags": {
-          "has-multiple-numeric-columns": true,
-          "has-categorical-variable": true,
-          "has-group-comparison-candidates": true,
-          "meets-minimum-sample-size": true,
-          "has-paired-test-candidates": false
-        },
-        "central_tendency_tags": {
-          "mean-median-similar": true,
-          "mean-median-different": false,
-          "has-mode": true
-        },
-        "comparison_capabilities_tags": {
-          "two-groups-present": false,
-          "multiple-groups-present": true,
-          "groups-have-different-centers": false,
-          "groups-have-different-spreads": false,
-          "groups-overlap-substantially": true
-        },
-        "distribution_shape_tags": {
-          "symmetric-distribution": true,
-          "right-skewed-distribution": true,
-          "left-skewed-distribution": false,
-          "approximately-normal": false,
-          "uniform-distribution": false,
-          "bimodal-distribution": true
-        },
-        "inference_procedures_tags": {
-          "good-for-one-sample-t-test": true,
-          "good-for-one-sample-z-test": true,
-          "good-for-one-proportion-z-test": false,
-          "good-for-two-sample-t-test": false,
-          "good-for-two-sample-z-test": false,
-          "good-for-two-proportion-z-test": false,
-          "meets-equal-variance-assumption": false,
-          "violates-equal-variance-assumption": false
-        },
-        "normality_tags": {
-          "passes-normality-test": false,
-          "fails-normality-test": true,
-          "large-enough-for-clt": true
-        },
-        "outlier_tags": {
-          "contains-outliers": true,
-          "no-outliers": false,
-          "extreme-outliers": true
-        },
-        "regression_quality_tags": {
-          "good-linear-fit": true,
-          "moderate-linear-fit": false,
-          "poor-linear-fit": false,
-          "has-influential-points": true,
-          "regression-appropriate": true
-        },
-        "statistical_procedures_tags": {
-          "good-for-transformation": true
-        },
-        "structure_complexity_tags": {
-          "univariate": false,
-          "bivariate": false,
-          "multivariate": true,
-          "small-dataset": false,
-          "medium-dataset": false,
-          "large-dataset": true
-        },
-        "two_way_table_tags": {
-          "two-way-table": false
-        },
-        "value_scale_tags": {
-          "single-digit-values": false,
-          "double-digit-values": false,
-          "three-digit-values": false,
-          "large-scale-values": true
-        },
-        "variability_tags": {
-          "high-variability": true,
-          "moderate-variability": false,
-          "low-variability": false,
-          "restricted-range": true,
-          "wide-range": true
-        },
-        "variable_types_tags": {
-          "all-discrete": true,
-          "all-continuous": false,
-          "mixed-types": false
-        }
-      }
-    },
-    {
-      "id": "census-annual-pop-selected-age-groups-2024",
-      "title": "Annual Estimates of the Resident Population for Selected Age Groups by Sex for the United States",
-      "version": "1.0",
-      "provider": {
-        "name": "U.S. Census Bureau",
-        "agency": "U.S. Department of Commerce",
-        "url": "https://www.census.gov/data/datasets/time-series/demo/popest/2020s-national-detail.html"
-      },
-      "download": {
-        "url": "https://www2.census.gov/programs-surveys/popest/tables/2020-2024/national/asrh/nc-est2024-agesex.xlsx",
-        "description": "Link downloads an XLSX file.",
-        "file_size": "18.3 KB"
-      },
-      "requires_account": false,
-      "sensitive": false,
-      "pipeline_ready": true,
-      "student_suitability": "unreviewed",
-      "geographic_granularity": "nation",
-      "coverage": [
-        {
-          "level": "nation",
-          "geoid": "US"
-        }
-      ],
-      "location": {
-        "latitude": 38.8468,
-        "longitude": -76.9296,
-        "label": "U.S. Census Bureau headquarters, Suitland, MD (approximate)"
-      },
-      "variables": [
-        "Age group",
-        "Estimates base (both sexes)",
-        "Estimates base (male)",
-        "Estimates base (female)",
-        "2020 both sexes",
-        "2020 male",
-        "2020 female",
-        "2021 both sexes",
-        "2021 male",
-        "2021 female",
-        "2022 both sexes",
-        "2022 male",
-        "2022 female",
-        "2023 both sexes",
-        "2023 male",
-        "2023 female",
-        "2024 both sexes",
-        "2024 male",
-        "2024 female"
-      ],
-      "description_tags": [
-        "Business & Economy",
-        "Population Data"
-      ],
-      "analysis_tags": {
-        "anova_tags": {
-          "good-for-one-way-anova": false,
-          "good-for-two-way-anova": false,
-          "good-for-chi-square-gof": false,
-          "good-for-chi-square-independence": false,
-          "good-for-paired-t-test": false
-        },
-        "association_tags": {
-          "positive-correlation": false,
-          "negative-correlation": false,
-          "no-correlation": false,
-          "strong-correlation": false,
-          "moderate-correlation": false,
-          "weak-correlation": false,
-          "linear-relationship": false,
-          "nonlinear-relationship": false,
-          "curved-relationship": false,
-          "exponential-pattern": false
-        },
-        "automation_rules_tags": {
-          "has-multiple-numeric-columns": false,
-          "has-categorical-variable": true,
-          "has-group-comparison-candidates": false,
-          "meets-minimum-sample-size": true,
-          "has-paired-test-candidates": false
-        },
-        "central_tendency_tags": {
-          "mean-median-similar": false,
-          "mean-median-different": false,
-          "has-mode": false
-        },
-        "comparison_capabilities_tags": {
-          "two-groups-present": false,
-          "multiple-groups-present": false,
-          "groups-have-different-centers": false,
-          "groups-have-different-spreads": false,
-          "groups-overlap-substantially": false
-        },
-        "distribution_shape_tags": {
-          "symmetric-distribution": false,
-          "right-skewed-distribution": false,
-          "left-skewed-distribution": false,
-          "approximately-normal": false,
-          "uniform-distribution": false,
-          "bimodal-distribution": false
-        },
-        "inference_procedures_tags": {
-          "good-for-one-sample-t-test": false,
-          "good-for-one-sample-z-test": false,
-          "good-for-one-proportion-z-test": false,
-          "good-for-two-sample-t-test": false,
-          "good-for-two-sample-z-test": false,
-          "good-for-two-proportion-z-test": false,
-          "meets-equal-variance-assumption": false,
-          "violates-equal-variance-assumption": false
-        },
-        "normality_tags": {
-          "passes-normality-test": false,
-          "fails-normality-test": false,
-          "large-enough-for-clt": true
-        },
-        "outlier_tags": {
-          "contains-outliers": false,
-          "no-outliers": false,
-          "extreme-outliers": false
-        },
-        "regression_quality_tags": {
-          "good-linear-fit": false,
-          "moderate-linear-fit": false,
-          "poor-linear-fit": false,
-          "has-influential-points": false,
-          "regression-appropriate": false
-        },
-        "statistical_procedures_tags": {
-          "good-for-transformation": false
-        },
-        "structure_complexity_tags": {
-          "univariate": false,
-          "bivariate": false,
-          "multivariate": false,
-          "small-dataset": false,
-          "medium-dataset": true,
-          "large-dataset": false
-        },
-        "two_way_table_tags": {
-          "two-way-table": false
-        },
-        "value_scale_tags": {
-          "single-digit-values": true,
-          "double-digit-values": false,
-          "three-digit-values": false,
-          "large-scale-values": false
-        },
-        "variability_tags": {
-          "high-variability": false,
-          "moderate-variability": false,
-          "low-variability": false,
-          "restricted-range": false,
-          "wide-range": false
-        },
-        "variable_types_tags": {
-          "all-discrete": false,
-          "all-continuous": false,
-          "mixed-types": false
-        }
-      }
-    },
     {
       "id": "census-county-estimates-all-2025",
       "title": "County Estimates All Data 2025",
@@ -332,7 +20,8 @@
       "download": {
         "url": "https://www2.census.gov/programs-surveys/popest/datasets/2020-2025/counties/totals/co-est2025-alldata.csv",
         "description": "Link downloads a CSV file.",
-        "file_size": "2023 KB"
+        "file_size": "2023 KB",
+        "format": "csv"
       },
       "requires_account": false,
       "sensitive": false,
@@ -349,6 +38,12 @@
         "latitude": 38.8468,
         "longitude": -76.9296,
         "label": "U.S. Census Bureau headquarters, Suitland, MD (approximate)"
+      },
+      "filters": {
+        "year": false,
+        "state": true,
+        "county": true,
+        "zipcode": false
       },
       "variables": [
         "SUMLEV",
@@ -444,7 +139,8 @@
       "download": {
         "url": "https://www2.census.gov/programs-surveys/popest/tables/2020-2025/state/detail/SCPRC-EST2025-18+POP.xlsx",
         "description": "Link downloads an XLSX file.",
-        "file_size": "14.7 KB"
+        "file_size": "14.7 KB",
+        "format": "xlsx"
       },
       "requires_account": false,
       "sensitive": false,
@@ -461,6 +157,12 @@
         "latitude": 38.8468,
         "longitude": -76.9296,
         "label": "U.S. Census Bureau headquarters, Suitland, MD (approximate)"
+      },
+      "filters": {
+        "year": false,
+        "state": true,
+        "county": false,
+        "zipcode": false
       },
       "variables": [
         "Geographic Area",
@@ -592,7 +294,8 @@
       "download": {
         "url": "https://www2.census.gov/programs-surveys/popest/datasets/2020-2025/state/totals/NST-EST2025-ALLDATA.csv",
         "description": "Link downloads a CSV file.",
-        "file_size": "52 KB"
+        "file_size": "52 KB",
+        "format": "csv"
       },
       "requires_account": false,
       "sensitive": false,
@@ -609,6 +312,12 @@
         "latitude": 38.8468,
         "longitude": -76.9296,
         "label": "U.S. Census Bureau headquarters, Suitland, MD (approximate)"
+      },
+      "filters": {
+        "year": false,
+        "state": true,
+        "county": false,
+        "zipcode": false
       },
       "variables": [
         "SUMLEV",
@@ -759,7 +468,8 @@
       "download": {
         "url": "https://www2.census.gov/programs-surveys/popest/datasets/2020-2025/state/totals/NST-EST2025-POPCHG2020-2025.csv",
         "description": "Link downloads a CSV file.",
-        "file_size": "16 KB"
+        "file_size": "16 KB",
+        "format": "csv"
       },
       "requires_account": false,
       "sensitive": false,
@@ -776,6 +486,12 @@
         "latitude": 38.8468,
         "longitude": -76.9296,
         "label": "U.S. Census Bureau headquarters, Suitland, MD (approximate)"
+      },
+      "filters": {
+        "year": false,
+        "state": true,
+        "county": false,
+        "zipcode": false
       },
       "variables": [
         "SUMLEV",
@@ -919,7 +635,8 @@
       "download": {
         "url": "https://www.countyhealthrankings.org/sites/default/files/media/document/analytic_data2025_v3.csv",
         "description": "Link downloads a CSV file with one row per county, plus rows for each state and the United States.",
-        "file_size": "13.1 MB"
+        "file_size": "13.1 MB",
+        "format": "csv"
       },
       "requires_account": false,
       "sensitive": false,
@@ -934,8 +651,8 @@
       ],
       "filters": {
         "year": false,
-        "state": false,
-        "county": false,
+        "state": true,
+        "county": true,
         "zipcode": false
       },
       "variables": [
@@ -1945,8 +1662,9 @@
       },
       "download": {
         "url": "https://www.epa.gov/system/files/other-files/2024-05/airtoxscreen_2020_emissions_county_sourcegroup.zip",
-        "description": "Link downloads a ZIP file.",
-        "file_size": "108 MB"
+        "description": "Link downloads a ZIP file containing a Microsoft Access database (.accdb).",
+        "file_size": "108 MB",
+        "format": "zip/accdb"
       },
       "requires_account": false,
       "sensitive": false,
@@ -2026,7 +1744,8 @@
       "download": {
         "url": "https://data.epa.gov/efservice/downloads/tri/mv_tri_basic_download/2024_TN/csv",
         "description": "Link downloads a CSV file of every TRI report filed by Tennessee facilities for reporting year 2024.",
-        "file_size": "1.6 MB"
+        "file_size": "1.6 MB",
+        "format": "csv"
       },
       "requires_account": false,
       "sensitive": false,
@@ -2041,9 +1760,9 @@
       ],
       "filters": {
         "year": false,
-        "state": false,
-        "county": false,
-        "zipcode": false
+        "state": true,
+        "county": true,
+        "zipcode": true
       },
       "variables": [
         "1. YEAR",
@@ -2296,7 +2015,7 @@
       "sensitive": false,
       "pipeline_ready": false,
       "student_suitability": "unreviewed",
-      "geographic_granularity": "nation",
+      "geographic_granularity": "point",
       "coverage": [
         {
           "level": "nation",
@@ -2310,8 +2029,8 @@
       },
       "filters": {
         "year": true,
-        "state": false,
-        "county": false,
+        "state": true,
+        "county": true,
         "zipcode": false
       },
       "description_tags": [
@@ -2483,6 +2202,12 @@
         "longitude": -83.9375,
         "label": "Knox County, TN (approximate center)"
       },
+      "filters": {
+        "year": false,
+        "state": false,
+        "county": true,
+        "zipcode": false
+      },
       "description_tags": [
         "Health & Social Services",
         "Population Data"
@@ -2523,6 +2248,12 @@
         "longitude": -83.9187,
         "label": "City County Building, 400 Main St, Knoxville, TN (approximate)"
       },
+      "filters": {
+        "year": false,
+        "state": false,
+        "county": true,
+        "zipcode": false
+      },
       "description_tags": [
         "Housing & Buildings",
         "Government Administration"
@@ -2561,6 +2292,12 @@
         "latitude": 35.9931,
         "longitude": -83.9375,
         "label": "Knox County, TN (approximate center)"
+      },
+      "filters": {
+        "year": false,
+        "state": false,
+        "county": true,
+        "zipcode": false
       },
       "description_tags": [
         "PreK-12 Education",
@@ -2602,6 +2339,12 @@
         "longitude": -83.9187,
         "label": "City County Building, 400 Main St, Knoxville, TN (approximate)"
       },
+      "filters": {
+        "year": false,
+        "state": false,
+        "county": true,
+        "zipcode": false
+      },
       "description_tags": [
         "Government Administration",
         "Law & Public Safety"
@@ -2615,24 +2358,27 @@
       }
     },
     {
-      "id": "usda-milk-production",
-      "title": "U.S. Milk Production and Related Data",
+      "id": "nanda-grocery-food-stores",
+      "title": "NaNDA: Grocery and Food Stores by Census Tract and ZCTA, 1990-2022",
       "version": "1.0",
+      "description": "Yearly counts and density of grocery stores, supermarkets, meat and fish markets, fruit and vegetable markets, warehouse clubs, and all food stores for every U.S. census tract and ZIP Code Tabulation Area from 1990 to 2022.",
+      "about": "This NaNDA dataset counts food retailers in every U.S. census tract and ZIP Code Tabulation Area (ZCTA) for each year from 1990 to 2022. It can show how access to food stores has changed in a neighborhood over three decades.\n\n## What's Included\n\nFor grocery stores, supermarkets, meat and fish markets, fruit and vegetable markets, warehouse clubs selling food, and all food stores:\n\n- Number of establishments\n- Number of employees\n- Establishments per 1,000 people\n- Establishments per square mile\n\nThere are separate files for 2010 and 2020 tract boundaries and 2010 and 2020 ZCTA boundaries. Each row also has the year, total population, and land area.\n\n## Finding Your County\n\nIn the tract files, the first five digits of the tract code (`tract_fips10` or `tract_fips20`) are the county FIPS code. ZCTA codes do not include a county, and ZCTAs can cross county lines. ZCTAs are also not the same as ZIP codes, so use a ZIP-to-ZCTA crosswalk to match ZIP code data.\n\n## Accessing the Data\n\nOpen the study page and log in to ICPSR to download. The files are not linked directly, so this dataset has no preview on this site.\n\n## Community Use\n\n- Find neighborhoods that have lost grocery stores or supermarkets.\n- Support food access planning with long-term local trends.\n\n## Classroom Use\n\n- **Statistics**: Compare store density across tracts in your county.\n- **Social studies**: Discuss food deserts and what store counts can and can't show.\n- **Data literacy**: Compare counts, per-person rates, and per-square-mile rates for the same place.\n\n## Terms and Credit\n\nMelendez, Clary, Clarke, Noppert, and Gypin, National Neighborhood Data Archive. Licensed under [Creative Commons Attribution-NonCommercial 4.0](https://creativecommons.org/licenses/by-nc/4.0/). Distributed by ICPSR, and downloading also means agreeing to its [Terms of Use](https://www.icpsr.umich.edu/sites/icpsr/about/policies/terms-of-use). Cite the dataset using the citation on its [ICPSR study page](https://doi.org/10.3886/ICPSR209313.V2). Catalog details retrieved from ICPSR on 2026-11-03 under [ICPSR's metadata conditions](https://www.icpsr.umich.edu/sites/icpsr/about/repository-operations/accessing-metadata).",
+      "notes": "ICPSR study 209313, version V2.1 (2026-06-19), CC BY-NC 4.0. Link only: ICPSR requires a login to download, so this source has no preview. In the tract files, the first five digits of tract_fips10 or tract_fips20 are the county FIPS. ZCTA files have no county code, and ZCTAs are not the same as ZIP codes. Connecticut users of 2022 or later data should use tract_fips22.",
+      "published_date": "2026-06-19",
       "provider": {
-        "name": "USDA Economic Research Service (ERS)",
-        "agency": "U.S. Department of Agriculture",
-        "url": "https://www.ers.usda.gov/data-products/dairy-data"
+        "name": "National Neighborhood Data Archive (NaNDA)",
+        "agency": "University of Michigan Institute for Social Research",
+        "url": "https://doi.org/10.3886/ICPSR209313.V2"
       },
       "download": {
-        "url": "https://www.ers.usda.gov/media/5503/us-milk-production-and-related-data-quarterly-and-annual.csv?v=38125",
-        "description": "Link downloads a CSV file. Spreadsheet updates quarterly on website.",
-        "file_size": "56.7 KB"
+        "description": "Log in to ICPSR on the study page to download. Files are not linked directly. Choose one zip of CSV files or four Stata files (Tract 2010, Tract 2020, ZCTA 2010, ZCTA 2020).",
+        "file_size": "116 MB (CSV zip); Stata files 118-350 MB"
       },
-      "requires_account": false,
+      "requires_account": true,
       "sensitive": false,
-      "pipeline_ready": true,
+      "pipeline_ready": false,
       "student_suitability": "unreviewed",
-      "geographic_granularity": "nation",
+      "geographic_granularity": "tract",
       "coverage": [
         {
           "level": "nation",
@@ -2640,129 +2386,192 @@
         }
       ],
       "location": {
-        "latitude": 38.8882,
-        "longitude": -77.0303,
-        "label": "USDA headquarters, Washington, DC (approximate)"
+        "latitude": 42.279,
+        "longitude": -83.74,
+        "label": "University of Michigan Institute for Social Research, Ann Arbor, MI (approximate)"
       },
-      "variables": [
-        "Year",
-        "Period",
-        "Timeperiod_id",
-        "Timeperiod_name",
-        "Aggregation",
-        "Data_item",
-        "Value",
-        "Units"
-      ],
+      "filters": {
+        "year": true,
+        "state": true,
+        "county": true,
+        "zipcode": true
+      },
       "description_tags": [
-        "Agriculture",
         "Business & Economy"
       ],
       "analysis_tags": {
-        "anova_tags": {
-          "good-for-one-way-anova": true,
-          "good-for-two-way-anova": false,
-          "good-for-chi-square-gof": false,
-          "good-for-chi-square-independence": true,
-          "good-for-paired-t-test": true
-        },
-        "association_tags": {
-          "positive-correlation": true,
-          "negative-correlation": false,
-          "no-correlation": false,
-          "strong-correlation": false,
-          "moderate-correlation": false,
-          "weak-correlation": true,
-          "linear-relationship": false,
-          "nonlinear-relationship": false,
-          "curved-relationship": false,
-          "exponential-pattern": false
-        },
-        "automation_rules_tags": {
-          "has-multiple-numeric-columns": true,
-          "has-categorical-variable": true,
-          "has-group-comparison-candidates": true,
-          "meets-minimum-sample-size": true,
-          "has-paired-test-candidates": true
-        },
-        "central_tendency_tags": {
-          "mean-median-similar": true,
-          "mean-median-different": true,
-          "has-mode": true
-        },
-        "comparison_capabilities_tags": {
-          "two-groups-present": false,
-          "multiple-groups-present": true,
-          "groups-have-different-centers": true,
-          "groups-have-different-spreads": true,
-          "groups-overlap-substantially": true
-        },
-        "distribution_shape_tags": {
-          "symmetric-distribution": true,
-          "right-skewed-distribution": true,
-          "left-skewed-distribution": false,
-          "approximately-normal": false,
-          "uniform-distribution": false,
-          "bimodal-distribution": false
-        },
-        "inference_procedures_tags": {
-          "good-for-one-sample-t-test": true,
-          "good-for-one-sample-z-test": true,
-          "good-for-one-proportion-z-test": false,
-          "good-for-two-sample-t-test": false,
-          "good-for-two-sample-z-test": false,
-          "good-for-two-proportion-z-test": false,
-          "meets-equal-variance-assumption": false,
-          "violates-equal-variance-assumption": false
-        },
-        "normality_tags": {
-          "passes-normality-test": false,
-          "fails-normality-test": true,
-          "large-enough-for-clt": true
-        },
-        "outlier_tags": {
-          "contains-outliers": true,
-          "no-outliers": false,
-          "extreme-outliers": true
-        },
-        "regression_quality_tags": {
-          "good-linear-fit": false,
-          "moderate-linear-fit": false,
-          "poor-linear-fit": true,
-          "has-influential-points": true,
-          "regression-appropriate": false
-        },
-        "statistical_procedures_tags": {
-          "good-for-transformation": true
-        },
-        "structure_complexity_tags": {
-          "univariate": false,
-          "bivariate": false,
-          "multivariate": true,
-          "small-dataset": false,
-          "medium-dataset": false,
-          "large-dataset": true
-        },
-        "two_way_table_tags": {
-          "two-way-table": false
-        },
-        "value_scale_tags": {
-          "single-digit-values": false,
-          "double-digit-values": false,
-          "three-digit-values": false,
-          "large-scale-values": true
-        },
-        "variability_tags": {
-          "high-variability": true,
-          "moderate-variability": false,
-          "low-variability": true,
-          "restricted-range": false,
-          "wide-range": true
-        },
-        "variable_types_tags": {
-          "all-discrete": false,
-          "all-continuous": false,
-          "mixed-types": true
+        "pedagogical_tags": {
+          "data-literacy": true,
+          "social-justice": true,
+          "policy-analysis": true
+        }
+      }
+    },
+    {
+      "id": "nanda-libraries",
+      "title": "NaNDA: Libraries by Census Tract and ZCTA, 1992-2021",
+      "version": "1.0",
+      "description": "Yearly counts and density of libraries for every census tract and ZIP Code Tabulation Area in the U.S. and Puerto Rico from 1992 to 2021, based on the Public Libraries Survey.",
+      "about": "This NaNDA dataset counts libraries in every census tract and ZIP Code Tabulation Area (ZCTA) in the United States and Puerto Rico for each year from 1992 to 2021. It is based on the Public Libraries Survey from the Institute of Museum and Library Services.\n\n## What's Included\n\n- Number of libraries\n- Libraries per person and per square mile\n- Geographic code, year, total population, and land area\n\nThere are separate files for 2010 and 2020 tract boundaries and 2010 and 2020 ZCTA boundaries.\n\n## Finding Your County\n\nThe first five digits of an 11-digit census tract code are the county FIPS code. ZCTA codes do not include a county, and ZCTAs can cross county lines. ZCTAs are also not the same as ZIP codes, so use a ZIP-to-ZCTA crosswalk to match ZIP code data.\n\n## Accessing the Data\n\nOpen the study page and log in to ICPSR to download. The files are not linked directly, so this dataset has no preview on this site. They come only in Stata (`.dta`) format, which Stata, R, and Python can open.\n\n## Community Use\n\n- See which neighborhoods have gained or lost library access since the 1990s.\n- Compare library density with population in different parts of your county.\n\n## Classroom Use\n\n- **Statistics**: Compare library density across tracts in your county.\n- **Civics**: Who is served by public libraries, and who has to travel farther to reach one?\n- **Data literacy**: Why might a count of libraries change when boundaries change?\n\n## Terms and Credit\n\nMelendez, Clarke, Clary, Noppert, and Gypin, National Neighborhood Data Archive. Licensed under [Creative Commons Attribution-NonCommercial 4.0](https://creativecommons.org/licenses/by-nc/4.0/). Distributed by ICPSR, and downloading also means agreeing to its [Terms of Use](https://www.icpsr.umich.edu/sites/icpsr/about/policies/terms-of-use). Cite the dataset using the citation on its [ICPSR study page](https://doi.org/10.3886/ICPSR200038.V5). Catalog details retrieved from ICPSR on 2026-11-03 under [ICPSR's metadata conditions](https://www.icpsr.umich.edu/sites/icpsr/about/repository-operations/accessing-metadata).",
+      "notes": "ICPSR study 200038, version V5.0 (2026-04-29), CC BY-NC 4.0. Link only: ICPSR requires a login to download, so this source has no preview. Stata format only. Tract codes start with the county FIPS. ZCTA files have no county code, and ZCTAs are not the same as ZIP codes.",
+      "published_date": "2026-04-29",
+      "provider": {
+        "name": "National Neighborhood Data Archive (NaNDA)",
+        "agency": "University of Michigan Institute for Social Research",
+        "url": "https://doi.org/10.3886/ICPSR200038.V5"
+      },
+      "download": {
+        "description": "Log in to ICPSR on the study page to download. Files are not linked directly. There are four Stata (.dta) files (Tract 2010, Tract 2020, ZCTA 2010, ZCTA 2020) and no CSV.",
+        "file_size": "28-86 MB per file"
+      },
+      "requires_account": true,
+      "sensitive": false,
+      "pipeline_ready": false,
+      "student_suitability": "unreviewed",
+      "geographic_granularity": "tract",
+      "coverage": [
+        {
+          "level": "nation",
+          "geoid": "US"
+        }
+      ],
+      "location": {
+        "latitude": 42.279,
+        "longitude": -83.74,
+        "label": "University of Michigan Institute for Social Research, Ann Arbor, MI (approximate)"
+      },
+      "filters": {
+        "year": true,
+        "state": true,
+        "county": true,
+        "zipcode": true
+      },
+      "description_tags": [
+        "Government Administration"
+      ],
+      "analysis_tags": {
+        "pedagogical_tags": {
+          "civic-education": true,
+          "data-literacy": true
+        }
+      }
+    },
+    {
+      "id": "nanda-voter-turnout-partisanship-by-county",
+      "title": "NaNDA: Voter Registration, Turnout, and Partisanship by County, 2004-2022",
+      "version": "1.0",
+      "description": "County voter registration and turnout for general elections from 2004 to 2022, with Democratic and Republican vote shares and partisanship indices built from presidential and Senate results.",
+      "about": "This NaNDA dataset tracks voter registration and turnout in U.S. counties from 2004 to 2022. It also measures how each county has voted, using Democratic and Republican partisanship indices for 2006 to 2022.\n\n## What's Included\n\n- Registered voters, ballots cast, and citizen voting age population\n- Registration rate, turnout among eligible voters, and turnout among registered voters\n- Democratic and Republican presidential and Senate vote counts and shares\n- Partisanship indices averaged over the current and previous elections\n\nRows are identified by county FIPS code and year. Alaska and U.S. territories are not included.\n\n## Accessing the Data\n\nOpen the study page and log in to ICPSR to download. The file is not linked directly, so this dataset has no preview on this site.\n\n## Why It Is Marked Sensitive\n\nThese are county totals, not records about individual voters. The file does include party vote shares and partisanship indices, so it is kept out of the student view by default. Turnout and registration can be used without the party measures.\n\n## Community Use\n\n- Compare your county's registration and turnout with its neighbors over time.\n- See how turnout differs between presidential and midterm years.\n\n## Classroom Use\n\n- **Civics**: Why might turnout among eligible voters differ from turnout among registered voters?\n- **Statistics**: Graph turnout trends across election years.\n- **Data literacy**: Discuss how a partisanship index is built and what it leaves out.\n\n## Terms and Credit\n\nData come from the National Neighborhood Data Archive, distributed by ICPSR under its [Terms of Use](https://www.icpsr.umich.edu/sites/icpsr/about/policies/terms-of-use). Cite the dataset using the citation on its [ICPSR study page](https://doi.org/10.3886/ICPSR38506.v2). Catalog details retrieved from ICPSR on 2026-11-03 under [ICPSR's metadata conditions](https://www.icpsr.umich.edu/sites/icpsr/about/repository-operations/accessing-metadata).",
+      "notes": "ICPSR study 38506, version V2 (2024-10-14). Link only: ICPSR requires a login to download and its terms bar redistribution without written agreement, so this source has no preview. Rows are identified by STCOFIPS10 (county FIPS) and YEAR. Alaska and the territories are excluded. Marked sensitive because the file includes party vote shares and partisanship indices.",
+      "published_date": "2024-10-14",
+      "provider": {
+        "name": "National Neighborhood Data Archive (NaNDA)",
+        "agency": "University of Michigan Institute for Social Research",
+        "url": "https://doi.org/10.3886/ICPSR38506.v2"
+      },
+      "download": {
+        "description": "Log in to ICPSR on the study page to download. Files are not linked directly. ICPSR offers Delimited, SAS, SPSS, Stata, R and ASCII versions.",
+        "file_size": "28.8 MB"
+      },
+      "requires_account": true,
+      "sensitive": true,
+      "pipeline_ready": false,
+      "student_suitability": "not_suitable",
+      "geographic_granularity": "county",
+      "coverage": [
+        {
+          "level": "nation",
+          "geoid": "US"
+        }
+      ],
+      "location": {
+        "latitude": 42.279,
+        "longitude": -83.74,
+        "label": "University of Michigan Institute for Social Research, Ann Arbor, MI (approximate)"
+      },
+      "filters": {
+        "year": true,
+        "state": true,
+        "county": true,
+        "zipcode": false
+      },
+      "variables": [
+        "County FIPS code",
+        "Year",
+        "Registered voters",
+        "Ballots cast",
+        "Citizen voting age population",
+        "Percent of eligible voters registered",
+        "Percent of eligible voters casting ballots",
+        "Percent of registered voters casting ballots",
+        "Democratic presidential votes",
+        "Republican presidential votes",
+        "Democratic presidential vote share",
+        "Republican presidential vote share",
+        "Democratic Senate votes",
+        "Republican Senate votes",
+        "Democratic Senate vote share",
+        "Republican Senate vote share",
+        "Democratic partisanship index",
+        "Republican partisanship index"
+      ],
+      "description_tags": [
+        "Elections & Politics"
+      ],
+      "analysis_tags": {
+        "pedagogical_tags": {
+          "civic-education": true,
+          "data-literacy": true,
+          "policy-analysis": true
+        }
+      }
+    },
+    {
+      "id": "nanda-weather-by-county",
+      "title": "NaNDA: Weather by County, 2003-2016",
+      "version": "1.0",
+      "description": "Daily weather for counties in the contiguous U.S. from 2003 to 2016, including average temperature, freezing, cold and hot days, rain, and snow, compiled from NOAA weather station records.",
+      "about": "NaNDA's weather files give one row per day for each county in the contiguous United States and Washington, DC, from 2003 to 2016. The values come from NOAA's Global Historical Climatology Network - Daily weather stations, matched to 2010 county boundaries.\n\n## What's Included\n\n- Eight weather conditions, each with one file per year (112 files), including average temperature, freezing days, cold days, hot days, rainy days, and snowy days\n- County FIPS code (`STCOFIPS10`) and date of observation on every row\n\nAlaska, Hawaii, and U.S. territories are not included, and the data stop at 2016.\n\n## Accessing the Data\n\nOpen the study page and log in to ICPSR to download. The files are not linked directly, so this dataset has no preview on this site.\n\n## Community Use\n\n- See how many very hot or freezing days your county had each year.\n- Line up heat or snow days with local events, school closures, or energy use.\n\n## Classroom Use\n\n- **Statistics**: Compare the spread of daily temperatures across seasons or counties.\n- **Earth science**: Look for changes in hot and freezing days between 2003 and 2016.\n- **Data literacy**: Discuss what a county value means when it comes from only a few weather stations.\n\n## Terms and Credit\n\nData come from the National Neighborhood Data Archive, distributed by ICPSR under its [Terms of Use](https://www.icpsr.umich.edu/sites/icpsr/about/policies/terms-of-use). Cite the dataset using the citation on its [ICPSR study page](https://doi.org/10.3886/ICPSR38858.v1). Catalog details retrieved from ICPSR on 2026-11-03 under [ICPSR's metadata conditions](https://www.icpsr.umich.edu/sites/icpsr/about/repository-operations/accessing-metadata).",
+      "notes": "ICPSR study 38858, version V1 (2023-09-14). Link only: ICPSR requires a login to download and its terms bar redistribution without written agreement, so this source has no preview. Each file has one row per day per county, identified by STCOFIPS10 (2010 county FIPS). Covers the contiguous U.S. and DC; Alaska, Hawaii and the territories are excluded.",
+      "published_date": "2023-09-14",
+      "provider": {
+        "name": "National Neighborhood Data Archive (NaNDA)",
+        "agency": "University of Michigan Institute for Social Research",
+        "url": "https://doi.org/10.3886/ICPSR38858.v1"
+      },
+      "download": {
+        "description": "Log in to ICPSR on the study page to download. Files are not linked directly, and each weather condition has one file per year.",
+        "file_size": "112 files; the Average Temperature files are about 780 MB each"
+      },
+      "requires_account": true,
+      "sensitive": false,
+      "pipeline_ready": false,
+      "student_suitability": "unreviewed",
+      "geographic_granularity": "county",
+      "coverage": [
+        {
+          "level": "nation",
+          "geoid": "US"
+        }
+      ],
+      "location": {
+        "latitude": 42.279,
+        "longitude": -83.74,
+        "label": "University of Michigan Institute for Social Research, Ann Arbor, MI (approximate)"
+      },
+      "filters": {
+        "year": true,
+        "state": true,
+        "county": true,
+        "zipcode": false
+      },
+      "description_tags": [
+        "Energy & Environment"
+      ],
+      "analysis_tags": {
+        "pedagogical_tags": {
+          "data-literacy": true,
+          "quantitative-methods": true
         }
       }
     }

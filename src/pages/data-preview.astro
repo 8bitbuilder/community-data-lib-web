@@ -14,6 +14,7 @@ import {
   normalizeDescriptionTags,
   type BackendSource,
 } from '@lib/api/backend';
+import { downloadFileType } from '@lib/data/fileType';
 import { previewUnavailableReason } from '@lib/data/previewSupport';
 import type { PreviewIndexEntry } from '@lib/data/staticPreview';
 import { buildDatasheet } from '../../backend/lib/datasheet.mjs';
@@ -53,6 +54,7 @@ const sources = Object.fromEntries(
           provider: source.provider?.name ? `${source.provider.name}${agency}` : '',
           providerUrl: source.provider?.url ?? '',
           downloadUrl: source.download?.url ?? '',
+          fileType: source.download?.url ? downloadFileType(source.download.format) : null,
           requiresAccount: Boolean(source.requires_account),
           description: buildCatalogDescription(source),
           topical: normalizeDescriptionTags(source.description_tags),
@@ -151,6 +153,10 @@ const pageData = {
           <div class="tag-group">
             <span class="tag-label">Geographic</span>
             <div class="tag-chips" id="geographic-tags"></div>
+          </div>
+          <div class="tag-group" id="file-type-group" hidden>
+            <span class="tag-label">File type</span>
+            <div class="tag-chips" id="file-type-tags"></div>
           </div>
         </div>
 
@@ -295,6 +301,7 @@ const pageData = {
       type PreviewVariable,
       type RowFile,
     } from '@lib/data/staticPreview';
+    import type { DownloadFileType } from '@lib/data/fileType';
 
     interface SourceModel {
       id: string;
@@ -302,6 +309,7 @@ const pageData = {
       provider: string;
       providerUrl: string;
       downloadUrl: string;
+      fileType: DownloadFileType | null;
       requiresAccount: boolean;
       description: string;
       topical: string[];
@@ -411,10 +419,28 @@ const pageData = {
       tags.forEach((tag, i) => {
         const chip = document.createElement('span');
         chip.className = `tag-chip ${filledFirst && i === 0 ? 'tag-filled' : 'tag-outline'}`;
-        // Keep the comma inside the chip so the flex gap only falls after it.
-        chip.textContent = i < tags.length - 1 ? `${tag},` : tag;
+        chip.textContent = tag;
         container.appendChild(chip);
       });
+    }
+
+    // "CSV", "ZIP → ACCDB": what the Download button gets (web#43).
+    function renderFileType(fileType: DownloadFileType | null) {
+      $('file-type-group').hidden = !fileType;
+      if (!fileType) return;
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip tag-filled';
+      chip.textContent = fileType.label;
+      chip.title = fileType.description;
+      $('file-type-tags').replaceChildren(chip);
+      if (fileType.needsConversion) {
+        const note = document.createElement('span');
+        note.className = 'tag-chip tag-warning';
+        note.textContent = 'Needs conversion';
+        note.title = 'Convert the download to CSV before using it in a spreadsheet or notebook.';
+        $('file-type-tags').appendChild(note);
+      }
+      $('download-btn').setAttribute('aria-label', `Download: ${fileType.description}`);
     }
 
     function initSourcePicker() {
@@ -457,6 +483,7 @@ const pageData = {
       renderTags('topical-tags', source.topical, true);
       renderTags('pedagogical-tags', source.pedagogical);
       renderTags('geographic-tags', source.geographic);
+      renderFileType(source.fileType);
       for (const key of ['who', 'how', 'where', 'why', 'when'] as const) {
         $(`ds-${key}`).textContent = source.datasheet[key];
       }
@@ -987,13 +1014,14 @@ const pageData = {
     .tag-chips {
       display: flex;
       flex-wrap: wrap;
-      column-gap: 0.35em;
-      row-gap: 0;
+      gap: var(--space-1);
       line-height: 1.5;
     }
 
-    /* Borderless tinted pills in Barlow Semi Condensed (site-wide tag style) */
-    .tag-chip {
+    /* Borderless tinted pills in Barlow Semi Condensed (site-wide tag style).
+       The page script creates the chips, so they don't carry Astro's scope
+       attribute: style them through the static .tag-chips container. */
+    .tag-chips :global(.tag-chip) {
       display: inline-flex;
       align-items: center;
       padding: 2px 10px;
@@ -1005,14 +1033,19 @@ const pageData = {
       line-height: 1.35;
     }
 
-    .tag-filled {
+    .tag-chips :global(.tag-filled) {
       background: rgba(62, 168, 188, 0.15);
       color: #1f5b6e;
     }
 
-    .tag-outline {
+    .tag-chips :global(.tag-outline) {
       background: rgba(35, 53, 75, 0.07);
       color: var(--color-text-muted);
+    }
+
+    .tag-chips :global(.tag-warning) {
+      background: rgba(217, 119, 6, 0.14);
+      color: #8a4b08;
     }
 
     .actions-panel {
@@ -1410,6 +1443,7 @@ const pageData = {
     .chart-canvas-wrap[hidden],
     .chart-controls[hidden],
     .table-panel[hidden],
+    .tag-group[hidden],
     .btn-download[hidden] {
       display: none;
     }

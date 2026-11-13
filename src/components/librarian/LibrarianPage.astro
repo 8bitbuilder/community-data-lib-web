@@ -1,0 +1,38 @@
+---
+// Frame for the /librarian/ pages: heading, the portal nav (shown once logged in by
+// src/lib/librarian/client.ts) and a status line. Visitors never need these pages;
+// only librarians log in.
+import Layout from '@layouts/Layout.astro';
+import { withBasePath } from '@lib/paths';
+import '../../styles/librarian.css';
+
+interface Props {
+  title: string;
+  description: string;
+  heading: string;
+  intro?: string;
+}
+
+const { title, description, heading, intro } = Astro.props;
+---
+
+<Layout title={title} description={description}>
+  <section class="portal">
+    <header class="page-header">
+      <p class="eyebrow">Librarian portal</p>
+      <h1>{heading}</h1>
+      {intro && <p class="intro">{intro}</p>}
+    </header>
+
+    <nav class="portal-nav" id="portal-nav" aria-label="Librarian portal" hidden>
+      <a href={withBasePath('/librarian/')}>My libraries</a>
+      <a href={withBasePath('/librarian/register/')}>Register a library</a>
+      <span class="nav-email" id="nav-email"></span>
+      <button type="button" class="button-secondary" id="logout-btn">Log out</button>
+    </nav>
+
+    <div id="portal-status" class="status" role="status" hidden></div>
+
+    <slot />
+  </section>
+</Layout>

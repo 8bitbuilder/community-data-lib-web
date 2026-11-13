@@ -8,6 +8,7 @@ syncedFromBackend: true
 tags:
   - "Health & Social Services"
   - "Population Data"
+  - "county"
 dataThemes:
   - "Health & Social Services"
   - "Population Data"

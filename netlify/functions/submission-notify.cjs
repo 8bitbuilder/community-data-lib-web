@@ -48,9 +48,17 @@ exports.handler = async function (event) {
   const sensitive = data.sensitive === 'true' ? '⚠️ SENSITIVE' : '';
   const submittedAt = new Date().toISOString();
 
+  // The form blocks national-only answers, but a bot can skip its script: flag those for review.
+  const { geographyLabel, geographyProblem } = await import('../../src/lib/submission/geography.mjs');
+  const geography = geographyLabel(data.geography_level);
+  const geographyVariable = data.geography_variable || '';
+  const geographyOk = geographyProblem(data.geography_level) === null;
+
   console.log('New resource submission received:', {
     title,
     category,
+    geography: data.geography_level || null,
+    geographyOk,
     submitterName,
     submittedAt,
   });
@@ -75,8 +83,21 @@ exports.handler = async function (event) {
             { type: 'mrkdwn', text: `*Difficulty:*\n${difficulty}` },
             { type: 'mrkdwn', text: `*Themes:*\n${themes || 'none'}` },
             { type: 'mrkdwn', text: `*Tags:*\n${tags || 'none'}` },
+            {
+              type: 'mrkdwn',
+              text: `*Smallest geography:*\n${geography}${geographyVariable ? ` (column: ${geographyVariable})` : ''}`,
+            },
           ],
         },
+        geographyOk
+          ? null
+          : {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `⚠️ *Geography doesn't meet the state-or-smaller rule* (${geography}) — national-only data can't be listed.`,
+              },
+            },
         {
           type: 'section',
           text: { type: 'mrkdwn', text: `*Description:*\n${description}` },
@@ -140,6 +161,6 @@ exports.handler = async function (event) {
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ received: true, title }),
+    body: JSON.stringify({ received: true, title, geographyOk }),
   };
 };

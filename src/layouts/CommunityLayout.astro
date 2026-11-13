@@ -83,6 +83,10 @@ const navItems = [
   <body>
     <div class="paper-grain" aria-hidden="true"></div>
 
+    <div class="network-bar">
+      <a href={cdlHref} class="network-link"><span aria-hidden="true">←</span> Back to Community Data Libraries</a>
+    </div>
+
     <nav class="navbar" role="navigation" aria-label="Community navigation">
       <div class="nav-container">
 
@@ -514,6 +518,17 @@ const navItems = [
 </style>
 
 <style>
+  /* ── Link back to the main site (web#40) ─────── */
+  .network-bar { background: var(--color-secondary); }
+  .network-link {
+    display: flex; align-items: center; gap: var(--space-2);
+    max-width: 1200px; min-height: 44px; margin: 0 auto; padding: 0 var(--space-6);
+    color: #F8FAFC; font-size: var(--font-size-sm); font-weight: 600; text-decoration: none;
+  }
+  .network-link:hover { color: #F8FAFC; text-decoration: underline; }
+  .network-link:focus-visible { outline-color: #F8FAFC; outline-offset: -4px; }
+  @media (min-width: 768px) { .network-link { min-height: 36px; } }
+
   /* ── Navbar ──────────────────────────────────── */
   .navbar {
     font-family: var(--font-nav); /* links, drawer and CTA; the wordmark stays Doto */

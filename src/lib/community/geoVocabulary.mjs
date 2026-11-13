@@ -3,7 +3,7 @@
  * written by `npm run geo:boundaries` from the Census county file that /maps draws.
  *
  * Pure functions only (the vocabulary is passed in) so the same rules run in the
- * prebuild check and tests (and later any other caller that needs them).
+ * prebuild check, the communities loader, the librarian Netlify Function and tests.
  */
 
 /**
@@ -30,12 +30,24 @@ export function createVocabulary(/** @type {VocabularyFile} */ file) {
   };
 }
 
-/** Whether one coverage entry ({ level, geoid }) names a place in the vocabulary. */
-export function isKnownCoverage(vocabulary, { level, geoid }) {
+/**
+ * Whether one coverage entry ({ level, geoid, counties? }) names a place in the vocabulary.
+ *
+ * Tract (11-digit GEOID) and zip (5-digit ZCTA) entries are checked by the counties they
+ * list, which the backend export writes: a tract's must be its own first 5 digits, and a
+ * ZCTA's must all be known counties. The ZCTA list itself lives in the backend
+ * (data/reference/zcta-county.json) and is checked there.
+ */
+export function isKnownCoverage(vocabulary, { level, geoid, counties }) {
   if (level === 'nation') return geoid === 'US';
   if (level === 'state') return vocabulary.states.has(geoid);
   if (level === 'county') return vocabulary.counties.has(geoid);
-  return false;
+  if (level !== 'tract' && level !== 'zip') return false;
+  const code = String(geoid ?? '');
+  if (!(level === 'tract' ? /^\d{11}$/ : /^\d{5}$/).test(code)) return false;
+  if (!Array.isArray(counties) || counties.length === 0) return false;
+  if (level === 'tract' && counties.some((county) => county !== code.slice(0, 5))) return false;
+  return counties.every((county) => vocabulary.counties.has(String(county)));
 }
 
 /**

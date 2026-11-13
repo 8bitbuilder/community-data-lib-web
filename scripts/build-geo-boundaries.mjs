@@ -98,7 +98,7 @@ async function readLayer(workDir, zip, { key, nameField, stateNameField }) {
 }
 
 /**
- * States and counties for the build-time checks and the Data Preview county names,
+ * States and counties for the build-time checks and the librarian county picker,
  * both taken from the county file so every county's state is in the list.
  */
 export function buildVocabulary(counties, sources) {

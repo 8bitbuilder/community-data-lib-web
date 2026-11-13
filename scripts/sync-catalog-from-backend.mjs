@@ -19,8 +19,9 @@ import {
   getWebExportsDir,
   getWebSourcesDir,
 } from './backend-paths.mjs';
+import { checkCatalogScope, isNationalLevel } from '../backend/lib/catalogScope.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname =path.dirname(fileURLToPath(import.meta.url));
 const outputDir = path.resolve(__dirname, '../src/content/master-library/datasets');
 
 async function resolveSourcesDir() {
@@ -74,6 +75,7 @@ export async function loadCatalogSources() {
       ...analysis,
       ...rest,
     }));
+    assertCatalogInScope(sources);
     return { sources, origin: `SQLite export ${file}` };
   }
 
@@ -81,9 +83,27 @@ export async function loadCatalogSources() {
   console.warn('WARNING: no SQLite export found; reading YAML directly. Run export_catalog.py.');
   const sources = [];
   for (const file of await listSourceFiles(sourcesDir)) {
-    sources.push(YAML.parse(await readFile(path.join(sourcesDir, file), 'utf8')));
+    const source = YAML.parse(await readFile(path.join(sourcesDir, file), 'utf8'));
+    // The YAML keeps national-level sources; only the export leaves them out.
+    if (isNationalLevel(source.filters)) continue;
+    if (!source.filters) console.warn(`WARNING: ${source.id} has no filters (web#42)`);
+    sources.push(source);
   }
   return { sources, origin: `YAML ${sourcesDir}` };
+}
+
+/**
+ * The backend's export should already follow the local-data rule (web#42). Stop the
+ * build if it doesn't, rather than publish a national-level or unchecked dataset.
+ */
+export function assertCatalogInScope(sources) {
+  const { national, missingFilters } = checkCatalogScope(sources);
+  const problems = [];
+  if (national.length) problems.push(`national-level: ${national.join(', ')}`);
+  if (missingFilters.length) problems.push(`no filters: ${missingFilters.join(', ')}`);
+  if (problems.length) {
+    throw new Error(`Catalog export breaks the local-data rule (web#42): ${problems.join('; ')}. Fix the YAML in the backend repo.`);
+  }
 }
 
 // All active analysis tags: the catalog's pedagogical filter needs every one, and
@@ -162,6 +182,19 @@ function yamlQuote(value) {
   return `"${text}"`;
 }
 
+/**
+ * One coverage entry as a frontmatter flow mapping. Tract and zip (ZCTA) entries keep
+ * the `counties` the backend export lists, so the site matches them to libraries
+ * without a crosswalk of its own.
+ */
+export function coverageLine(c) {
+  const geoid = yamlQuote(c.geoid ?? c.fips ?? 'US');
+  const counties = Array.isArray(c.counties) && c.counties.length
+    ? `, counties: [${c.counties.map((county) => yamlQuote(county)).join(', ')}]`
+    : '';
+  return `  - { level: ${yamlQuote(c.level)}, geoid: ${geoid}${counties} }`;
+}
+
 function buildMarkdown(source) {
   const themes = normalizeDescriptionTags(source.description_tags);
   const pedagogicalTags = extractPedagogicalTags(source);
@@ -199,9 +232,7 @@ function buildMarkdown(source) {
     ...(coverage.length
       ? [
           'coverage:',
-          ...coverage.map(
-            (c) => `  - { level: ${yamlQuote(c.level)}, geoid: ${yamlQuote(c.geoid ?? c.fips ?? 'US')} }`
-          ),
+          ...coverage.map(coverageLine),
         ]
       : []),
     ...(source.published_date ? [`publishedDate: ${source.published_date}`] : []),

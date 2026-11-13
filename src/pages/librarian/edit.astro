@@ -1,0 +1,190 @@
+---
+// One static page for every library: Netlify serves it at /web/librarian/<slug>/edit/
+// (a rewrite in netlify.toml), so new libraries need no rebuild. Locally, use
+// /web/librarian/edit/?slug=<slug>.
+import LibrarianPage from '@components/librarian/LibrarianPage.astro';
+import CountyPicker from '@components/librarian/CountyPicker.astro';
+import { LIMITS } from '@lib/community/librarianRules.mjs';
+---
+
+<LibrarianPage
+  title="Edit Community Library"
+  description="Edit a community data library's details and editors."
+  heading="Edit library"
+>
+  <form class="card" id="edit-form" novalidate hidden>
+    <h2 id="edit-title">Details</h2>
+    <p class="note" id="edit-state"></p>
+
+    <div class="field">
+      <label for="f-name">Library name <span class="required">*</span></label>
+      <input id="f-name" name="name" type="text" maxlength={LIMITS.name} required />
+      <p class="field-error" data-error-for="name"></p>
+    </div>
+
+    <CountyPicker />
+
+    <div class="field-row">
+      <div class="field">
+        <label for="f-place">Place name</label>
+        <input id="f-place" name="place_name" type="text" maxlength={LIMITS.placeName} />
+        <p class="field-error" data-error-for="place_name"></p>
+      </div>
+      <div class="field">
+        <label for="f-slug">Web address</label>
+        <input id="f-slug" type="text" readonly />
+        <p class="field-hint">Can't be changed.</p>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="f-description">Description</label>
+      <textarea id="f-description" name="description" maxlength={LIMITS.description} rows="3"></textarea>
+      <p class="field-error" data-error-for="description"></p>
+    </div>
+
+    <p class="form-error" role="alert"></p>
+    <div class="actions"><button type="submit">Save changes</button></div>
+  </form>
+
+  <section class="card" id="editors" hidden>
+    <h2>Editors</h2>
+    <p class="note">
+      Everyone listed can edit this library and add or remove editors. Visitors reach you through the contact form on
+      the library's page; your email is not shown there. A library always keeps at least one editor.
+    </p>
+    <ul class="item-list" id="editor-list"></ul>
+    <form class="inline-form" id="add-editor-form" novalidate>
+      <input id="f-new-editor" name="email" type="email" placeholder="colleague@example.org" aria-label="Email of an editor to add" />
+      <button type="submit" class="button-secondary">Add editor</button>
+    </form>
+    <p class="field-error" id="editor-error" role="alert"></p>
+  </section>
+</LibrarianPage>
+
+<script>
+  import { editSlugFromLocation } from '@lib/librarian/portal';
+  import { api, ApiError, pages, rebuildMessage, requireUser, showFieldErrors, showStatus } from '@lib/librarian/client';
+  import { initCountyPicker } from '@lib/librarian/countyPicker';
+  import type { User } from '@netlify/identity';
+
+  interface Library {
+    slug: string;
+    name: string;
+    place_name?: string;
+    description?: string;
+    county_fips: string;
+    county?: string;
+    state_code?: string;
+    approved: boolean;
+    editors: string[];
+  }
+
+  const form = document.getElementById('edit-form') as HTMLFormElement;
+  const county = initCountyPicker(document.querySelector('[data-county-picker]') as HTMLElement);
+  const editorError = document.getElementById('editor-error') as HTMLElement;
+  const slug = editSlugFromLocation(location.pathname, location.search);
+  const path = `/${encodeURIComponent(slug ?? '')}`;
+  const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+  let me: User | null = null;
+
+  const field = (id: string) => document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement;
+
+  function fill(lib: Library) {
+    document.getElementById('edit-title')!.textContent = lib.name;
+    document.getElementById('edit-state')!.textContent = lib.approved
+      ? `Published at ${pages.community(lib.slug)}. Saving rebuilds the public page.`
+      : 'Waiting for approval by the Community Data Libraries team. Changes are saved now and published once approved.';
+    field('f-name').value = lib.name;
+    field('f-place').value = lib.place_name ?? '';
+    field('f-slug').value = lib.slug;
+    field('f-description').value = lib.description ?? '';
+    county.set(lib.county_fips);
+    renderEditors(lib.editors);
+  }
+
+  function renderEditors(editors: string[]) {
+    document.getElementById('editor-list')!.replaceChildren(
+      ...editors.map((email) => {
+        const li = document.createElement('li');
+        const main = Object.assign(document.createElement('span'), { className: 'item-main item-name', textContent: email });
+        const remove = Object.assign(document.createElement('button'), {
+          type: 'button',
+          className: 'button-secondary',
+          textContent: email === me?.email?.toLowerCase() ? 'Leave' : 'Remove',
+          disabled: editors.length <= 1,
+        });
+        remove.addEventListener('click', async () => {
+          editorError.textContent = '';
+          try {
+            const result = await api(`${path}/editors/${encodeURIComponent(email)}`, { method: 'DELETE' });
+            if (email === me?.email?.toLowerCase()) {
+              location.href = pages.dashboard;
+              return;
+            }
+            renderEditors(result.editors);
+          } catch (err) {
+            editorError.textContent = message(err);
+          }
+        });
+        li.append(main, remove);
+        return li;
+      })
+    );
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const button = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+    button.disabled = true;
+    try {
+      const result = await api(path, {
+        method: 'PUT',
+        body: { name: data.get('name'), place_name: data.get('place_name'), description: data.get('description'), county_fips: county.value() },
+      });
+      showFieldErrors(form, []);
+      fill(result.library);
+      showStatus(`Saved. ${rebuildMessage(result.rebuild)}`.trim());
+    } catch (err) {
+      if (err instanceof ApiError) showFieldErrors(form, err.errors, err.message);
+      else showStatus(message(err), 'error');
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  document.getElementById('add-editor-form')!.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    editorError.textContent = '';
+    const input = document.getElementById('f-new-editor') as HTMLInputElement;
+    try {
+      const result = await api(`${path}/editors`, { method: 'POST', body: { email: input.value } });
+      input.value = '';
+      renderEditors(result.editors);
+    } catch (err) {
+      editorError.textContent = message(err);
+    }
+  });
+
+  async function init() {
+    if (!slug) {
+      showStatus('No library given. Open this page from My libraries.', 'error');
+      return;
+    }
+    me = await requireUser();
+    if (!me) return;
+    const { library, canEdit } = (await api(path)) as { library: Library; canEdit: boolean };
+    fill(library);
+    form.hidden = false;
+    document.getElementById('editors')!.hidden = false;
+    if (!canEdit) {
+      // Admins can look at a library they don't edit, but not change it.
+      form.querySelectorAll('input, textarea, button').forEach((el) => el.setAttribute('disabled', ''));
+      document.getElementById('add-editor-form')!.hidden = true;
+      showStatus('You can see this library because you approve libraries, but only its editors can change it.');
+    }
+  }
+
+  init().catch((err) => showStatus(message(err), 'error'));
+</script>

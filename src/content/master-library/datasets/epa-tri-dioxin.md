@@ -8,6 +8,8 @@ syncedFromBackend: true
 tags:
   - "Energy & Environment"
   - "Government Administration"
+  - "state"
+  - "county"
   - "year"
 dataThemes:
   - "Energy & Environment"
@@ -15,7 +17,7 @@ dataThemes:
 pedagogicalTags: []
 sensitive: false
 studentSuitability: "unreviewed"
-granularity: "nation"
+granularity: "point"
 coverage:
   - { level: "nation", geoid: "US" }
 featured: false
