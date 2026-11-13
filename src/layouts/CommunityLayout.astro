@@ -1,6 +1,6 @@
 ---
 import { Image } from 'astro:assets';
-import { withBasePath } from '@lib/paths';
+import { libraryHref, mainSiteHref, withBasePath } from '@lib/paths';
 // Same emblem + ribbon bookmark as the main site nav
 import cdlEmblem from '../assets/brand/cdl-emblem-transparent.png';
 // Lower-48 county/state outlines used as the footer texture on the main site
@@ -12,7 +12,8 @@ interface Props {
   description?: string;
   communityName: string;
   communityLocation?: string;
-  communityBase: string; // e.g. '/communities/knox-county'
+  communitySlug: string; // e.g. 'knox-county'
+  page: 'home' | 'catalog' | 'contact';
   footerTitle?: string;  // e.g. 'Knoxville Community Data Library'
 }
 
@@ -20,7 +21,8 @@ const {
   title,
   communityName,
   communityLocation,
-  communityBase,
+  communitySlug,
+  page,
   footerTitle,
   description = `A community data library for ${communityName}.`,
 } = Astro.props;
@@ -28,32 +30,24 @@ const {
 const pageTitle = title ? `${title} | ${communityName}` : communityName;
 const footerName = footerTitle ?? communityName;
 
-const base = communityBase.replace(/\/$/, '');
-const homeHref   = withBasePath(`${base}/`);
-const catalogHref = withBasePath(`${base}/catalog/`);
-const contactHref = withBasePath(`${base}/contact/`);
+// The library's own pages are on its subdomain when PUBLIC_LIBRARY_DOMAIN is set
+// (web#31); everything else is a main-site page, linked absolutely so it never
+// shows under the library's subdomain.
+const homeHref    = libraryHref(communitySlug, '/');
+const catalogHref = libraryHref(communitySlug, '/catalog/');
+const contactHref = libraryHref(communitySlug, '/contact/');
 // Data Resources and Suggest a Data Resource are main-site pages; community
 // libraries never get their own copies (or their own map).
-const dataHref    = withBasePath('/data-resources');
-const submitHref  = withBasePath('/submit');
-const cdlHref     = withBasePath('/');
+const dataHref    = mainSiteHref('/data-resources');
+const submitHref  = mainSiteHref('/submit');
+const cdlHref     = mainSiteHref('/');
 
 const navItems = [
-  { href: catalogHref, label: 'Community Catalog', carryAudience: true },
-  { href: dataHref, label: 'Data Resources', carryAudience: false },
-  { href: submitHref, label: 'Suggest a Data Resource', carryAudience: false },
-  { href: contactHref, label: 'Contact the Librarian', carryAudience: false },
+  { href: catalogHref, label: 'Community Catalog', carryAudience: true, active: page === 'catalog' },
+  { href: dataHref, label: 'Data Resources', carryAudience: false, active: false },
+  { href: submitHref, label: 'Suggest a Data Resource', carryAudience: false, active: false },
+  { href: contactHref, label: 'Contact the Librarian', carryAudience: false, active: page === 'contact' },
 ];
-
-const currentPath = Astro.url.pathname;
-function isActive(href: string): boolean {
-  const normalized = href.replace(/\/$/, '');
-  const currentNorm = currentPath.replace(/\/$/, '');
-  if (normalized === currentNorm) return true;
-  // Home only matches exactly; other pages match prefix
-  if (href === homeHref) return false;
-  return currentPath.startsWith(normalized);
-}
 ---
 
 <!doctype html>
@@ -118,8 +112,8 @@ function isActive(href: string): boolean {
             <li class="nav-item">
               <a
                 href={item.href}
-                class={`nav-link ${isActive(item.href) ? 'active' : ''}`}
-                aria-current={isActive(item.href) ? 'page' : undefined}
+                class={`nav-link ${item.active ? 'active' : ''}`}
+                aria-current={item.active ? 'page' : undefined}
                 data-carry-audience={item.carryAudience ? '' : undefined}
               >{item.label}</a>
             </li>
@@ -148,7 +142,7 @@ function isActive(href: string): boolean {
             <li>
               <a
                 href={item.href}
-                class={`mobile-link ${isActive(item.href) ? 'active' : ''}`}
+                class={`mobile-link ${item.active ? 'active' : ''}`}
                 data-carry-audience={item.carryAudience ? '' : undefined}
               >
                 {item.label}
