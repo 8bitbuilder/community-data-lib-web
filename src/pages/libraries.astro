@@ -1,0 +1,291 @@
+---
+import Layout from '@layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+import { libraryHref, withBasePath } from '@lib/paths';
+import { librarySearchText } from '@lib/community/librarySearch';
+
+// Same collection that generates the community pages, so the list matches what is published.
+const communities = (await getCollection('communities')).sort((a, b) =>
+  a.data.name.localeCompare(b.data.name)
+);
+
+const createHref = withBasePath('/create-community-library');
+const total = communities.length;
+const countLabel = `${total} ${total === 1 ? 'library' : 'libraries'}`;
+---
+
+<Layout
+  title="Community Libraries"
+  description="Find a community data library by name, county, city, or state."
+>
+  <section class="libraries-shell">
+    <header class="page-header">
+      <p class="eyebrow">Community Libraries</p>
+      <h1>Find a community library.</h1>
+      <p class="intro">
+        Each community library is a local view of the main catalog for one county. Search by the
+        library's name, its county, city, or state.
+      </p>
+    </header>
+
+    <section class="library-panel" aria-labelledby="library-list-heading">
+      <div class="panel-header">
+        <h2 id="library-list-heading">All community libraries</h2>
+        <p class="result-count" id="library-count" aria-live="polite">{countLabel}</p>
+      </div>
+
+      {
+        total > 0 ? (
+          <>
+            <form class="library-search" id="library-search" role="search">
+              <label for="library-q">Search libraries</label>
+              <input
+                type="search"
+                id="library-q"
+                name="q"
+                placeholder="Try Knoxville, Knox County, or TN"
+                autocomplete="off"
+              />
+            </form>
+
+            <ul class="library-list" id="library-list">
+              {communities.map((community) => {
+                const data = community.data;
+                const location = [data.county, data.state_code].filter(Boolean).join(', ');
+                return (
+                  <li class="library-item" data-search={librarySearchText(data)}>
+                    <a href={libraryHref(data.slug)} class="library-name">
+                      {data.name}
+                    </a>
+                    <span class="library-meta">
+                      {data.place_name && `${data.place_name} · `}
+                      {location}
+                      {data.county_fips && ` · FIPS ${data.county_fips}`}
+                    </span>
+                    {data.description && <p class="library-description">{data.description}</p>}
+                  </li>
+                );
+              })}
+            </ul>
+
+            <p class="empty-state" id="library-no-match" hidden>
+              No community library matches that search yet. If your county does not have one, you
+              can <a href={createHref}>create it</a>.
+            </p>
+          </>
+        ) : (
+          <p class="empty-state">No community libraries have been created yet.</p>
+        )
+      }
+    </section>
+
+    <section class="create-cta">
+      <div>
+        <h2>Don't see your community?</h2>
+        <p>Each county can have one library. Librarians create and maintain them for free.</p>
+      </div>
+      <a href={createHref} class="button">Create a community library</a>
+    </section>
+  </section>
+
+  <script>
+    import { matchesLibraryQuery } from '@lib/community/librarySearch';
+
+    const form = document.getElementById('library-search') as HTMLFormElement | null;
+    const input = document.getElementById('library-q') as HTMLInputElement | null;
+    const countEl = document.getElementById('library-count');
+    const noMatch = document.getElementById('library-no-match');
+    const items = Array.from(document.querySelectorAll<HTMLElement>('.library-item'));
+
+    function applySearch() {
+      const query = input?.value ?? '';
+      let shown = 0;
+      for (const item of items) {
+        const ok = matchesLibraryQuery(item.dataset.search ?? '', query);
+        item.hidden = !ok;
+        if (ok) shown++;
+      }
+
+      const total = items.length;
+      const noun = total === 1 ? 'library' : 'libraries';
+      if (countEl) {
+        countEl.textContent = query.trim() ? `${shown} of ${total} ${noun}` : `${total} ${noun}`;
+      }
+      if (noMatch) noMatch.hidden = shown > 0;
+
+      // Keep the search in the address so it can be shared or bookmarked.
+      const url = new URL(window.location.href);
+      if (query.trim()) url.searchParams.set('q', query.trim());
+      else url.searchParams.delete('q');
+      window.history.replaceState(null, '', url);
+    }
+
+    if (input) {
+      input.value = new URLSearchParams(window.location.search).get('q') ?? '';
+      input.addEventListener('input', applySearch);
+      if (input.value) applySearch();
+    }
+    form?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      applySearch();
+    });
+  </script>
+
+  <style>
+    .libraries-shell {
+      display: grid;
+      gap: var(--space-8);
+    }
+
+    .page-header {
+      display: grid;
+      gap: var(--space-3);
+      max-width: 70ch;
+    }
+
+    .eyebrow {
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      color: var(--color-secondary);
+    }
+
+    .page-header h1 {
+      margin: 0;
+      font-size: clamp(2.25rem, 4vw, 3.5rem);
+    }
+
+    .intro {
+      margin: 0;
+      color: var(--color-text-muted);
+      font-size: var(--font-size-lg);
+    }
+
+    .library-panel,
+    .create-cta {
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      border-radius: var(--radius-xl);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-sm);
+      display: grid;
+      gap: var(--space-4);
+      align-content: start;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-2xl);
+    }
+
+    .panel-header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2) var(--space-4);
+      align-items: baseline;
+      justify-content: space-between;
+    }
+
+    .result-count {
+      margin: 0;
+      font-size: var(--font-size-sm);
+      color: var(--color-text-dim);
+    }
+
+    .library-search {
+      display: grid;
+      gap: var(--space-2);
+      max-width: 32rem;
+    }
+
+    .library-search label {
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-text-dim);
+    }
+
+    .library-search input {
+      width: 100%;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-2) var(--space-3);
+      background: var(--color-surface-raised);
+      color: var(--color-text);
+      font-family: var(--font-sans);
+      font-size: var(--font-size-base);
+    }
+
+    .library-search input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+
+    .library-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .library-item {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-1) var(--space-4);
+      align-items: baseline;
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .library-item[hidden] {
+      display: none;
+    }
+
+    .library-name {
+      font-weight: 600;
+    }
+
+    .library-meta {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-dim);
+    }
+
+    .library-description {
+      flex-basis: 100%;
+      margin: 0;
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+    }
+
+    .empty-state {
+      margin: 0;
+      padding: var(--space-6);
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius-md);
+      text-align: center;
+      color: var(--color-text-muted);
+    }
+
+    .empty-state[hidden] {
+      display: none;
+    }
+
+    .create-cta p {
+      margin: var(--space-2) 0 0;
+      color: var(--color-text-muted);
+    }
+
+    .create-cta .button {
+      justify-self: start;
+    }
+
+    @media (min-width: 768px) {
+      .create-cta {
+        grid-template-columns: 1fr auto;
+        align-items: center;
+      }
+    }
+  </style>
+</Layout>
