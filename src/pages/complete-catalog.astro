@@ -3,45 +3,174 @@ import Layout from '@layouts/Layout.astro';
 import { getCollection } from 'astro:content';
 import { canAudienceAccess, extractPedagogicalTags, type AudienceRole } from '@lib/data/libraryAccess';
 import { catalogEntryHref, withBasePath } from '@lib/paths';
+import { entryCounties, type CoverageEntry } from '@lib/data/communityFilter';
+import { buildBoundaryIndex } from '@lib/data/coverageMap';
+import vocabulary from '@data/geo-vocabulary.json';
 
 const resources = await getCollection('master-library');
 
-// Non-audience filters can still be read server-side (works in dev mode SSR,
-// and client-side JS handles audience; for static builds everything is client-side)
-const selectedTheme = (Astro.url.searchParams.get('theme') ?? '').trim();
-const selectedPedagogicalTag = (Astro.url.searchParams.get('pedagogicalTag') ?? '').trim();
-const query = (Astro.url.searchParams.get('q') ?? '').trim();
-const sort = Astro.url.searchParams.get('sort') ?? 'updated';
-
-const searchQuery = query.toLowerCase();
+// Non-audience filters (theme, search, sort) are now all applied client-side, which works in
+// dev mode SSR and in static builds, so the server just renders every resource, newest first.
+const sortedResources = [...resources].sort((l, r) => {
+  const lt = l.data.publishedDate ? new Date(l.data.publishedDate).getTime() : 0;
+  const rt = r.data.publishedDate ? new Date(r.data.publishedDate).getTime() : 0;
+  return rt - lt;
+});
 
 // All unique themes (audience-independent for static compatibility)
 const allThemes = [...new Set(
   resources.flatMap(r => r.data.dataThemes.length > 0 ? r.data.dataThemes : r.data.tags)
 )].sort((a, b) => a.localeCompare(b));
 
+// ── Pedagogical ──────────────────────────────────────────────────
 const allPedagogicalTags = extractPedagogicalTags(resources);
 
-// Apply non-audience filters server-side (theme, search, sort)
-const filteredResources = resources.filter((resource) => {
-  const themes = resource.data.dataThemes.length > 0 ? resource.data.dataThemes : resource.data.tags;
-  const matchesTheme = selectedTheme ? themes.includes(selectedTheme) : true;
-  const matchesPedagogicalTag = selectedPedagogicalTag
-    ? resource.data.pedagogicalTags.includes(selectedPedagogicalTag)
-    : true;
-  const haystack = [resource.data.title, resource.data.description, ...themes, ...resource.data.tags]
-    .join(' ')
-    .toLowerCase();
-  const matchesSearch = searchQuery ? haystack.includes(searchQuery) : true;
-  return matchesTheme && matchesPedagogicalTag && matchesSearch;
-});
+// Proposed grouping of the tags already in the catalog. Matching ignores case.
+const PEDAGOGICAL_CATEGORIES: { name: string; tags: string[] }[] = [
+  {
+    name: 'Civic and teaching',
+    tags: ['civic-education', 'data-literacy', 'policy-analysis', 'quantitative-methods', 'social-justice'],
+  },
+  {
+    name: 'Data type and scale',
+    tags: [
+      'all discrete', 'has categorical variable', 'has multiple numeric columns', 'mixed types',
+      'multivariate', 'large dataset', 'medium dataset', 'large scale values', 'single digit values',
+    ],
+  },
+  {
+    name: 'Spread and distribution',
+    tags: [
+      'high variability', 'moderate variability', 'low variability', 'restricted range', 'wide range',
+      'approximately normal', 'bimodal distribution', 'left skewed distribution',
+      'right skewed distribution', 'symmetric distribution', 'contains outliers', 'extreme outliers',
+      'passes normality test', 'fails normality test',
+    ],
+  },
+  {
+    name: 'Groups and summary statistics',
+    tags: [
+      'has group comparison candidates', 'has paired test candidates', 'two groups present',
+      'multiple groups present', 'groups have different centers', 'groups have different spreads',
+      'groups overlap substantially', 'has mode', 'mean median similar', 'mean median different',
+      'meets minimum sample size', 'large enough for clt', 'meets equal variance assumption',
+      'violates equal variance assumption',
+    ],
+  },
+  {
+    name: 'Relationships',
+    tags: [
+      'positive correlation', 'negative correlation', 'strong correlation', 'moderate correlation',
+      'weak correlation', 'linear relationship', 'nonlinear relationship', 'curved relationship',
+      'exponential pattern', 'good linear fit', 'moderate linear fit', 'poor linear fit',
+      'has influential points', 'regression appropriate',
+    ],
+  },
+  {
+    name: 'Analysis methods',
+    tags: [
+      'good for one way anova', 'good for chi square gof', 'good for chi square independence',
+      'good for one proportion z test', 'good for one sample t test', 'good for one sample z test',
+      'good for paired t test', 'good for two sample t test', 'good for two sample z test',
+      'good for two proportion z test', 'good for transformation',
+    ],
+  },
+];
+const normTag = (t: string) => t.trim().toLowerCase();
+const mappedPedagogicalTags = new Set(PEDAGOGICAL_CATEGORIES.flatMap((c) => c.tags.map(normTag)));
+const pedagogicalGroups = PEDAGOGICAL_CATEGORIES
+  .map((c) => ({ name: c.name, tags: allPedagogicalTags.filter((t) => c.tags.map(normTag).includes(normTag(t))) }));
+const unmappedPedagogicalTags = allPedagogicalTags.filter((t) => !mappedPedagogicalTags.has(normTag(t)));
+if (unmappedPedagogicalTags.length > 0) {
+  pedagogicalGroups.push({ name: 'Other', tags: unmappedPedagogicalTags });
+}
+const visiblePedagogicalGroups = pedagogicalGroups.filter((g) => g.tags.length > 0);
 
-const sortedResources = [...filteredResources].sort((l, r) => {
-  if (sort === 'title') return l.data.title.localeCompare(r.data.title);
-  const lt = l.data.publishedDate ? new Date(l.data.publishedDate).getTime() : 0;
-  const rt = r.data.publishedDate ? new Date(r.data.publishedDate).getTime() : 0;
-  return rt - lt;
-});
+// ── Geographic ───────────────────────────────────────────────────
+// Geography comes from each resource's `coverage` entries ({ level, geoid, counties? }), with the
+// same meaning as the /maps page:
+//   nation -> matches every state and county
+//   state  -> matches that state and every county in it
+//   county, tract, zip -> match their county (a ZIP can span several) and that county's state
+// geo-vocabulary.json lists states with `usps`; BoundaryArea wants the USPS code in `state`.
+const boundaryIndex = buildBoundaryIndex(
+  vocabulary.states.map((s) => ({ geoid: s.geoid, name: s.name, state: s.usps })),
+  vocabulary.counties
+);
+const stateLabel = (fips: string) => boundaryIndex.states.get(fips)?.name;
+const countyLabel = (geoid: string) => boundaryIndex.counties.get(geoid)?.name ?? `County ${geoid}`;
+const countyTitle = (geoid: string) => {
+  const county = boundaryIndex.counties.get(geoid);
+  return county ? `${county.name}, ${county.state}` : `County ${geoid}`;
+};
+
+function getGeoTags(resource: (typeof resources)[number]) {
+  const coverage = ((resource.data as { coverage?: CoverageEntry[] }).coverage ?? []) as CoverageEntry[];
+  const national = coverage.some((entry) => entry.level === 'nation');
+  const states = new Set<string>();
+  const statewide = new Set<string>();
+  const counties = new Map<string, { state: string; county: string; title: string }>();
+
+  for (const entry of coverage) {
+    if (entry.level === 'state') {
+      const state = stateLabel(entry.geoid);
+      if (state) {
+        states.add(state);
+        statewide.add(state);
+      }
+    } else if (entry.level === 'county' || entry.level === 'tract' || entry.level === 'zip') {
+      for (const geoid of entryCounties(entry)) {
+        const state = stateLabel(geoid.slice(0, 2));
+        if (!state) continue;
+        states.add(state);
+        const county = countyLabel(geoid);
+        counties.set(`${state}::${county}`, { state, county, title: countyTitle(geoid) });
+      }
+    }
+  }
+
+  return {
+    national,
+    states: [...states].sort((a, b) => a.localeCompare(b)),
+    statewide: [...statewide],
+    counties: [...counties.values()],
+  };
+}
+
+const geoById = new Map(resources.map((r) => [r.id, getGeoTags(r)]));
+
+// Sidebar options: every state and county that appears in the data
+const geoIndex = new Map<string, Set<string>>();
+for (const geo of geoById.values()) {
+  for (const state of geo.states) {
+    if (!geoIndex.has(state)) geoIndex.set(state, new Set());
+  }
+  for (const { state, county } of geo.counties) geoIndex.get(state)!.add(county);
+}
+const geoStates = [...geoIndex.entries()]
+  .map(([state, counties]) => ({ state, counties: [...counties].sort((a, b) => a.localeCompare(b)) }))
+  .sort((a, b) => a.state.localeCompare(b.state));
+
+function getGeoChips(resource: (typeof resources)[number]) {
+  const geo = geoById.get(resource.id)!;
+  return [
+    ...geo.states.map((s) => ({ type: 'state', value: s, label: s, title: s })),
+    ...geo.counties.map((c) => ({ type: 'county', value: `${c.state}::${c.county}`, label: c.county, title: c.title })),
+  ];
+}
+
+function getGeoAttrs(resource: (typeof resources)[number]) {
+  const geo = geoById.get(resource.id)!;
+  return {
+    national: geo.national ? 'true' : '',
+    states: geo.states.join('|'),
+    statewide: geo.statewide.join('|'),
+    counties: geo.counties.map((c) => `${c.state}::${c.county}`).join('|'),
+  };
+}
+
+// Number of options shown before "See more"
+const FILTER_LIMIT = 5;
 
 // Compute which audiences can access each resource (for data attributes)
 function getResourceAudiences(resource: (typeof resources)[number]): string {
@@ -52,13 +181,7 @@ function getResourceAudiences(resource: (typeof resources)[number]): string {
   return audiences.join(' ');
 }
 
-const clearFiltersHref = withBasePath('/complete-catalog');
 const suggestionHref = withBasePath('/submit');
-const activeFilters = [
-  selectedTheme ? `Theme: ${selectedTheme}` : '',
-  selectedPedagogicalTag ? `Pedagogical Tag: ${selectedPedagogicalTag}` : '',
-  query ? `Search: ${query}` : '',
-].filter(Boolean);
 
 function formatDate(date: Date | undefined): string {
   if (!date) return 'Not specified';
@@ -75,204 +198,308 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
 ---
 
 <Layout title="Complete Catalog" description="All curated resources in the CDL complete catalog">
-  <section class="library-page">
-    <div class="sidebar-column">
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <h2>Filters</h2>
-        <button class="sidebar-close" id="sidebar-close" aria-label="Close filters">✕</button>
-      </div>
-      <form class="filters-form" id="catalog-filter-form">
+  <div class="catalog-page">
 
-        <label>
-          <span>Search</span>
-          <input type="search" name="q" value={query} placeholder="Search title, description, or themes" />
-        </label>
-
-        <label>
-          <span>Theme</span>
-          <select name="theme">
-            <option value="">All themes</option>
-            {allThemes.map((theme) => (
-              <option value={theme} selected={selectedTheme === theme}>{theme}</option>
-            ))}
-          </select>
-        </label>
-
-        <!-- Pedagogical tag filter: always rendered, shown/hidden by JS based on audience -->
-        <label id="pedagogical-tag-filter" style="display:none">
-          <span>Pedagogical Tag</span>
-          <select name="pedagogicalTag">
-            <option value="">All pedagogical tags</option>
-            {allPedagogicalTags.map((tag) => (
-              <option value={tag} selected={selectedPedagogicalTag === tag}>{tag}</option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          <span>Sort</span>
-          <select name="sort">
-            <option value="updated" selected={sort === 'updated'}>Most recent</option>
-            <option value="title" selected={sort === 'title'}>A-Z</option>
-          </select>
-        </label>
-
-        <div class="filter-actions">
-          <button type="submit" class="button">Apply</button>
-          <button type="button" class="reset-link" id="catalog-reset-btn">Reset</button>
-        </div>
-      </form>
-    </aside>
-
-
-  <section class="suggestion-block" aria-labelledby="suggestion-heading">
-    <h2 id="suggestion-heading">Have a dataset suggestion?</h2>
-    <p>Click here to submit a request to add a new dataset to our catalog.</p>
-    <a class="button suggestion-cta" href={suggestionHref}>
-      Suggest A Data Resource
-    </a>
-  </section>
-  </div>
-
-    <div class="content">
-      <button class="mobile-filter-btn" id="mobile-filter-btn" aria-expanded="false" aria-controls="sidebar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
-        Filters
-      </button>
-
-      <header class="content-header">
-        <div>
+    <!-- ── Hero: title + search ─────────────────────────── -->
+    <section class="catalog-hero">
+      <div class="catalog-inner">
+        <header class="content-header">
           <h1>Complete Catalog</h1>
           <p id="audience-label-text">
             Showing <strong>Complete Catalog</strong> view.
             All datasets are located here. Adjust filters on the left to locate a specific resource.
           </p>
-        </div>
-      </header>
+        </header>
 
-      <div class="results-head">
-        <p id="resource-count"><strong>{sortedResources.length}</strong> resources</p>
-        <div class="results-head-right">
-          {activeFilters.length > 0 && <a href={clearFiltersHref}>Clear filters</a>}
-          <div class="view-toggle" role="group" aria-label="View mode">
-            <button class="view-btn active" data-view="list" title="List view" aria-pressed="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-            </button>
-            <button class="view-btn" data-view="grid" title="Grid view" aria-pressed="false">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-            </button>
-            <button class="view-btn" data-view="table" title="Table view" aria-pressed="false">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>
-            </button>
-          </div>
-        </div>
+        <form class="search-form" id="catalog-search-form" role="search">
+          <input type="search" name="q" placeholder="Search title, description, or themes" aria-label="Search the catalog" />
+          <button type="submit" class="search-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span class="search-btn-label">Search</span>
+          </button>
+        </form>
       </div>
+    </section>
 
-      {activeFilters.length > 0 && (
-        <div class="active-filters" aria-label="Active filters">
-          {activeFilters.map((item) => (
-            <span class="chip">{item}</span>
-          ))}
-        </div>
-      )}
+    <div class="catalog-inner">
+      <section class="library-page">
+        <div class="sidebar-column">
 
-      <!-- data-audience="community" is the default; JS updates it on load -->
-      <section class="results" id="results-section" data-view="list" data-audience="community">
-        <h2>All Resources</h2>
+          <section class="suggestion-block" aria-labelledby="suggestion-heading">
+            <h2 id="suggestion-heading">Have a dataset suggestion?</h2>
+            <p>Click here to submit a request to add a new dataset to our catalog.</p>
+            <a class="button suggestion-cta" href={suggestionHref}>
+              Suggest A Data Resource
+            </a>
+          </section>
 
-        {sortedResources.length === 0 ? (
-          <article class="result-card empty"><p>No resources match your current filter combination.</p></article>
-        ) : (
-          <>
-            {/* Card / Grid view */}
-            <div class="cards-view">
-              {sortedResources.map((resource) => {
-                const themes = resource.data.dataThemes.length > 0 ? resource.data.dataThemes : resource.data.tags;
-                const previewHref = getPreviewHref(resource);
-                const resourceAudiences = getResourceAudiences(resource);
-                return (
-                  <article
-                    class="result-card"
-                    data-audiences={resourceAudiences}
-                    data-title={resource.data.title}
-                    data-search={[resource.data.title, resource.data.description, ...themes].join(' ').toLowerCase()}
-                    data-themes={themes.join('|')}
-                    data-pedagogical={resource.data.pedagogicalTags.join('|')}
-                    data-date={resource.data.publishedDate ? new Date(resource.data.publishedDate).getTime() : 0}
-                  >
-                    <div class="result-main">
-                      <h3>
-                        <a href={previewHref} class="preview-link">{resource.data.title}</a>
-                      </h3>
-                      <p>{resource.data.description}</p>
-                      <div class="chips">
-                        {themes.slice(0, 3).map((theme) => (
-                          <span class="chip chip-theme">{theme}</span>
-                        ))}
-                        {resource.data.pedagogicalTags.slice(0, 2).map((tag) => (
-                          <span class="chip chip-pedagogical">{tag}</span>
-                        ))}
-                      </div>
-                      <p class="meta-line">Updated {formatDate(resource.data.publishedDate)}</p>
-                    </div>
-                  </article>
-                );
-              })}
+          <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+              <h2>Filters</h2>
+              <button class="sidebar-close" id="sidebar-close" aria-label="Close filters">✕</button>
             </div>
+            <form class="filters-form" id="catalog-filter-form">
 
-            {/* Table view */}
-            <div class="table-view">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Title</th>
-                    <th>Themes</th>
-                    <th class="th-pedagogical">Pedagogical Tags</th>
-                    <th>Updated</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <!-- Geographic -->
+              <div class="filter-group" role="group" aria-labelledby="fg-geographic">
+                <h3 class="filter-group-title" id="fg-geographic">Geographic</h3>
+                {geoStates.length === 0 ? (
+                  <p class="filter-empty">No geographic tags yet.</p>
+                ) : (
+                  <>
+                    <ul class:list={['filter-list', { 'is-collapsed': geoStates.length > FILTER_LIMIT }]}>
+                      {geoStates.map(({ state, counties }) => (
+                        <li class="filter-item">
+                          <div class="filter-row">
+                            <label class="filter-check">
+                              <input type="checkbox" name="state" value={state} />
+                              <span>{state}</span>
+                            </label>
+                            {counties.length > 0 && (
+                              <button type="button" class="sub-toggle" aria-expanded="false" aria-label={`Show counties in ${state}`}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                              </button>
+                            )}
+                          </div>
+                          {counties.length > 0 && (
+                            <ul class="sub-list" hidden>
+                              {counties.map((county) => (
+                                <li>
+                                  <label class="filter-check">
+                                    <input type="checkbox" name="county" value={`${state}::${county}`} data-state={state} />
+                                    <span>{county}</span>
+                                  </label>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    {geoStates.length > FILTER_LIMIT && (
+                      <button type="button" class="see-more" aria-expanded="false">See more</button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <!-- Content -->
+              <div class="filter-group" role="group" aria-labelledby="fg-content">
+                <h3 class="filter-group-title" id="fg-content">Content</h3>
+                <ul class:list={['filter-list', { 'is-collapsed': allThemes.length > FILTER_LIMIT }]}>
+                  {allThemes.map((theme) => (
+                    <li class="filter-item">
+                      <label class="filter-check">
+                        <input type="checkbox" name="theme" value={theme} />
+                        <span>{theme}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+                {allThemes.length > FILTER_LIMIT && (
+                  <button type="button" class="see-more" aria-expanded="false">See more</button>
+                )}
+              </div>
+
+              <!-- Pedagogical -->
+              <div class="filter-group" role="group" aria-labelledby="fg-pedagogical">
+                <h3 class="filter-group-title" id="fg-pedagogical">Pedagogical</h3>
+                {visiblePedagogicalGroups.length === 0 ? (
+                  <p class="filter-empty">No pedagogical tags yet.</p>
+                ) : (
+                  visiblePedagogicalGroups.map((group) => (
+                    <details class="ped-category">
+                      <summary>{group.name}</summary>
+                      <ul class="filter-list ped-list">
+                        {group.tags.map((tag) => (
+                          <li class="filter-item">
+                            <label class="filter-check">
+                              <input type="checkbox" name="pedagogicalTag" value={tag} />
+                              <span>{tag}</span>
+                            </label>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  ))
+                )}
+              </div>
+
+              <div class="filter-actions">
+                <button type="button" class="reset-link" id="catalog-reset-btn">Reset</button>
+              </div>
+            </form>
+          </aside>
+        </div>
+
+        <div class="content">
+          <button class="mobile-filter-btn" id="mobile-filter-btn" aria-expanded="false" aria-controls="sidebar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+            Filters
+          </button>
+
+          <div class="results-head">
+            <p id="resource-count"><strong>{sortedResources.length}</strong> resources</p>
+            <div class="results-head-right">
+              <label class="sort-control">
+                <span>Sort by</span>
+                <select id="catalog-sort" name="sort">
+                  <option value="relevance" selected>Relevance</option>
+                  <option value="updated">Recently Updated</option>
+                  <option value="title">Name A-Z</option>
+                </select>
+              </label>
+              <div class="view-toggle" role="group" aria-label="View mode">
+                <button class="view-btn active" data-view="list" title="List view" aria-pressed="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                </button>
+                <button class="view-btn" data-view="grid" title="Grid view" aria-pressed="false">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                </button>
+                <button class="view-btn" data-view="table" title="Table view" aria-pressed="false">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- data-audience="community" is the default; JS updates it on load -->
+          <section class="results" id="results-section" data-view="list" data-audience="community">
+            <h2>All Resources</h2>
+
+            {sortedResources.length === 0 ? (
+              <article class="result-card empty"><p>No resources match your current filter combination.</p></article>
+            ) : (
+              <>
+                {/* Card / Grid view */}
+                <div class="cards-view">
                   {sortedResources.map((resource) => {
                     const themes = resource.data.dataThemes.length > 0 ? resource.data.dataThemes : resource.data.tags;
                     const previewHref = getPreviewHref(resource);
                     const resourceAudiences = getResourceAudiences(resource);
+                    const geoChips = getGeoChips(resource);
+                    const geoAttrs = getGeoAttrs(resource);
                     return (
-                      <tr
+                      <article
+                        class="result-card"
                         data-audiences={resourceAudiences}
                         data-title={resource.data.title}
                         data-search={[resource.data.title, resource.data.description, ...themes].join(' ').toLowerCase()}
                         data-themes={themes.join('|')}
                         data-pedagogical={resource.data.pedagogicalTags.join('|')}
+                        data-national={geoAttrs.national}
+                        data-states={geoAttrs.states}
+                        data-statewide={geoAttrs.statewide}
+                        data-counties={geoAttrs.counties}
                         data-date={resource.data.publishedDate ? new Date(resource.data.publishedDate).getTime() : 0}
                       >
-                        <td class="td-title">
-                          <a href={previewHref} class="preview-link">{resource.data.title}</a>
-                        </td>
-                        <td>
-                          <div class="chips">
-                            {themes.slice(0, 2).map((theme) => <span class="chip chip-theme">{theme}</span>)}
+                        <div class="result-main">
+                          <h3>
+                            <a href={previewHref} class="preview-link">{resource.data.title}</a>
+                          </h3>
+                          <p>{resource.data.description}</p>
+                          <div class="tag-rows">
+                            {(geoChips.length > 0 || geoAttrs.national) && (
+                              <div class="chips">
+                                {geoAttrs.national && <span class="chip chip-geo chip-static">National</span>}
+                                {geoChips.slice(0, 3).map((chip) => (
+                                  <button type="button" class="chip chip-geo" data-filter={chip.type} data-value={chip.value} title={chip.title}>{chip.label}</button>
+                                ))}
+                              </div>
+                            )}
+                            {themes.length > 0 && (
+                              <div class="chips">
+                                {themes.slice(0, 3).map((theme) => (
+                                  <button type="button" class="chip chip-theme" data-filter="theme" data-value={theme}>{theme}</button>
+                                ))}
+                              </div>
+                            )}
+                            {resource.data.pedagogicalTags.length > 0 && (
+                              <div class="chips">
+                                {resource.data.pedagogicalTags.slice(0, 2).map((tag) => (
+                                  <button type="button" class="chip chip-pedagogical" data-filter="pedagogicalTag" data-value={tag}>{tag}</button>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        </td>
-                        <td class="td-pedagogical">
-                          <div class="chips">
-                            {resource.data.pedagogicalTags.slice(0, 2).map((tag) => (
-                              <span class="chip chip-pedagogical">{tag}</span>
-                            ))}
-                          </div>
-                        </td>
-                        <td class="td-meta">{formatDate(resource.data.publishedDate)}</td>
-                      </tr>
+                          <p class="meta-line">Updated {formatDate(resource.data.publishedDate)}</p>
+                        </div>
+                      </article>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
+                </div>
+
+                {/* Table view */}
+                <div class="table-view">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Title</th>
+                        <th>Geographic</th>
+                        <th>Content</th>
+                        <th class="th-pedagogical">Pedagogical</th>
+                        <th>Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedResources.map((resource) => {
+                        const themes = resource.data.dataThemes.length > 0 ? resource.data.dataThemes : resource.data.tags;
+                        const previewHref = getPreviewHref(resource);
+                        const resourceAudiences = getResourceAudiences(resource);
+                        const geoChips = getGeoChips(resource);
+                        const geoAttrs = getGeoAttrs(resource);
+                        return (
+                          <tr
+                            data-audiences={resourceAudiences}
+                            data-title={resource.data.title}
+                            data-search={[resource.data.title, resource.data.description, ...themes].join(' ').toLowerCase()}
+                            data-themes={themes.join('|')}
+                            data-pedagogical={resource.data.pedagogicalTags.join('|')}
+                            data-national={geoAttrs.national}
+                            data-states={geoAttrs.states}
+                            data-statewide={geoAttrs.statewide}
+                            data-counties={geoAttrs.counties}
+                            data-date={resource.data.publishedDate ? new Date(resource.data.publishedDate).getTime() : 0}
+                          >
+                            <td class="td-title">
+                              <a href={previewHref} class="preview-link">{resource.data.title}</a>
+                            </td>
+                            <td>
+                              <div class="chips">
+                                {geoAttrs.national && <span class="chip chip-geo chip-static">National</span>}
+                                {geoChips.slice(0, 2).map((chip) => (
+                                  <button type="button" class="chip chip-geo" data-filter={chip.type} data-value={chip.value} title={chip.title}>{chip.label}</button>
+                                ))}
+                              </div>
+                            </td>
+                            <td>
+                              <div class="chips">
+                                {themes.slice(0, 2).map((theme) => (
+                                  <button type="button" class="chip chip-theme" data-filter="theme" data-value={theme}>{theme}</button>
+                                ))}
+                              </div>
+                            </td>
+                            <td class="td-pedagogical">
+                              <div class="chips">
+                                {resource.data.pedagogicalTags.slice(0, 2).map((tag) => (
+                                  <button type="button" class="chip chip-pedagogical" data-filter="pedagogicalTag" data-value={tag}>{tag}</button>
+                                ))}
+                              </div>
+                            </td>
+                            <td class="td-meta">{formatDate(resource.data.publishedDate)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
       </section>
     </div>
-  </section>
+  </div>
 
   <script>
     // ── Mobile sidebar toggle ──────────────────────────────────────────
@@ -320,7 +547,6 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
     // ── Audience switching (client-side, static-build compatible) ─────
     const audienceLabelEl = document.getElementById('audience-label-text');
     const resourceCountEl = document.getElementById('resource-count');
-    const pedagogicalFilterEl = document.getElementById('pedagogical-tag-filter');
     const hiddenAudienceInput = document.getElementById('hidden-audience') as HTMLInputElement | null;
 
     const audienceDescriptions: Record<string, string> = {
@@ -349,11 +575,6 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
       document.querySelectorAll<HTMLElement>('.audience-switch [data-audience]').forEach((link) => {
         link.classList.toggle('active', link.dataset.audience === audience);
       });
-
-      // Show/hide pedagogical tag filter
-      if (pedagogicalFilterEl) {
-        (pedagogicalFilterEl as HTMLElement).style.display = audience === 'teacher' ? '' : 'none';
-      }
 
       // Update audience label paragraph
       // if (audienceLabelEl) {
@@ -399,65 +620,102 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
     applyAudience(initialAudience);
 
     // ── Client-side filters (theme, search, sort) ──────────────
+    const searchForm    = document.getElementById('catalog-search-form') as HTMLFormElement | null;
+    const searchInput   = searchForm?.querySelector<HTMLInputElement>('[name="q"]') ?? null;
+    const sortSelect    = document.getElementById('catalog-sort') as HTMLSelectElement | null;
     const filterForm    = document.getElementById('catalog-filter-form') as HTMLFormElement | null;
-    const searchInput   = filterForm?.querySelector<HTMLInputElement>('[name="q"]') ?? null;
-    const themeSelect   = filterForm?.querySelector<HTMLSelectElement>('[name="theme"]') ?? null;
-    const sortSelect    = filterForm?.querySelector<HTMLSelectElement>('[name="sort"]') ?? null;
     const resetBtn      = document.getElementById('catalog-reset-btn');
-    const pedagSelect   = filterForm?.querySelector<HTMLSelectElement>('[name="pedagogicalTag"]') ?? null;
     const cardsView     = document.querySelector<HTMLElement>('.cards-view');
     const tableBody     = document.querySelector<HTMLElement>('.table-view tbody');
 
-    // The pedagogical filter only applies in teacher view, where it's visible.
-    function matchesFilters(el: HTMLElement, q: string, theme: string, ptag: string) {
-      const search = el.dataset.search ?? '';
-      const themes = (el.dataset.themes ?? '').split('|').filter(Boolean);
-      const pedagogical = (el.dataset.pedagogical ?? '').split('|').filter(Boolean);
-      const teacherView = section?.dataset.audience === 'teacher';
-      return (
-        (!q || search.includes(q)) &&
-        (!theme || themes.includes(theme)) &&
-        (!ptag || !teacherView || pedagogical.includes(ptag))
-      );
+    type FilterName = 'state' | 'county' | 'theme' | 'pedagogicalTag';
+
+    const splitAttr = (value: string | undefined) => (value ?? '').split('|').filter(Boolean);
+
+    function checkboxes(name: FilterName): HTMLInputElement[] {
+      return Array.from(filterForm?.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`) ?? []);
+    }
+    function checkedValues(name: FilterName): string[] {
+      return checkboxes(name).filter((cb) => cb.checked).map((cb) => cb.value);
+    }
+
+    interface Filters {
+      q: string;
+      themes: string[];
+      ptags: string[];
+      states: string[];
+      counties: string[];
+    }
+
+    function matchesFilters(el: HTMLElement, f: Filters) {
+      const elThemes = splitAttr(el.dataset.themes);
+      const elPed = splitAttr(el.dataset.pedagogical);
+      const elStates = splitAttr(el.dataset.states);
+      const elStatewide = splitAttr(el.dataset.statewide);
+      const elCounties = splitAttr(el.dataset.counties);
+      const elNational = el.dataset.national === 'true';
+
+      const okSearch = !f.q || (el.dataset.search ?? '').includes(f.q);
+      const okTheme = f.themes.length === 0 || f.themes.some((t) => elThemes.includes(t));
+      const okPed = f.ptags.length === 0 || f.ptags.some((t) => elPed.includes(t));
+      // Same meaning as the maps page: national data covers every state and county, and
+      // statewide data covers every county in its state. If counties of a checked state are
+      // also checked, only those counties count (plus national and statewide data).
+      const okGeo =
+        f.states.length === 0 ||
+        elNational ||
+        f.states.some((state) => {
+          const chosen = f.counties.filter((c) => c.startsWith(`${state}::`));
+          if (chosen.length === 0) return elStates.includes(state);
+          return elStatewide.includes(state) || chosen.some((c) => elCounties.includes(c));
+        });
+
+      return okSearch && okTheme && okPed && okGeo;
+    }
+
+    function relevance(el: HTMLElement, q: string) {
+      if (!q) return 0;
+      const inTitle = (el.dataset.title ?? '').toLowerCase().includes(q) ? 2 : 0;
+      const inText = (el.dataset.search ?? '').includes(q) ? 1 : 0;
+      return inTitle + inText;
     }
 
     function applyFilters() {
-      const q     = searchInput?.value.trim().toLowerCase() ?? '';
-      const theme = themeSelect?.value ?? '';
-      const sort  = sortSelect?.value ?? 'updated';
-      const ptag  = pedagSelect?.value ?? '';
+      const filters: Filters = {
+        q: searchInput?.value.trim().toLowerCase() ?? '',
+        themes: checkedValues('theme'),
+        ptags: checkedValues('pedagogicalTag'),
+        states: checkedValues('state'),
+        counties: checkedValues('county'),
+      };
+      const sort = sortSelect?.value ?? 'relevance';
+
+      const compare = (a: HTMLElement, b: HTMLElement) => {
+        if (sort === 'title') return (a.dataset.title ?? '').localeCompare(b.dataset.title ?? '');
+        if (sort === 'relevance') {
+          const diff = relevance(b, filters.q) - relevance(a, filters.q);
+          if (diff !== 0) return diff;
+        }
+        return Number(b.dataset.date ?? '0') - Number(a.dataset.date ?? '0');
+      };
 
       // Filter cards
       const cards = Array.from(document.querySelectorAll<HTMLElement>('.result-card:not(.empty)'));
-      cards.forEach(card => {
-        const ok = matchesFilters(card, q, theme, ptag);
-        card.classList.toggle('filtered-out', !ok);
+      cards.forEach((card) => {
+        card.classList.toggle('filtered-out', !matchesFilters(card, filters));
       });
 
       // Filter table rows
       const rows = Array.from(document.querySelectorAll<HTMLElement>('tr[data-audiences]'));
-      rows.forEach(row => {
-        const ok = matchesFilters(row, q, theme, ptag);
-        row.classList.toggle('filtered-out', !ok);
+      rows.forEach((row) => {
+        row.classList.toggle('filtered-out', !matchesFilters(row, filters));
       });
 
       // Sort cards view
-      if (cardsView) {
-        const sortable = cards.slice().sort((a, b) => {
-          if (sort === 'title') return (a.dataset.title ?? '').localeCompare(b.dataset.title ?? '');
-          return Number(b.dataset.date ?? '0') - Number(a.dataset.date ?? '0');
-        });
-        sortable.forEach(c => cardsView.appendChild(c));
-      }
+      if (cardsView) cards.slice().sort(compare).forEach((c) => cardsView.appendChild(c));
 
       // Sort table rows
-      if (tableBody) {
-        const sortableRows = rows.slice().sort((a, b) => {
-          if (sort === 'title') return (a.dataset.title ?? '').localeCompare(b.dataset.title ?? '');
-          return Number(b.dataset.date ?? '0') - Number(a.dataset.date ?? '0');
-        });
-        sortableRows.forEach(r => tableBody.appendChild(r));
-      }
+      if (tableBody) rows.slice().sort(compare).forEach((r) => tableBody.appendChild(r));
 
       updateCatalogCount();
     }
@@ -474,22 +732,204 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
       resourceCountEl.innerHTML = `<strong>${count}</strong> resources`;
     }
 
-    filterForm?.addEventListener('submit', (e) => { e.preventDefault(); applyFilters(); });
-    searchInput?.addEventListener('input', applyFilters);
-    themeSelect?.addEventListener('change', applyFilters);
-    sortSelect?.addEventListener('change', applyFilters);
-    pedagSelect?.addEventListener('change', applyFilters);
+    // ── Filter sidebar: expand / collapse ─────────────────────────────
+    function setSeeMore(list: HTMLElement, expanded: boolean) {
+      list.classList.toggle('is-collapsed', !expanded);
+      const btn = list.nextElementSibling;
+      if (btn instanceof HTMLButtonElement && btn.classList.contains('see-more')) {
+        btn.textContent = expanded ? 'See less' : 'See more';
+        btn.setAttribute('aria-expanded', String(expanded));
+      }
+    }
 
-    resetBtn?.addEventListener('click', () => {
-      if (searchInput)  searchInput.value = '';
-      if (themeSelect)  themeSelect.value = '';
-      if (sortSelect)   sortSelect.value = 'updated';
-      if (pedagSelect)  pedagSelect.value = '';
+    function setSubList(sub: HTMLElement, expanded: boolean) {
+      sub.hidden = !expanded;
+      sub.closest('.filter-item')?.querySelector('.sub-toggle')?.setAttribute('aria-expanded', String(expanded));
+    }
+
+    document.querySelectorAll<HTMLButtonElement>('.see-more').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const list = btn.previousElementSibling as HTMLElement | null;
+        if (list) setSeeMore(list, list.classList.contains('is-collapsed'));
+      });
+    });
+
+    document.querySelectorAll<HTMLButtonElement>('.sub-toggle').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const sub = btn.closest('.filter-item')?.querySelector<HTMLElement>('.sub-list');
+        if (sub) setSubList(sub, sub.hidden);
+      });
+    });
+
+    // Make sure a checked option is visible (open its dropdowns / expanded lists)
+    function revealCheckbox(cb: HTMLInputElement) {
+      const details = cb.closest('details');
+      if (details) details.open = true;
+      const sub = cb.closest<HTMLElement>('.sub-list');
+      if (sub) setSubList(sub, true);
+      const list = cb.closest<HTMLElement>('.filter-list');
+      if (list?.classList.contains('is-collapsed')) setSeeMore(list, true);
+    }
+
+    // Check one filter option (used by URL params and by tag chips)
+    function selectFilter(name: FilterName, value: string) {
+      const cb = checkboxes(name).find((c) => c.value === value);
+      if (!cb) return;
+      cb.checked = true;
+      if (name === 'county') {
+        // A county needs its state checked too
+        const parent = checkboxes('state').find((c) => c.value === cb.dataset.state);
+        if (parent) {
+          parent.checked = true;
+          revealCheckbox(parent);
+        }
+      }
+      revealCheckbox(cb);
+    }
+
+    // ── Events ────────────────────────────────────────────────────────
+    filterForm?.addEventListener('submit', (e) => e.preventDefault());
+    filterForm?.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.name === 'county' && target.checked) {
+        selectFilter('county', target.value);
+      }
+      if (target.name === 'state' && !target.checked) {
+        // Unchecking a state clears its counties
+        checkboxes('county').filter((c) => c.dataset.state === target.value).forEach((c) => (c.checked = false));
+      }
       applyFilters();
     });
+
+    searchForm?.addEventListener('submit', (e) => { e.preventDefault(); applyFilters(); });
+    searchInput?.addEventListener('input', applyFilters);
+    sortSelect?.addEventListener('change', applyFilters);
+
+    // Clicking a tag chip on a result applies the matching filter
+    document.addEventListener('click', (e) => {
+      const chip = (e.target as HTMLElement).closest<HTMLElement>('.chip[data-filter]');
+      if (!chip) return;
+      selectFilter(chip.dataset.filter as FilterName, chip.dataset.value ?? '');
+      applyFilters();
+    });
+
+    resetBtn?.addEventListener('click', () => {
+      if (searchInput) searchInput.value = '';
+      if (sortSelect) sortSelect.value = 'relevance';
+      filterForm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((cb) => (cb.checked = false));
+      applyFilters();
+    });
+
+    // Initial state from URL params (?q=, ?sort=, ?theme=, ?pedagogicalTag=, ?state=, ?county=State::County)
+    const initParams = new URLSearchParams(window.location.search);
+    if (searchInput) searchInput.value = initParams.get('q') ?? '';
+    const initSort = initParams.get('sort') ?? '';
+    if (sortSelect && ['relevance', 'updated', 'title'].includes(initSort)) sortSelect.value = initSort;
+    (['state', 'county', 'theme', 'pedagogicalTag'] as FilterName[]).forEach((name) => {
+      initParams.getAll(name).forEach((value) => selectFilter(name, value.trim()));
+    });
+    applyFilters();
   </script>
 
   <style>
+    /* ── Page shell ─────────────────────── */
+    .catalog-page {
+      /* Straighter corners and white cards, scoped to this page */
+      --radius-lg: 4px;
+      --radius-md: 3px;
+      --color-surface: #FFFFFF;
+      --color-surface-raised: #FFFFFF;
+
+      background: #F2F7F5;
+      /* Full-bleed band, even inside a centered layout container */
+      width: 100vw;
+      margin-left: calc(50% - 50vw);
+      padding-bottom: var(--space-8);
+    }
+
+    /* Layout.astro gives <main> 2rem of top/bottom padding and the footer a 4rem top margin.
+       Remove them on this page only so the teal band meets the nav bar and the grey
+       background meets the footer. "body" raises specificity above the layout's own rules. */
+    :global(body main) {
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+
+    :global(body footer) {
+      margin-top: 0;
+    }
+
+    .catalog-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 var(--space-5);
+    }
+
+    .catalog-hero {
+      background: #005B56;
+      padding: var(--space-8) 0;
+      margin-bottom: var(--space-6);
+    }
+
+    /* ── Search bar ─────────────────────── */
+    .search-form {
+      display: flex;
+      width: 100%;
+      margin-top: var(--space-5);
+    }
+
+    .search-form input {
+      flex: 1;
+      min-width: 0;
+      height: 56px;
+      padding: 0 var(--space-5);
+      border: 0;
+      border-radius: var(--radius-md) 0 0 var(--radius-md);
+      background: #FFFFFF;
+      color: #1F2933;
+      font-family: var(--font-sans);
+      font-size: var(--font-size-lg);
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    .search-form input:focus {
+      outline: 3px solid #D4A017;
+      outline-offset: 2px;
+    }
+
+    .search-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      height: 56px;
+      padding: 0 var(--space-6);
+      border: 0;
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      background: #D4A017;
+      color: #1A1A1A;
+      font-family: var(--font-sans);
+      font-size: var(--font-size-base);
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: none;
+      transform: none;
+      transition: background 0.15s ease;
+    }
+
+    .search-btn:hover {
+      background: #B98A0F;
+      color: #1A1A1A;
+      box-shadow: none;
+      transform: none;
+    }
+
+    @media (max-width: 480px) {
+      .search-btn-label { display: none; }
+      .search-btn { padding: 0 var(--space-4); }
+    }
+
     /* ── Layout ─────────────────────────── */
     .library-page {
       display: grid;
@@ -599,38 +1039,145 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
       gap: var(--space-4);
     }
 
-    .filters-form label {
+    /* ── Filter groups ───────────────── */
+    .filter-group {
       display: grid;
       gap: var(--space-2);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--color-border);
     }
 
-    .filters-form span {
-      font-size: var(--font-size-xs);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
+    .filters-form > .filter-group:first-child {
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    .filter-group-title {
+      margin: 0;
+      font-size: var(--font-size-base);
+      font-weight: 700;
+      color: var(--color-text);
+    }
+
+    .filter-empty {
+      margin: 0;
+      font-size: var(--font-size-sm);
       color: var(--color-text-dim);
     }
 
-    .filters-form input,
-    .filters-form select {
-      width: 100%;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      padding: var(--space-2) var(--space-3);
-      background: var(--color-surface-raised);
-      color: var(--color-text);
-      font-family: var(--font-sans);
-      font-size: var(--font-size-sm);
-      transition: border-color 0.15s ease;
-      appearance: none;
-      -webkit-appearance: none;
+    .filter-list,
+    .sub-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: var(--space-1);
     }
 
-    .filters-form input:focus,
-    .filters-form select:focus {
-      outline: none;
-      border-color: var(--color-primary);
+    /* Collapsed: only the first few options show until "See more" */
+    .filter-list.is-collapsed > .filter-item:nth-child(n + 6) { display: none; }
+
+    /* Expanded: the full list scrolls */
+    .filter-list:not(.is-collapsed) {
+      max-height: 280px;
+      overflow-y: auto;
+      padding-right: var(--space-1);
+    }
+
+    .filter-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
+    }
+
+    .filter-check {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-2);
+      padding: 2px 0;
+      font-size: var(--font-size-sm);
+      line-height: 1.35;
+      color: var(--color-text);
+      cursor: pointer;
+    }
+
+    .filter-check input {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      margin: 2px 0 0;
+      accent-color: #005B56;
+    }
+
+    .sub-list {
+      margin: var(--space-1) 0 var(--space-2) var(--space-6);
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .sub-list[hidden] { display: none; }
+
+    .sub-toggle {
+      display: inline-flex;
+      align-items: center;
+      padding: var(--space-1);
+      border: 0;
+      background: none;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .sub-toggle:hover { color: var(--color-primary); background: none; box-shadow: none; transform: none; }
+    .sub-toggle svg { transition: transform 0.15s ease; }
+    .sub-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+    .see-more {
+      justify-self: start;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: #005B56;
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      text-decoration: underline;
+      cursor: pointer;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .see-more:hover { background: none; color: #003F3B; box-shadow: none; transform: none; }
+
+    /* Pedagogical category dropdowns */
+    .ped-category {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: #FFFFFF;
+    }
+
+    .ped-category > summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      color: var(--color-text);
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .ped-category > summary::-webkit-details-marker { display: none; }
+    .ped-category > summary::after { content: '▾'; color: var(--color-text-muted); transition: transform 0.15s ease; }
+    .ped-category[open] > summary::after { transform: rotate(180deg); }
+
+    .ped-category .filter-list {
+      max-height: 220px;
+      overflow-y: auto;
+      padding: 0 var(--space-3) var(--space-3);
     }
 
     .filter-actions {
@@ -639,22 +1186,18 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
       gap: var(--space-3);
     }
 
-    .filter-actions .button {
-      padding: var(--space-2) var(--space-4);
-      font-size: var(--font-size-sm);
-      border-radius: var(--radius-md);
-    }
-
     .reset-link {
       display: inline-flex;
       align-items: center;
       padding: var(--space-2) var(--space-3);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
-      color: #FFFFFF;
+      background: #FFFFFF;
+      color: var(--color-primary);
       font-size: var(--font-size-sm);
       font-weight: 500;
       text-decoration: none;
+      cursor: pointer;
       transition: all 0.15s ease;
     }
 
@@ -716,11 +1259,12 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
     .content-header h1 {
       margin-bottom: var(--space-2);
       font-size: clamp(var(--font-size-2xl), 2.5vw, var(--font-size-4xl));
+      color: #FFFFFF;
     }
 
     .content-header p {
       margin: 0;
-      color: var(--color-text-muted);
+      color: #FFFFFF;
       font-size: var(--font-size-sm);
     }
 
@@ -851,6 +1395,33 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
       gap: var(--space-4);
     }
 
+    /* ── Sort dropdown ───────────────── */
+    .sort-control {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .sort-control span {
+      white-space: nowrap;
+    }
+
+    .sort-control select {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-2) var(--space-3);
+      background: #FFFFFF;
+      color: var(--color-text);
+      font-family: var(--font-sans);
+      font-size: var(--font-size-sm);
+      cursor: pointer;
+    }
+
+    .sort-control select:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+
     /* ── View toggle ─────────────────── */
     .view-toggle {
       display: flex;
@@ -858,7 +1429,7 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
       padding: 3px;
-      background: var(--color-surface-raised);
+      background: #FFFFFF;
     }
 
     .view-btn {
@@ -886,14 +1457,6 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
     .view-btn.active {
       background: var(--color-primary);
       color: #F8FAFC;
-    }
-
-    /* ── Active filters ───────────────── */
-    .active-filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2);
-      margin-top: calc(var(--space-3) * -1);
     }
 
     /* ── Results section ─────────────── */
@@ -924,13 +1487,6 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
     #results-section[data-audience="teacher"] tr[data-audiences]:not([data-audiences~="teacher"]) { display: none; }
     #results-section[data-audience="student"]  tr[data-audiences]:not([data-audiences~="student"])  { display: none; }
     #results-section[data-audience="community"] tr[data-audiences]:not([data-audiences~="community"]) { display: none; }
-
-    /* Pedagogical tag chips — only visible in teacher view */
-    #results-section:not([data-audience="teacher"]) .chip-pedagogical { display: none; }
-
-    /* Pedagogical column header in table — only visible in teacher view */
-    #results-section:not([data-audience="teacher"]) .th-pedagogical,
-    #results-section:not([data-audience="teacher"]) .td-pedagogical { display: none; }
 
     /* ── Cards ─────────────────────────── */
     .result-card { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); transition: border-color 0.15s ease; display: grid; grid-template-columns: 1fr; }
@@ -971,36 +1527,65 @@ function getPreviewHref(resource: (typeof resources)[number]): string {
       font-size: var(--font-size-xs);
     }
 
-    /* ── Chips ─────────────────────────── */
+    /* ── Chips (clickable tags) ───────── */
+    .tag-rows {
+      display: grid;
+      gap: var(--space-1);
+    }
+
     .chips {
       display: flex;
       flex-wrap: wrap;
       gap: var(--space-2);
     }
 
-    /* Borderless tinted pills in Barlow Semi Condensed (site-wide tag style) */
+    /* Borderless tinted chips in Barlow Semi Condensed (site-wide tag style) */
     .chip {
       display: inline-flex;
       align-items: center;
-      padding: 2px 10px;
+      padding: 1px 8px;
       border: 0;
-      border-radius: 999px;
+      border-radius: 4px;
       font-family: var(--font-tag);
-      font-size: 0.875rem;
+      font-size: 0.8125rem;
       font-weight: 400;
       line-height: 1.35;
-      color: var(--color-text-muted);
-      background: rgba(35, 53, 75, 0.07);
+      cursor: pointer;
+      box-shadow: none;
+      transform: none;
+      transition: filter 0.15s ease;
     }
 
-    .chip-theme {
-      color: #1f5b6e;
-      background: rgba(62, 168, 188, 0.15);
+    .chip:hover {
+      text-decoration: underline;
+      filter: brightness(0.95);
+      box-shadow: none;
+      transform: none;
     }
 
-    .chip-pedagogical {
-      color: var(--color-primary);
-      background: var(--color-primary-glow);
+    .chip-static,
+    .chip-static:hover {
+      cursor: default;
+      text-decoration: none;
+      filter: none;
+    }
+
+    .chip-geo,
+    .chip-geo:hover {
+      color: #294735;
+      background: #E5F1DF;
+    }
+
+    .chip-theme,
+    .chip-theme:hover {
+      color: #254653;
+      background: #E1F1F4;
+    }
+
+    .chip-pedagogical,
+    .chip-pedagogical:hover {
+      color: #51412B;
+      background: #F7EFD9;
     }
 
     .result-card.empty { padding: var(--space-8); text-align: center; }
