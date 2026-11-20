@@ -212,6 +212,8 @@ export function topicalTags(entry: CatalogEntryData, community?: CommunityGeo): 
 export interface CommunityNames {
   name: string;
   place_name?: string;
+  county?: string;
+  state_code?: string;
 }
 
 export function communityDisplay(community: CommunityNames): {
@@ -220,10 +222,29 @@ export function communityDisplay(community: CommunityNames): {
   welcomeHeading: string;
 } {
   const place = community.place_name?.trim();
+  const county = community.county?.trim();
+  const state = community.state_code?.trim();
   return {
     placeName: place || community.name,
-    // e.g. "Knoxville Community Data Library"; falls back to the configured name.
-    libraryTitle: place ? `${place} Community Data Library` : community.name,
+    // e.g. "Knox County, TN Community Data Library"; falls back to the place
+    // name ("Knoxville Community Data Library"), then the configured name.
+    libraryTitle:
+      county && state
+        ? `${county}, ${state} Community Data Library`
+        : place
+          ? `${place} Community Data Library`
+          : community.name,
     welcomeHeading: `Welcome to ${place || community.name}`,
   };
+}
+
+/**
+ * Decorative initial for a community's artwork: the first letter of the county
+ * name, capitalised (e.g. "K" for Knox County). Washington, DC is its own case:
+ * its one "county" is the whole district, so it always reads "DC". Empty when
+ * there's no county name.
+ */
+export function countyInitial(community: { county?: string; state_code?: string }): string {
+  if (community.state_code === 'DC') return 'DC';
+  return (community.county ?? '').match(/\p{L}/u)?.[0]?.toLocaleUpperCase() ?? '';
 }

@@ -144,6 +144,18 @@ test('communityDisplay derives heading and library title from place_name', () =>
   );
 });
 
+test('communityDisplay titles the library by county and state when it has them', () => {
+  assert.equal(
+    communityDisplay({
+      name: 'Knox County Data Library',
+      place_name: 'Knoxville',
+      county: 'Knox County',
+      state_code: 'TN',
+    }).libraryTitle,
+    'Knox County, TN Community Data Library'
+  );
+});
+
 test('communityDisplay falls back to the library name without place_name', () => {
   assert.deepEqual(communityDisplay({ name: 'Oak Ridge Data Library' }), {
     placeName: 'Oak Ridge Data Library',

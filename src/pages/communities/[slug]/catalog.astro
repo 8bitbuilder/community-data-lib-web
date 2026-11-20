@@ -27,7 +27,6 @@ interface Props {
 const { community } = Astro.props;
 const data = community.data;
 const { libraryTitle, placeName } = communityDisplay(data);
-const location = [data.county, data.state_code].filter(Boolean).join(', ');
 
 // A community catalog is always a filtered view of the main catalog.
 const resources = (await getCollection('master-library'))
@@ -48,7 +47,6 @@ function detailHref(entry: CollectionEntry<'master-library'>): string {
   title="Community Catalog"
   description={`Datasets for ${placeName} from the Community Data Libraries catalog.`}
   communityName={libraryTitle}
-  communityLocation={location || undefined}
   communitySlug={data.slug}
   page="catalog"
 >

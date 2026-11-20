@@ -1,16 +1,14 @@
 ---
 import Layout from '@layouts/Layout.astro';
 import { getCollection } from 'astro:content';
-import { libraryHref, withBasePath } from '@lib/paths';
+import { withBasePath } from '@lib/paths';
 
-// Existing libraries come from the same collection that generates community pages,
-// so this list can never drift from what is actually published.
-const communities = (await getCollection('communities')).sort((a, b) =>
-  a.data.name.localeCompare(b.data.name)
-);
+// The full list, with search, lives on /libraries; this page only counts them.
+const libraryCount = (await getCollection('communities')).length;
 
 const registerHref = withBasePath('/librarian/register/');
 const loginHref = withBasePath('/librarian/login/');
+const librariesHref = withBasePath('/libraries');
 ---
 
 <Layout
@@ -55,8 +53,9 @@ const loginHref = withBasePath('/librarian/login/');
       <h2 id="steps-heading">How to create one</h2>
       <ol>
         <li>
-          <strong>Check the list below.</strong> Each county can have one library. If yours already has
-          one, use the contact form on its page to reach its editors instead of creating a duplicate.
+          <strong>Check the <a href={librariesHref}>list of community libraries</a>.</strong> Each county
+          can have one library. If yours already has one, use the contact form on its page to reach its
+          editors instead of creating a duplicate.
         </li>
         <li>
           <strong>Create a librarian account.</strong> <a href={loginHref}>Sign up</a> with your email
@@ -69,7 +68,8 @@ const loginHref = withBasePath('/librarian/login/');
         </li>
         <li>
           <strong>Approval.</strong> The Community Data Libraries team reviews new libraries. Once approved,
-          the site rebuilds within a few minutes and your library appears on the list below. After that,
+          the site rebuilds within a few minutes and your library appears on the
+          <a href={librariesHref}>library list</a>. After that,
           your edits in the portal are published on the next rebuild, a few minutes later.
         </li>
       </ol>
@@ -79,25 +79,17 @@ const loginHref = withBasePath('/librarian/login/');
 
     <section class="existing" id="existing" aria-labelledby="existing-heading">
       <h2 id="existing-heading">Existing community libraries</h2>
-      {
-        communities.length > 0 ? (
-          <ul class="community-list">
-            {communities.map((community) => (
-              <li class="community-item">
-                <a href={libraryHref(community.data.slug)}>
-                  {community.data.name}
-                </a>
-                <span class="community-meta">
-                  {[community.data.county, community.data.state_code].filter(Boolean).join(', ')}
-                  {community.data.county_fips && ` · FIPS ${community.data.county_fips}`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p class="empty-state">No community libraries have been created yet.</p>
-        )
-      }
+      <p class="note">
+        {libraryCount === 0
+          ? 'No community libraries have been created yet.'
+          : `There ${libraryCount === 1 ? 'is' : 'are'} ${libraryCount} community ${libraryCount === 1 ? 'library' : 'libraries'} so far. Search by name, county, city, or state to see whether yours already has one.`}
+      </p>
+      <form class="existing-search" action={librariesHref} method="get" role="search">
+        <label for="existing-q" class="visually-hidden">Search community libraries</label>
+        <input type="search" id="existing-q" name="q" placeholder="Try Knoxville, Knox County, or TN" />
+        <button type="submit" class="button">Search libraries</button>
+      </form>
+      <a href={librariesHref} class="see-all">See all community libraries</a>
     </section>
   </section>
 
@@ -191,40 +183,45 @@ const loginHref = withBasePath('/librarian/login/');
       font-size: var(--font-size-sm);
     }
 
-    .community-list {
-      list-style: none;
-      padding: 0;
-    }
-
-    .community-list li + li {
-      margin-top: 0;
-    }
-
-    .community-item {
+    .existing-search {
       display: flex;
       flex-wrap: wrap;
-      gap: var(--space-2) var(--space-4);
-      align-items: baseline;
-      padding: var(--space-3) 0;
-      border-bottom: 1px solid var(--color-border);
+      gap: var(--space-3);
+      align-items: center;
     }
 
-    .community-item a {
+    .existing-search input {
+      flex: 1 1 16rem;
+      max-width: 32rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-2) var(--space-3);
+      background: var(--color-surface-raised);
+      color: var(--color-text);
+      font-family: var(--font-sans);
+      font-size: var(--font-size-base);
+    }
+
+    .existing-search input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+
+    .see-all {
+      justify-self: start;
       font-weight: 600;
     }
 
-    .community-meta {
-      font-size: var(--font-size-sm);
-      color: var(--color-text-dim);
-    }
-
-    .empty-state {
-      margin: 0;
-      padding: var(--space-6);
-      border: 1px dashed var(--color-border);
-      border-radius: var(--radius-md);
-      text-align: center;
-      color: var(--color-text-muted);
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
   </style>
 </Layout>

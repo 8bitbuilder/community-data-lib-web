@@ -1,17 +1,14 @@
 ---
-import { Image } from 'astro:assets';
 import { libraryHref, mainSiteHref, withBasePath } from '@lib/paths';
-// Same emblem + ribbon bookmark as the main site nav
-import cdlEmblem from '../assets/brand/cdl-emblem-transparent.png';
 // Lower-48 county/state outlines used as the footer texture on the main site
 import usCountiesUrl from '../assets/footer/us-counties.svg?url';
+import CommunityBadge from '../components/CommunityBadge.astro';
 import '../styles/tailwind.css';
 
 interface Props {
   title?: string;
   description?: string;
   communityName: string;
-  communityLocation?: string;
   communitySlug: string; // e.g. 'knox-county'
   page: 'home' | 'catalog' | 'contact';
   footerTitle?: string;  // e.g. 'Knoxville Community Data Library'
@@ -20,7 +17,6 @@ interface Props {
 const {
   title,
   communityName,
-  communityLocation,
   communitySlug,
   page,
   footerTitle,
@@ -29,6 +25,15 @@ const {
 
 const pageTitle = title ? `${title} | ${communityName}` : communityName;
 const footerName = footerTitle ?? communityName;
+
+// Splits "Knox County, TN Community Data Library" into its place and the
+// "Community Data Library" suffix, so the nav and footer can set the suffix on
+// its own line. Titles without the suffix stay on one line.
+const SUFFIX = 'Community Data Library';
+const splitTitle = (title: string) =>
+  title.endsWith(` ${SUFFIX}`) ? [title.slice(0, -SUFFIX.length - 1), SUFFIX] : [title];
+const brandLines = splitTitle(communityName);
+const footerLines = splitTitle(footerName);
 
 // The library's own pages are on its subdomain when PUBLIC_LIBRARY_DOMAIN is set
 // (web#31); everything else is a main-site page, linked absolutely so it never
@@ -83,30 +88,15 @@ const navItems = [
   <body>
     <div class="paper-grain" aria-hidden="true"></div>
 
-    <div class="network-bar">
-      <a href={cdlHref} class="network-link"><span aria-hidden="true">←</span> Back to Community Data Libraries</a>
-    </div>
-
     <nav class="navbar" role="navigation" aria-label="Community navigation">
       <div class="nav-container">
 
-        <!-- Brand: the main-site ribbon bookmark (links to Community Data Libraries)
-             followed by this library's name (links to the library home). -->
+        <!-- Brand: the library's badge (a small pointillist scene with the
+             county initial) and its name; both link to the library home. -->
         <div class="nav-brand">
-          <a href={cdlHref} class="brand-tab-link" aria-label="Community Data Libraries home">
-            <span class="brand-tab">
-              <Image
-                src={cdlEmblem}
-                alt=""
-                class="brand-mark"
-                widths={[58, 116, 174]}
-                sizes="58px"
-                loading="eager"
-              />
-            </span>
-          </a>
           <a href={homeHref} class="brand-link">
-            <span class="brand-name">{communityName}{communityLocation && <><br/><span class="brand-location">{communityLocation}</span></>}</span>
+            <CommunityBadge slug={communitySlug} />
+            <span class="brand-name">{brandLines.length > 1 ? <><span class="brand-place">{brandLines[0]}</span><br /><span class="brand-label">{brandLines[1]}</span></> : brandLines[0]}</span>
           </a>
         </div>
 
@@ -136,6 +126,30 @@ const navItems = [
             <span class="hb"></span>
             <span class="hb"></span>
           </button>
+          <!-- Back to the main Community Data Libraries site (web#40): a door
+               that swings open on hover/focus. Icons: Lucide door-closed /
+               door-open (ISC licence). -->
+          <a
+            href={cdlHref}
+            class="network-door"
+            title="Back to Community Data Libraries"
+          >
+            <span class="door-icons">
+            <svg class="door door-closed" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14" />
+              <path d="M2 20h20" />
+              <path d="M14 12v.01" />
+            </svg>
+            <svg class="door door-open" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M11 20H2" />
+              <path d="M11 4.562v16.157a1 1 0 0 0 1.242.97L19 20V5.562a2 2 0 0 0-1.515-1.94l-4-1A2 2 0 0 0 11 4.561z" />
+              <path d="M11 4H8a2 2 0 0 0-2 2v14" />
+              <path d="M14 12h.01" />
+              <path d="M22 20h-3" />
+            </svg>
+            </span>
+            <span class="door-label"><span>Exit to</span> <span>CDL</span> <span>Main</span></span>
+          </a>
         </div>
       </div>
 
@@ -167,10 +181,9 @@ const navItems = [
       <div class="footer-inner">
         <div class="footer-top">
           <div class="footer-brand">
-            <Image src={cdlEmblem} alt="" class="footer-mark" widths={[72, 144, 216]} sizes="72px" />
+            <span class="footer-mark"><CommunityBadge slug={communitySlug} variant="seal" /></span>
             <div>
-              <span class="footer-title">{footerName}</span>
-              {communityLocation && <p class="footer-tagline">{communityLocation}</p>}
+              <span class="footer-title">{footerLines.length > 1 ? <><span class="title-place">{footerLines[0]}</span><br />{footerLines[1]}</> : footerLines[0]}</span>
             </div>
           </div>
           <nav class="footer-links" aria-label="Footer navigation">
@@ -276,9 +289,9 @@ const navItems = [
     --color-accent-glow: rgba(26, 107, 69, 0.10);
 
     /* Main-site nav palette */
-    --color-nav: #23354B;
+    --color-nav: #36606A;             /* dark teal (a little deeper than the Teacher card's hover #426F78); was navy #23354B */
     --color-nav-light: #34495F;
-    --color-footer: #1F3349;          /* main Layout footer navy */
+    --color-footer: #36606A;          /* dark teal, matching the nav; was the main Layout footer navy #1F3349 */
     --color-teal-light: #7CD3C4;
     --color-teal-light-glow: rgba(124, 211, 196, 0.14);
     --color-node-blue: #AFE5F3;       /* emblem network nodes */
@@ -454,9 +467,17 @@ const navItems = [
     padding: var(--space-12) var(--space-6) var(--space-8);
     margin-top: var(--space-16); position: relative; overflow: hidden;
   }
+  /* Navy grosgrain ribbon along the top of the footer: the same highlight /
+     body / groove stops as the hero's county initial. The ribs run across the
+     ribbon, as on real grosgrain. */
   footer::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-accent-light) 50%, var(--color-secondary-light) 100%);
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px; z-index: 1; /* above the map texture */
+    background: repeating-linear-gradient(
+      to right,
+      #3D5A80 0 1px,
+      #31496A 1px 2.5px,
+      #22374F 2.5px 3.5px
+    );
   }
 
   /* Very faint U.S. county and state outlines as a background texture, as on the main site. */
@@ -478,38 +499,27 @@ const navItems = [
     margin-bottom: var(--space-6);
   }
   .footer-brand { display: flex; align-items: flex-start; gap: var(--space-4); }
-  /* Same emblem art as the nav ribbon (transparent background), on navy grosgrain */
-  .footer-mark {
-    display: block; width: 72px; height: 72px; padding: 9px 7px 11px;
-    object-fit: contain; flex-shrink: 0; margin-top: -4px;
-    border: 1px solid rgba(175, 229, 243, 0.35); border-radius: 50%;
-    background: repeating-linear-gradient(
-      to bottom,
-      #3D5A80 0 1px,
-      #31496A 1px 2.5px,
-      #22374F 2.5px 3.5px
-    );
-  }
+  /* The library's seal (CommunityBadge, seal variant). */
+  .footer-mark { display: block; flex-shrink: 0; margin-top: -4px; }
   /* Doto (round dots), matching the nav wordmark */
   .footer-title {
     display: block; font-family: var(--font-brand); font-variation-settings: 'ROND' 100;
     font-weight: 800; font-size: 1.125rem; color: #E2E8F0; letter-spacing: 0; margin-bottom: var(--space-1);
   }
-  .footer-tagline { margin: 0; font-size: var(--font-size-sm); color: #A0B4C4; line-height: 1.35; max-width: 30ch; text-wrap: balance; }
   .footer-links { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); align-items: center; }
-  .footer-links a { font-family: var(--font-nav); font-size: var(--font-size-sm); color: #A0B4C4; text-decoration: none; transition: color 0.15s ease; font-weight: 500; }
-  .footer-links a:hover { color: var(--color-primary-light); text-decoration: none; }
+  .footer-links a { font-family: var(--font-nav); font-size: var(--font-size-sm); color: #D6E2E5; text-decoration: none; transition: color 0.15s ease; font-weight: 500; }
+  .footer-links a:hover { color: #FFFFFF; text-decoration: none; }
   .footer-bottom { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
-  .footer-copy { font-size: var(--font-size-xs); color: #8BA4B8; margin: 0; font-family: var(--font-sans); }
-  .footer-copy a { color: var(--color-primary-light); text-decoration: underline; text-underline-offset: 3px; }
+  .footer-copy { font-size: var(--font-size-xs); color: #C7D6DA; margin: 0; font-family: var(--font-sans); }
+  .footer-copy a { color: #EEF5F5; text-decoration: underline; text-underline-offset: 3px; }
   .footer-copy a:hover { color: #FFFFFF; text-decoration: underline; }
   .footer-tagline-bottom {
     display: flex; align-items: center; gap: var(--space-2);
-    font-size: var(--font-size-xs); color: #8BA4B8; margin: 0; font-family: var(--font-sans);
+    font-size: var(--font-size-xs); color: #C7D6DA; margin: 0; font-family: var(--font-sans);
   }
-  .footer-tagline-bottom a { color: var(--color-primary-light); text-decoration: underline; text-underline-offset: 3px; }
+  .footer-tagline-bottom a { color: #EEF5F5; text-decoration: underline; text-underline-offset: 3px; }
   .footer-tagline-bottom a:hover { color: #FFFFFF; text-decoration: underline; }
-  .footer-tagline-bottom .footer-email { display: inline-flex; color: var(--color-teal-light); text-decoration: none; }
+  .footer-tagline-bottom .footer-email { display: inline-flex; color: #EEF5F5; text-decoration: none; }
   .footer-tagline-bottom .footer-email:hover { color: #FFFFFF; }
 
   :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: var(--radius-sm); }
@@ -519,124 +529,85 @@ const navItems = [
 
 <style>
   /* ── Link back to the main site (web#40) ─────── */
-  .network-bar { background: var(--color-secondary); }
-  .network-link {
-    display: flex; align-items: center; gap: var(--space-2);
-    max-width: 1200px; min-height: 44px; margin: 0 auto; padding: 0 var(--space-6);
-    color: #F8FAFC; font-size: var(--font-size-sm); font-weight: 600; text-decoration: none;
+  /* A door icon with a small three-line caption to its right, at the far right
+     of the nav bar; the closed door swaps for an open one on hover/focus. */
+  .network-door {
+    display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;
+    padding: var(--space-1) var(--space-2); border-radius: var(--radius-md);
+    color: #B1D9D4; /* soft grey-mint: quiet next to the nav links, but just passes 4.5:1 on the teal bar (4.52:1) */
+    text-decoration: none;
+    transition: color 0.15s ease;
   }
-  .network-link:hover { color: #F8FAFC; text-decoration: underline; }
-  .network-link:focus-visible { outline-color: #F8FAFC; outline-offset: -4px; }
-  @media (min-width: 768px) { .network-link { min-height: 36px; } }
+  .network-door:hover,
+  .network-door:focus-visible { color: #DDF4EF; text-decoration: none; } /* a little brighter on hover, short of white */
+  .door-icons { display: grid; }
+  /* Barlow small caps, like the footer's "Knox County, TN" and the header's location line. */
+  .door-label {
+    display: grid; justify-items: start;
+    font-family: var(--font-sans); font-size: 0.66rem; font-weight: 500;
+    letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.15; white-space: nowrap;
+  }
+  /* Narrower screens: a slightly smaller door and caption. */
+  @media (max-width: 899px) {
+    .door-label { font-size: 0.62rem; }
+    .network-door { gap: var(--space-1); }
+    .network-door .door { width: 26px; height: 26px; }
+  }
+  .network-door .door { grid-area: 1 / 1; }
+  /* Mirrored so its knob is on the same side as the open door's (hinge on the right). */
+  .network-door .door-closed { transform: scaleX(-1); }
+  .network-door .door-open { opacity: 0; }
+  .network-door:hover .door-closed,
+  .network-door:focus-visible .door-closed { opacity: 0; }
+  .network-door:hover .door-open,
+  .network-door:focus-visible .door-open { opacity: 1; }
 
   /* ── Navbar ──────────────────────────────────── */
   .navbar {
     font-family: var(--font-nav); /* links, drawer and CTA; the wordmark stays Doto */
-    background: var(--color-nav); border-bottom: 2px solid rgba(31, 51, 73, 0.4);
+    background: var(--color-nav); border-bottom: 2px solid rgba(38, 66, 72, 0.4);
     box-shadow: var(--shadow-md);
     position: sticky; top: 0; z-index: 1000;
     backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%);
   }
   .nav-container {
     max-width: 1200px; margin: 0 auto; padding: 0 var(--space-6);
-    /* 76px matches the main site bar, which the ribbon bookmark geometry is built around. */
+    /* 76px matches the main site bar. */
     display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); height: 76px;
   }
 
   /* Brand */
-  .nav-brand { flex-shrink: 0; display: flex; align-items: center; gap: var(--space-3); }
-  .brand-link { display: flex; align-items: center; text-decoration: none; transition: opacity 0.15s ease; }
+  /* The brand may shrink (its name wraps) so the menu and door buttons always fit on narrow screens. */
+  .nav-brand { flex-shrink: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-3); }
+  .brand-link { display: flex; align-items: center; gap: var(--space-3); min-width: 0; text-decoration: none; transition: opacity 0.15s ease; }
   .brand-link:hover { opacity: 0.8; text-decoration: none; }
-  .brand-tab-link { display: flex; text-decoration: none; }
-  .brand-tab-link:hover { text-decoration: none; }
 
-  /* "Bookmark" ribbon that hangs below the bar and holds the emblem (same as the main nav).
-     The tab keeps the bar's 76px in the layout; the ribbon overhangs the page. */
-  .brand-tab {
-    position: relative;
-    align-self: flex-start;
-    width: 76px;
-    height: 76px;
-    flex-shrink: 0;
-    filter: drop-shadow(0 4px 5px rgba(15, 25, 40, 0.3));
+  /* Community name in Doto (round dots), white on the nav bar — same as the main wordmark. */
+  /* Footer title: the place line ("Knox County, TN") in Philosopher, a little
+     larger than the dotted "Community Data Library" under it, in a pale teal
+     (5:1 on the footer teal). */
+  .title-place {
+    font-family: var(--font-display); font-variation-settings: normal;
+    font-weight: 700; font-size: 1.3em; line-height: 1.1; color: #C2E2E3;
   }
-
-  /* ::before is the thin mustard edge (full ribbon shape); ::after is the grosgrain face,
-     inset 1.5px on the sides and along the notch so the mustard shows as a border. */
-  .brand-tab::before,
-  .brand-tab::after {
-    content: '';
-    position: absolute;
-    top: -24px;
+  /* Nav title: the place in the dotted wordmark font, a little larger, over a
+     small spaced-caps "COMMUNITY DATA LIBRARY" label in soft grey-mint. */
+  .brand-place { font-size: 1.22em; }
+  .brand-label {
+    font-family: var(--font-sans); font-variation-settings: normal;
+    font-weight: 500; font-size: 0.775em; letter-spacing: 0.12em;
+    text-transform: uppercase; color: #B1D9D4;
   }
-
-  .brand-tab::before {
-    left: 0;
-    right: 0;
-    height: 170px;
-    background: var(--color-secondary);
-    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 18px), 0 100%);
-  }
-
-  .brand-tab::after {
-    left: 1.5px;
-    right: 1.5px;
-    height: 167.6px;
-    background: repeating-linear-gradient(
-        to bottom,
-        #1C8A7B 0 1px,
-        #0E7265 1px 2.5px,
-        #08544A 2.5px 3.5px
-      );
-    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 17.3px), 0 100%);
-  }
-
-  /* Retracted at rest; drops down on hover/focus. */
-  .brand-tab::before,
-  .brand-tab::after,
-  .brand-mark {
-    transition: translate 0.6s cubic-bezier(0.34, 1.25, 0.64, 1);
-  }
-
-  .brand-tab::before,
-  .brand-tab::after { translate: 0 -70px; }
-  .brand-mark { translate: 0 -50px; }
-
-  .brand-tab-link:hover .brand-tab::before,
-  .brand-tab-link:hover .brand-tab::after,
-  .brand-tab-link:hover .brand-mark,
-  .brand-tab-link:focus-visible .brand-tab::before,
-  .brand-tab-link:focus-visible .brand-tab::after,
-  .brand-tab-link:focus-visible .brand-mark {
-    translate: 0 0;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .brand-tab::before,
-    .brand-tab::after,
-    .brand-mark { transition: none; }
-  }
-
-  /* Emblem art (transparent background) sitting on the lower part of the ribbon. */
-  .brand-mark {
-    position: absolute;
-    z-index: 1;
-    top: 69px;
-    left: 9px;
-    display: block;
-    width: 58px;
-    height: auto;
-  }
-
-  /* Community name in Doto (round dots), white on the navy bar — same as the main wordmark. */
   .brand-name {
     font-family: var(--font-brand); font-variation-settings: 'ROND' 100;
     font-size: 0.8rem; font-weight: 800; color: #FFFFFF;
     letter-spacing: 0; line-height: 1.15;
   }
-  .brand-location {
-    font-family: var(--font-nav); font-size: 0.68rem; font-weight: 500; color: var(--color-teal-light);
-    letter-spacing: 0.04em; text-transform: uppercase;
+  @media (max-width: 360px) {
+    .nav-container { padding: 0 var(--space-4); gap: var(--space-2); }
+    .brand-link { gap: var(--space-2); }
+    .nav-actions { gap: var(--space-1); }
+    .network-door { padding-inline: var(--space-1); }
   }
 
   /* Desktop links */

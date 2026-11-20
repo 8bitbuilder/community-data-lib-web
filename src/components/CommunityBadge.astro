@@ -1,0 +1,263 @@
+---
+/**
+ * Community library badge: a pointillist landscape (sky, grass, sun) like the
+ * hero's backdrop, with the county initial over it in gold. Built at
+ * build time and seeded by the slug, so each library's badge is stable but its
+ * own. Renders nothing if the library or its county name can't be found.
+ *
+ * Variants:
+ * - "nav" (default): bright, faded dots cut to a circle with a thin pale ring,
+ *   for the nav bar.
+ * - "seal": for the footer, its dots in teal shades only, cut to the county's
+ *   own outline with a thin pale border, the county scaled up so the letter
+ *   fits inside it (a circle if the outline is missing).
+ */
+import { getEntry } from 'astro:content';
+import { countyInitial } from '@lib/data/communityFilter';
+import { countyOutline } from '@lib/data/countyOutline';
+import {
+  CAP_HEIGHT,
+  distanceToOutline,
+  isInside,
+  letterWidthEm,
+  resample,
+  seededRandom,
+} from '@lib/data/countyBurst';
+import { pointillistScene, type SceneColors } from '@lib/data/pointillistScene';
+
+interface Props {
+  slug: string;
+  variant?: 'nav' | 'seal';
+}
+
+const { slug, variant = 'nav' } = Astro.props;
+const isSeal = variant === 'seal';
+// The nav badge's shape: 'county' (like the footer seal) or 'circle'.
+const NAV_SHAPE: 'county' | 'circle' = 'county';
+const countyShaped = isSeal || NAV_SHAPE === 'county';
+const community = slug ? await getEntry('communities', slug) : undefined;
+const initial = community ? countyInitial(community.data) : '';
+
+const SIZE = 80; // viewBox units (square); shown at the CSS size below
+
+// The seal's teal shades, around the footer's own teal (#36606A). Each dot
+// takes one at random (seeded), so there's no sky, grass or sun, just an even
+// tone-on-tone speckle. Repeats weight the mix toward the middle tones.
+const SPECKLE = [
+  '#2C525B',
+  '#3F6E78',
+  '#467883',
+  '#467883',
+  '#4E828C',
+  '#4E828C',
+  '#5A8E98',
+  '#6A9CA5',
+  '#7FADB5',
+  '#93BDC3',
+];
+
+const COLORS: Record<'nav' | 'seal', SceneColors> = {
+  // Brighter than the hero's backdrop so they hold up small on the dark nav bar;
+  // the dots are then faded (see .community-badge-dots).
+  nav: {
+    sky: ['#4FB8DE', '#6CC6E6', '#8CD4EC', '#ABE1F2'],
+    grass: ['#2BA58F', '#3BAE7C', '#5CBA68', '#7CC15D'],
+    sun: ['#F5B942', '#F7C24F', '#F9D06E'],
+  },
+  // Placeholder: the seal's dots are recoloured at random from SPECKLE below.
+  seal: {
+    sky: SPECKLE,
+    grass: SPECKLE,
+    sun: SPECKLE,
+  },
+};
+
+// One letter fills most of the badge; "DC" is two, so it's set smaller. In a
+// county shape the letter is a little smaller, since the county has to grow to
+// hold it.
+const fontSize = (initial.length > 1 ? 0.46 : 0.68) * SIZE * (countyShaped ? 0.8 : 1);
+const letterHalfW = (letterWidthEm(initial) * fontSize) / 2;
+const letterHalfH = (CAP_HEIGHT * fontSize) / 2;
+
+// The seal's shape: the county, scaled up just enough that the letter fits
+// inside it (with a little room), and the letter placed where the county has
+// the most space. Its border points are checked against the letter's box,
+// which also catches inlets and holes. Falls back to a circle if there's no
+// outline, and stops growing at MAX_SEAL (the letter may then overhang).
+const RADIUS = SIZE / 2 - 3;
+const LETTER_ROOM = 3; // clear space around the letter inside the county
+const MAX_SEAL = SIZE * 2.5;
+function fitSeal() {
+  const fips = community?.data.county_fips;
+  let last = null;
+  for (let fit = SIZE - 4; fit <= MAX_SEAL; fit = Math.ceil(fit * 1.06)) {
+    const outline = countyOutline(fips, { maxWidth: fit, maxHeight: fit, padding: 2 });
+    if (!outline) return null;
+    const border = outline.rings.flatMap((ring) => resample(ring, 1));
+    const hw = letterHalfW + LETTER_ROOM;
+    const hh = letterHalfH + LETTER_ROOM;
+    let best: { x: number; y: number; room: number } | null = null;
+    for (let x = hw; x <= outline.width - hw; x += 1.5) {
+      for (let y = hh; y <= outline.height - hh; y += 1.5) {
+        if (!isInside([x, y], outline.rings)) continue;
+        if (border.some(([bx, by]) => Math.abs(bx - x) < hw && Math.abs(by - y) < hh)) continue;
+        const room = distanceToOutline([x, y], outline.rings);
+        if (!best || room > best.room) best = { x, y, room };
+      }
+    }
+    last = { outline, x: outline.width / 2, y: outline.height / 2 };
+    if (best) return { outline, x: best.x, y: best.y };
+  }
+  return last;
+}
+const seal = countyShaped && initial ? fitSeal() : null;
+const county = seal?.outline ?? null;
+
+// The badge's frame: square for the nav badge and the circle, the county's
+// own proportions for a county seal.
+const frameW = county ? county.width : SIZE;
+const frameH = county ? county.height : SIZE;
+
+// Keeps a dot whole and clear of the badge's border (county or circle).
+const insideShape = (dot: { cx: number; cy: number; r: number }) =>
+  county
+    ? isInside([dot.cx, dot.cy], county.rings) &&
+      distanceToOutline([dot.cx, dot.cy], county.rings) > dot.r + 1.2
+    : Math.hypot(dot.cx - SIZE / 2, dot.cy - SIZE / 2) + dot.r < RADIUS - 1.5;
+
+// The scene is generated on a larger square so its ragged edge falls outside
+// the frame; then only the dots inside the badge's shape are kept.
+const scene = Math.max(frameW, frameH) * 1.3;
+const offsetX = (scene - frameW) / 2;
+const offsetY = (scene - frameH) / 2;
+const dots = initial
+  ? pointillistScene({
+      width: scene,
+      height: scene,
+      seed: `${slug}:badge`,
+      spacing: 4.6,
+      sunRadius: 13,
+      hillHeight: 4,
+      colors: COLORS[variant],
+    })
+      .map((dot) => ({
+        ...dot,
+        cx: Math.round((dot.cx - offsetX) * 100) / 100,
+        cy: Math.round((dot.cy - offsetY) * 100) / 100,
+      }))
+      .filter(insideShape)
+  : [];
+if (isSeal) {
+  const rand = seededRandom(`${slug}:speckle`);
+  for (const dot of dots) dot.fill = SPECKLE[Math.floor(rand() * SPECKLE.length)];
+}
+
+// Letter centre, then its baseline (half a cap height below the centre).
+const letterX = seal ? seal.x : SIZE / 2;
+const letterY = (seal ? seal.y : SIZE / 2) + letterHalfH;
+
+// Shown at a fixed scale, so the letter is the same size on every seal and a
+// county seal is as wide and tall as its shape needs.
+// The nav badge is also kept short enough for the 76px bar.
+const NAV_MAX_HEIGHT_PX = 64;
+const PX_PER_UNIT = isSeal ? 72 / SIZE : Math.min(58 / SIZE, NAV_MAX_HEIGHT_PX / frameH);
+const widthPx = Math.round(frameW * PX_PER_UNIT);
+const heightPx = Math.round(frameH * PX_PER_UNIT);
+const shadowId = `badge-shadow-${variant}`; // both variants can be on one page
+---
+
+{
+  initial && (
+    <svg
+      class={`community-badge community-badge-${variant}`}
+      viewBox={`0 0 ${frameW} ${frameH}`}
+      width={widthPx}
+      height={heightPx}
+      aria-hidden="true"
+    >
+      <defs>
+        <filter id={shadowId} x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="1" dy="1.5" stdDeviation="1" flood-color="#06322c" flood-opacity="0.45" />
+        </filter>
+        {!isSeal && (
+          /* Nav letter: light gold at the top fading to soft gold at the foot. */
+          <linearGradient id="badge-letter-gradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0.15" stop-color="#f6e4b4" />
+            <stop offset="0.95" stop-color="#f2cb78" />
+          </linearGradient>
+        )}
+      </defs>
+      {county ? (
+        <path class="community-badge-ring" d={county.d} fill-rule="evenodd" />
+      ) : (
+        <circle class="community-badge-ring" cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} />
+      )}
+      <g class="community-badge-dots">
+        {dots.map((dot) => (
+          <circle cx={dot.cx} cy={dot.cy} r={dot.r} fill={dot.fill} />
+        ))}
+      </g>
+      <text
+        class="community-badge-initial"
+        x={letterX}
+        y={letterY}
+        font-size={fontSize}
+        text-anchor="middle"
+        filter={`url(#${shadowId})`}
+      >{initial}</text>
+    </svg>
+  )
+}
+
+<style>
+  .community-badge {
+    display: block;
+    flex-shrink: 0;
+    /* The colour behind the badge (the letter's edge and the shape's fill
+       match it), the shape's thin outline, and the letter's own colour. */
+    --badge-ground: var(--color-nav);
+    --badge-outline: rgba(175, 229, 243, 0.6); /* pale blue, a little brighter than the footer's */
+    --badge-letter: url(#badge-letter-gradient); /* light gold to soft gold */
+  }
+
+  /* Sizes are set on the <svg> itself (see PX_PER_UNIT). */
+  .community-badge-seal {
+    --badge-ground: var(--color-footer);
+    --badge-outline: rgba(175, 229, 243, 0.35); /* pale blue, like the old emblem's ring */
+    --badge-letter: #e2e8f0; /* the footer's library name (.footer-title) */
+  }
+
+  /* Very narrow screens: a smaller nav badge leaves room for the library name. */
+  @media (max-width: 360px) {
+    .community-badge-nav {
+      width: auto;
+      height: 40px;
+    }
+  }
+
+  .community-badge-nav .community-badge-dots {
+    opacity: 0.5;
+  }
+
+  /* Thin pale blue border around the badge's shape (a little brighter in the
+     nav than on the footer seal). */
+  .community-badge-ring {
+    fill: var(--badge-ground);
+    stroke: var(--badge-outline);
+    stroke-width: 1.2;
+    stroke-linejoin: round;
+  }
+
+  /* The letter (a light-to-soft gold gradient in the nav, the footer text colour on the seal), with an edge in the
+     colour behind the badge that keeps a clean gap between the letter and the
+     dots. The stroke is painted under the fill, so only its outer half shows. */
+  .community-badge-initial {
+    font-family: var(--font-display);
+    font-weight: 800;
+    fill: var(--badge-letter);
+    stroke: var(--badge-ground);
+    stroke-width: 3;
+    stroke-linejoin: round;
+    paint-order: stroke;
+  }
+</style>

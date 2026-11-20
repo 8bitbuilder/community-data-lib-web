@@ -2,8 +2,10 @@
 import CommunityLayout from '@layouts/CommunityLayout.astro';
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { libraryHref } from '@lib/paths';
-import { AUDIENCE_LABELS, AUDIENCE_ROLES, communityDisplay } from '@lib/data/communityFilter';
-import { countyOutline } from '@lib/data/countyOutline';
+import { AUDIENCE_ROLES, communityDisplay, countyInitial as initialFor } from '@lib/data/communityFilter';
+import { stateCountyOutline } from '@lib/data/countyOutline';
+import { countyBurst } from '@lib/data/countyBurst';
+import { pointillistScene } from '@lib/data/pointillistScene';
 
 export async function getStaticPaths() {
   const communities = await getCollection('communities');
@@ -21,24 +23,43 @@ const { community } = Astro.props;
 const data = community.data;
 const { libraryTitle, welcomeHeading, placeName } = communityDisplay(data);
 const catalogHref = libraryHref(data.slug, '/catalog/');
-const location = [data.county, data.state_code].filter(Boolean).join(', ');
 
-// e.g. "Knoxville Community Library" / "Knoxville Community Data Library"
-const pageHeading = `${placeName} Community Data Library`;
-const footerTitle = `${placeName} Community Data Library`;
+// e.g. "Knox County, TN Community Data Library"; falls back to the place name,
+// then the entry's `name` (see communityDisplay).
+const pageHeading = libraryTitle;
+const footerTitle = libraryTitle;
 
-// County shape for the header graphic. Resolved at build time from the TIGER
-// topology in public/geo/boundaries/ by the entry's 5-digit county_fips, so the
-// 800 KB file never reaches the browser. Null when the code is missing/unknown,
-// in which case the graphic is skipped and the header text fills the row.
-const outline = countyOutline(data.county_fips);
-const outlineLabel = [data.county, data.state_name ?? data.state_code]
-  .filter(Boolean)
-  .join(', ');
+// Tagline under the heading, the same wording for every library, e.g.
+// "Curated open data resources for Knox County, Tennessee" (no full stop: it is
+// a phrase, not a sentence). Falls back to the
+// place name if the county or state is missing. (The entry's own description is
+// still used for the page's meta description.)
+const taglinePlace =
+  [data.county, data.state_name ?? data.state_code].every(Boolean)
+    ? `${data.county}, ${data.state_name ?? data.state_code}`
+    : placeName;
+const tagline = `Curated open data resources for ${taglinePlace}`; // a phrase, so no full stop
 
-// Dotted-grid backdrop: a regular grid of dots whose size and colour vary a
-// little. Generated at build time from a seed derived from the community slug,
-// so the pattern is stable between builds but differs from library to library.
+// State + county for the header graphic: the whole state, with this county
+// filled in on it. Resolved at build time from the TIGER topology in
+// public/geo/boundaries/ by the entry's 5-digit county_fips (its first two
+// digits are the state), so the 800 KB file never reaches the browser. Null
+// when the code is missing/unknown, in which case the graphic is skipped and
+// the header text fills the row.
+// Straight-sided states (e.g. Tennessee) get a decorative tilt so they rise to
+// the right; states that already lean (e.g. California) keep their real angle.
+const shapes = stateCountyOutline(data.county_fips, {
+  tilt: { target: 10, max: 12 }, // degrees: lean to aim for / most we'll rotate
+});
+const stateLabel = data.state_name ?? data.state_code;
+const mapLabel = [data.county, stateLabel].every(Boolean)
+  ? `Map of ${stateLabel} with ${data.county} highlighted`
+  : `Map of ${stateLabel ?? 'the state'}`;
+
+// Dotted backdrop: a few rows of dots tracing the state's outline, then rays
+// of dots bursting outward from the outermost row. Built at build time from
+// the outline's points (see countyBurst), seeded by the slug so each library's
+// pattern is stable between builds but different from the next library's.
 // Colours repeat in the list to weight them (teal/green most common).
 const DOT_COLORS = [
   '#0B5075', // deep blue
@@ -51,36 +72,73 @@ const DOT_COLORS = [
   '#8FD3D6', // light blue
   '#F5B942', // gold
 ];
-const DOT_COLS = 24; // dots per row
-const DOT_ROWS = 18; // dots per column
-const DOT_STEP = 17.5; // spacing between dot centres, in viewBox units
-const DOT_W = DOT_COLS * DOT_STEP; // 420
-const DOT_H = DOT_ROWS * DOT_STEP; // 315 (4:3, matches the frame's aspect-ratio)
+const ART_W = 420; // frame viewBox width
+const ART_H = 315; // frame viewBox height (4:3, matches the frame's aspect-ratio)
 
-function seededRandom(seed: number) {
-  return () => {
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+// Decorative initial: first letter of the county name, capitalised (e.g. "K"
+// for Knox County), drawn in navy grosgrain to match the footer emblem's circle
+// (and the navy version of the nav ribbon). Washington, DC is its own case: its
+// one "county" is the whole district, so it always reads "DC" and may sit on
+// top of the county. Skipped if there's no county name.
+const isDC = data.state_code === 'DC';
+const countyInitial = initialFor(data);
 
-const rand = seededRandom(
-  [...String(data.slug)].reduce((hash, ch) => (hash * 31 + ch.charCodeAt(0)) | 0, 7)
-);
+// Placement: countyBurst picks the spot and size for the letter so it NEVER
+// covers the county, stays inside the frame, and otherwise sits as large as
+// possible on the state, near the middle (see placeLetter).
+const burst = shapes
+  ? countyBurst(shapes.state, {
+      width: ART_W,
+      height: ART_H,
+      seed: String(data.slug),
+      colors: DOT_COLORS,
+      countyScale: 0.72, // share of the frame the state fills
+      avoid: shapes.county.rings, // the letter must never cover the county
+      letter: countyInitial
+        ? {
+            text: countyInitial,
+            coverCounty: isDC,
+            maxSize: ART_H * 0.62,
+            minSize: ART_H * 0.2,
+          }
+        : undefined,
+      rows: 2, // outline rows hugging the state
+      rays: false, // rows only; the pointillist scene fills the background
+      rowGap: 9, // distance between outline rows
+      spacing: 9, // distance between dots along a row or ray
+      rayEvery: 2, // a ray starts at every 2nd dot of the outer row
+      rayLength: [26, 60], // short / long ray lengths (alternating)
+    })
+  : null;
 
-const dots = Array.from({ length: DOT_COLS * DOT_ROWS }, (_, i) => ({
-  cx: Number(((i % DOT_COLS) * DOT_STEP + DOT_STEP / 2).toFixed(2)),
-  cy: Number((Math.floor(i / DOT_COLS) * DOT_STEP + DOT_STEP / 2).toFixed(2)),
-  r: Number((1 + rand() * 1.3).toFixed(2)), // radius 1.0 – 2.3
-  fill: DOT_COLORS[Math.floor(rand() * DOT_COLORS.length)],
-}));
+// Very light pointillist landscape (sky, grass, sun, cloud, tree) in a
+// splotch-shaped patch behind the state; see pointillistScene.
+const sceneDots = burst
+  ? pointillistScene({
+      width: ART_W,
+      height: ART_H,
+      seed: String(data.slug),
+      avoid: burst.rings,
+      letterBox: burst.letter?.box,
+    })
+  : [];
+
+
+// Card titles. Written out here (rather than built from AUDIENCE_LABELS) so the
+// cards can say "Community Catalog" while the shared label elsewhere on the
+// site stays "Community Member".
+const roleTitles = {
+  teacher: 'Teacher Catalog',
+  student: 'Student Catalog',
+  community: 'Community Catalog',
+} as const;
 
 const roleDescriptions = {
-  teacher: 'Topical and pedagogical tags to help plan lessons with local data.',
-  student: 'A student-friendly selection of datasets for projects and exploration.',
-  community: 'Topical tags for exploring data about where you live.',
+  teacher:
+    'View all datasets in our catalog relevant to your community, each tagged with K-12 statistics and data science topics to make lesson planning easier.',
+  student:
+    'View all datasets in our catalog relevant to your community, screened for topical appropriateness for a K-12 student audience.',
+  community: 'View all datasets in our catalog relevant to your community.',
 } as const;
 ---
 
@@ -89,37 +147,64 @@ const roleDescriptions = {
   description={data.description ??
     `${libraryTitle}: local data for teachers, students, and community members.`}
   communityName={libraryTitle}
-  communityLocation={location || undefined}
   communitySlug={data.slug}
   page="home"
   footerTitle={footerTitle}
 >
   <section class="landing">
-    <!-- Hero: the county's own outline on a dotted-grid backdrop (left),
-         with the left-aligned kicker, title, and intro to its right. Stacks
+    <!-- Hero: the state with its county filled in, on a dotted burst (left),
+         with the left-aligned title and intro to its right. Stacks
          on narrow screens. -->
     <div class="hero">
       {
-        outline && (
+        shapes && burst && (
           <div class="county-band">
             <div class="county-art-frame">
-              <svg
-                class="county-dots"
-                viewBox={`0 0 ${DOT_W} ${DOT_H}`}
-                aria-hidden="true"
-                focusable="false"
-              >
-                {dots.map((dot) => (
-                  <circle cx={dot.cx} cy={dot.cy} r={dot.r} fill={dot.fill} />
-                ))}
-              </svg>
-              <svg
-                class="county-art"
-                viewBox={`0 0 ${outline.width} ${outline.height}`}
-                role="img"
-                aria-label={`Outline of ${outlineLabel}`}
-              >
-                <path d={outline.d} fill="#107366" stroke="#107366" stroke-width="2" stroke-linejoin="round" fill-rule="evenodd" />
+              <svg class="county-art" viewBox={`0 0 ${ART_W} ${ART_H}`} role="img" aria-label={mapLabel}>
+                <defs>
+                  <filter id="county-shadow" x="-30%" y="-30%" width="160%" height="160%">
+                    <feDropShadow dx="2" dy="3" stdDeviation="2" flood-color="#06322c" flood-opacity="0.35" />
+                  </filter>
+                </defs>
+                <g class="scene-dots" aria-hidden="true">
+                  {sceneDots.map((dot) => (
+                    <circle cx={dot.cx} cy={dot.cy} r={dot.r} fill={dot.fill} />
+                  ))}
+                </g>
+                <g aria-hidden="true">
+                  {burst.dots.map((dot) => (
+                    <circle cx={dot.cx} cy={dot.cy} r={dot.r} fill={dot.fill} />
+                  ))}
+                </g>
+                <g transform={burst.transform}>
+                  <path class="state-shape" d={shapes.state.d} fill-rule="evenodd" vector-effect="non-scaling-stroke" />
+                  <g filter="url(#county-shadow)">
+                    {/* Gold halo: the county drawn again with a wide stroke underneath,
+                        so a gold outline traces the county's own shape. */}
+                    <path class="county-halo" d={shapes.county.d} vector-effect="non-scaling-stroke" />
+                    <path class="county-shape" d={shapes.county.d} fill-rule="evenodd" vector-effect="non-scaling-stroke" />
+                  </g>
+                </g>
+                {burst.letter && (
+                  <g aria-hidden="true">
+                    {/* Navy grosgrain: horizontal ribs (highlight, body, groove), the
+                        same stops as .footer-mark in CommunityLayout. */}
+                    <pattern id="county-initial-grosgrain" patternUnits="userSpaceOnUse" width="4" height="3.5">
+                      <rect width="4" height="1" fill="#3D5A80" />
+                      <rect y="1" width="4" height="1.5" fill="#31496A" />
+                      <rect y="2.5" width="4" height="1" fill="#22374F" />
+                    </pattern>
+                    <text
+                      class="county-initial"
+                      x={burst.letter.x}
+                      y={burst.letter.y}
+                      font-size={burst.letter.size}
+                      text-anchor="middle"
+                      fill="url(#county-initial-grosgrain)"
+                      filter="url(#county-shadow)"
+                    >{countyInitial}</text>
+                  </g>
+                )}
               </svg>
             </div>
           </div>
@@ -127,19 +212,14 @@ const roleDescriptions = {
       }
 
       <header class="landing-header">
-        {location && <p class="kicker">{location}</p>}
         <h1>{pageHeading}</h1>
-        <p class="intro">
-          {
-            data.description ??
-              `Open data about ${placeName}, selected from the Community Data Libraries catalog.`
-          }
-        </p>
+        <p class="intro">{tagline}</p>
       </header>
     </div>
 
-    <!-- Three full-bleed, equal-width square bands (one per audience), in the
-         style of the main homepage's colour-contrasted sections. -->
+    <!-- Three equal-width cards (one per audience), spaced apart and raised with
+         a drop shadow so they read as big, pressable entry points. They're
+         links, not buttons, since each one navigates to the catalog. -->
     <section class="roles" aria-label="How will you use the library?">
       {
         AUDIENCE_ROLES.map((role) => (
@@ -149,7 +229,7 @@ const roleDescriptions = {
             data-audience={role}
           >
             <span class="role-inner">
-              <span class="role-name">{AUDIENCE_LABELS[role]} Catalog</span>
+              <span class="role-name">{roleTitles[role]}</span>
               <span class="role-desc">{roleDescriptions[role]}</span>
               <span class="role-arrow" aria-hidden="true">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
@@ -206,31 +286,58 @@ const roleDescriptions = {
     }
 
     .county-art-frame {
-      position: relative;
-      z-index: 1;
-      display: grid;
-      place-items: center;
       width: min(100%, 420px);
       aspect-ratio: 4 / 3;
-      padding: var(--space-6);
-      background-color: transparent;
     }
 
-    /* Varied dots fill the whole frame, sitting behind the county shape. */
-    .county-dots {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-    }
-
+    /* One SVG holds both the dots and the county, so they share coordinates. */
     .county-art {
-      /* Positioned so it paints above the (absolutely positioned) dots. */
-      position: relative;
       display: block;
       width: 100%;
       height: 100%;
-      object-fit: contain;
+    }
+
+    /* Background landscape: kept very light so it reads as texture. */
+    .scene-dots {
+      opacity: 0.6;
+    }
+
+    /* State in a pale teal tint; its county in a brighter version of the header/footer teal. */
+    .state-shape {
+      fill: #e4efee;
+      stroke: #3D707A; /* between the header/footer teal (#36606A) and the county (#45808A) */
+      stroke-width: 1.5;
+      stroke-linejoin: round;
+    }
+
+    /* Half of this stroke sits outside the county, so a hairline shows. White,
+       like the initial's edge, so the county reads as a cut-out on the state. */
+    .county-halo {
+      fill: none;
+      stroke: #ffffff;
+      stroke-width: 2.5;
+      stroke-linejoin: round;
+    }
+
+    /* A brighter cousin of the header and footer teal (#36606A), with a
+       darker edge. */
+    .county-shape {
+      fill: #45808A;
+      stroke: #2F5B63;
+      stroke-width: 1;
+      stroke-linejoin: round;
+    }
+
+    /* Large navy-grosgrain initial (fill is the SVG pattern). The soft
+       grey-mint edge matches the nav's exit door; the stroke is painted under
+       the fill, so only its outer half shows. */
+    .county-initial {
+      font-family: var(--font-display);
+      font-weight: 800;
+      stroke: #b1d9d4; /* the soft grey-mint of the nav's "Exit to CDL Main" door */
+      stroke-width: 3;
+      stroke-linejoin: round;
+      paint-order: stroke;
     }
 
     .landing-header {
@@ -241,16 +348,6 @@ const roleDescriptions = {
       max-width: 70ch;
       margin: 0;
       text-align: left;
-    }
-
-    .kicker {
-      margin: 0;
-      font-family: var(--font-mono);
-      font-size: var(--font-size-xs);
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--color-secondary);
     }
 
     h1 {
@@ -268,26 +365,47 @@ const roleDescriptions = {
       text-wrap: pretty;
     }
 
-    /* ── Audience bands ───────────────────────────
-       Full-bleed: break out of <main>'s 1200px column, three equal columns. */
+    /* ── Audience cards ───────────────────────────
+       A little wider than <main>'s 1200px column: centred and up to 1440px
+       across (the full window on smaller screens), keeping a gutter at the
+       sides, with three equal columns and whitespace between. */
     .roles {
-      width: 100vw;
-      margin-left: calc(50% - 50vw);
+      width: min(100vw, 1440px);
+      margin-left: calc(50% - min(50vw, 720px));
+      padding-inline: var(--space-6);
+      box-sizing: border-box;
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--space-6);
+      padding-bottom: var(--space-8);
     }
 
     .role-panel {
       /* --bg: section tint; --ink: darker shade used for text and the arrow at rest */
-      display: block;
-      aspect-ratio: 1 / 1;
+      /* Each card spans three rows of the cards' grid and shares them (subgrid):
+         title, description, arrow. A row is as tall as the tallest card's
+         content in it, so titles, descriptions and arrows line up across all
+         three cards at every width, and cards grow to fit their text instead of
+         overflowing. The vertical padding scales with the window for presence. */
+      display: grid;
+      grid-row: span 3;
+      grid-template-rows: subgrid;
+      row-gap: var(--space-4);
+      justify-items: center;
+      padding: clamp(var(--space-8), 5vw, 4.5rem) var(--space-8);
+      text-align: center;
       background: var(--bg);
       color: var(--ink);
       border-radius: 0;
+      box-shadow:
+        0 2px 4px rgba(15, 23, 42, 0.06),
+        0 12px 28px -6px rgba(15, 23, 42, 0.2);
       text-decoration: none;
       transition:
         background-color 0.2s ease,
-        color 0.2s ease;
+        color 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.2s ease;
     }
 
     .role-teacher {
@@ -297,7 +415,7 @@ const roleDescriptions = {
 
     .role-student {
       --bg: #e5f1df;
-      --ink: #66865b;
+      --ink: #56714d; /* darkened from #66865b for WCAG AA text contrast (4.65:1, 5.43:1 on hover) */
     }
 
     .role-community {
@@ -305,15 +423,9 @@ const roleDescriptions = {
       --ink: #496f6b;
     }
 
+    /* Let the title, description and arrow sit directly in the card's grid. */
     .role-inner {
-      display: grid;
-      align-content: center;
-      justify-items: center;
-      gap: var(--space-4);
-      width: 100%;
-      height: 100%;
-      padding: var(--space-8);
-      text-align: center;
+      display: contents;
     }
 
     .role-name {
@@ -326,9 +438,10 @@ const roleDescriptions = {
     }
 
     .role-desc {
-      max-width: 28ch;
+      align-self: start;
+      max-width: 40ch;
       font-size: var(--font-size-base);
-      line-height: var(--line-height-relaxed);
+      line-height: 1.4;
       color: inherit;
     }
 
@@ -354,11 +467,24 @@ const roleDescriptions = {
 
     /* Hover: the whole band flips to the darker shade, text and arrow disc go white,
        and the arrow glyph takes the (now dark) background colour. */
+    /* …and the card lifts a little, its shadow deepening; pressing it settles it
+       back down, like a big physical button. */
     .role-panel:hover,
     .role-panel:focus-visible {
       background: var(--ink);
       color: #ffffff;
       text-decoration: none;
+      transform: translateY(-3px);
+      box-shadow:
+        0 4px 8px rgba(15, 23, 42, 0.08),
+        0 20px 40px -8px rgba(15, 23, 42, 0.28);
+    }
+
+    .role-panel:active {
+      transform: translateY(0);
+      box-shadow:
+        0 1px 2px rgba(15, 23, 42, 0.08),
+        0 6px 14px -4px rgba(15, 23, 42, 0.2);
     }
 
     .role-panel:hover .role-arrow svg,
@@ -371,12 +497,16 @@ const roleDescriptions = {
         grid-template-columns: 1fr;
       }
       .role-panel {
-        aspect-ratio: auto;
-        min-height: 18rem;
+        padding-block: var(--space-12);
       }
     }
 
     @media (prefers-reduced-motion: reduce) {
+      .role-panel:hover,
+      .role-panel:focus-visible,
+      .role-panel:active {
+        transform: none;
+      }
       .role-panel,
       .role-arrow,
       .role-arrow svg {
